@@ -1,5 +1,5 @@
 use super::super::{
-    append_system, content_parts_from_value, content_text, normalize_message_role, numeric_field,
+    append_system, content_parts_from_value, normalize_message_role, numeric_field,
     openai_legacy_function_specs, openai_tool_calls_from_value, openai_tool_specs_from_value,
     push_message_if_useful, text_from_value,
 };
@@ -40,7 +40,9 @@ pub(in crate::core::gateway) fn decode_request(
             ),
         };
         if message.role == "tool" {
-            let content = content_text(&message.content);
+            // Keep the decoded parts so an image the tool returned survives
+            // instead of being flattened away into text.
+            let content = std::mem::take(&mut message.content);
             message.content = vec![GatewayContentPart::ToolResult {
                 tool_call_id: message.tool_call_id.clone(),
                 content,

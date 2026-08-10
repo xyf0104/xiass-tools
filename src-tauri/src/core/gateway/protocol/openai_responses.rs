@@ -1,7 +1,7 @@
 use super::super::{
     append_system, content_parts_from_value, normalize_message_role, numeric_field,
     push_message_if_useful, responses_function_call_from_value, responses_tool_specs_from_value,
-    text_from_value,
+    text_from_value, tool_result_content_parts,
 };
 use super::canonical::{GatewayContentPart, GatewayMessage, GatewayRequestParts};
 use serde_json::Value;
@@ -44,7 +44,7 @@ pub(in crate::core::gateway) fn decode_request(
                         .or_else(|| item.get("id"))
                         .and_then(Value::as_str)
                         .map(ToString::to_string);
-                    let content = text_from_value(
+                    let content = tool_result_content_parts(
                         item.get("output")
                             .or_else(|| item.get("content"))
                             .unwrap_or(&Value::Null),

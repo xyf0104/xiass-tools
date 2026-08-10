@@ -58,6 +58,9 @@ const DEFAULT_HOST: &str = "127.0.0.1";
 const DEFAULT_PORT: u16 = 43112;
 const TOKEN_PREFIX: &str = "codestudio-local-";
 const CLIENT_PROVIDER_ID: &str = "custom";
+const DATA_URL_SCHEME: &str = "data:";
+/// Media type assumed when a client sends image bytes without declaring one.
+const DEFAULT_IMAGE_MIME_TYPE: &str = "image/png";
 const CLIENT_MODEL: &str = "codestudio-default";
 const UPSTREAM_TIMEOUT_SECONDS: u16 = 120;
 #[cfg(test)]
@@ -1637,6 +1640,14 @@ fn content_parts_from_object(object: &Map<String, Value>, raw: &Value) -> Vec<Ga
             {
                 return vec![image_part_from_url(&url)];
             }
+            if let Some(part) = openai_file_reference_part(object) {
+                return vec![part];
+            }
+        }
+        "file" | "input_file" => {
+            if let Some(part) = openai_file_reference_part(object) {
+                return vec![part];
+            }
         }
         "image" => {
             if let Some(source) = object.get("source") {
@@ -1653,7 +1664,7 @@ fn content_parts_from_object(object: &Map<String, Value>, raw: &Value) -> Vec<Ga
                 .map(ToString::to_string);
             return vec![GatewayContentPart::ToolResult {
                 tool_call_id,
-                content: text_from_value(object.get("content").unwrap_or(&Value::Null)),
+                content: tool_result_content_parts(object.get("content").unwrap_or(&Value::Null)),
             }];
         }
         _ => {}
@@ -1686,7 +1697,7 @@ fn content_parts_from_object(object: &Map<String, Value>, raw: &Value) -> Vec<Ga
             .map(ToString::to_string);
         return vec![GatewayContentPart::ToolResult {
             tool_call_id: name,
-            content: text_from_value(value.get("response").unwrap_or(value)),
+            content: trimmed_text_part(&text_from_value(value.get("response").unwrap_or(value))),
         }];
     }
 
@@ -1734,15 +1745,36 @@ fn anthropic_image_part(source: &Value) -> Option<GatewayContentPart> {
             mime_type: source
                 .get("media_type")
                 .and_then(|value| value.as_str())
-                .unwrap_or("image/png")
+                .unwrap_or(DEFAULT_IMAGE_MIME_TYPE)
                 .to_string(),
             data: source.get("data")?.as_str()?.to_string(),
         }),
         "url" => Some(GatewayContentPart::ImageUrl(
             source.get("url")?.as_str()?.to_string(),
         )),
+        "file" => Some(GatewayContentPart::ImageFile {
+            file_id: source.get("file_id")?.as_str()?.to_string(),
+        }),
         _ => None,
     }
+}
+
+/// Read a Files API reference from an OpenAI content block, which spells it
+/// `{"file_id": ...}` on a Responses `input_image` and
+/// `{"file": {"file_id": ...}}` on a chat `file` block.
+fn openai_file_reference_part(object: &Map<String, Value>) -> Option<GatewayContentPart> {
+    let file_id = object
+        .get("file_id")
+        .or_else(|| object.get("file").and_then(|file| file.get("file_id")))
+        .or_else(|| {
+            object
+                .get("image_url")
+                .and_then(|image_url| image_url.get("file_id"))
+        })?
+        .as_str()?;
+    Some(GatewayContentPart::ImageFile {
+        file_id: file_id.to_string(),
+    })
 }
 
 fn gemini_inline_data_part(value: &Value) -> Option<GatewayContentPart> {
@@ -1751,10 +1783,45 @@ fn gemini_inline_data_part(value: &Value) -> Option<GatewayContentPart> {
             .get("mimeType")
             .or_else(|| value.get("mime_type"))
             .and_then(|value| value.as_str())
-            .unwrap_or("image/png")
+            .unwrap_or(DEFAULT_IMAGE_MIME_TYPE)
             .to_string(),
         data: value.get("data")?.as_str()?.to_string(),
     })
+}
+
+/// Decode the `content` of a tool result into canonical parts.
+///
+/// Only an array is walked structurally, because that is the shape a client
+/// uses to return mixed text and images. A string or a bare JSON object is the
+/// tool's own payload, so it stays a single text part rather than being taken
+/// apart into unknown blocks.
+fn tool_result_content_parts(value: &Value) -> Vec<GatewayContentPart> {
+    match value {
+        Value::Array(_) => content_parts_from_value(value),
+        _ => trimmed_text_part(&text_from_value(value)),
+    }
+}
+
+/// The image parts of a tool result, for protocols that cannot carry an image
+/// inside a tool message and need it relocated into a following user turn.
+fn tool_result_image_parts(parts: &[GatewayContentPart]) -> Vec<GatewayContentPart> {
+    parts
+        .iter()
+        .filter_map(|part| match part {
+            GatewayContentPart::ToolResult { content, .. } => Some(content.iter()),
+            _ => None,
+        })
+        .flatten()
+        .filter(|part| {
+            matches!(
+                part,
+                GatewayContentPart::ImageUrl(_)
+                    | GatewayContentPart::ImageBase64 { .. }
+                    | GatewayContentPart::ImageFile { .. }
+            )
+        })
+        .cloned()
+        .collect()
 }
 
 fn image_part_from_url(url: &str) -> GatewayContentPart {
@@ -1765,10 +1832,32 @@ fn image_part_from_url(url: &str) -> GatewayContentPart {
     }
 }
 
+/// Split a `data:` URL into its media type and base64 payload.
+///
+/// RFC 2397 makes both the `data:` scheme and the `;base64` marker
+/// case-insensitive and allows media-type parameters, so
+/// `DATA:image/jpeg;charset=utf-8;BASE64,...` is a valid JPEG. Upstream
+/// providers only accept a bare `type/subtype` media type, so parameters are
+/// dropped here rather than forwarded as part of the media type. A data URL
+/// that is not base64-encoded returns `None` and is kept as a plain URL.
 fn split_data_url(url: &str) -> Option<(String, String)> {
-    let rest = url.strip_prefix("data:")?;
-    let (mime_type, data) = rest.split_once(";base64,")?;
-    Some((mime_type.to_string(), data.to_string()))
+    let rest = url
+        .get(..DATA_URL_SCHEME.len())
+        .filter(|prefix| prefix.eq_ignore_ascii_case(DATA_URL_SCHEME))
+        .map(|prefix| &url[prefix.len()..])?;
+    // The first comma ends the metadata; the base64 alphabet contains none.
+    let (metadata, data) = rest.split_once(',')?;
+    let mut fields = metadata.split(';');
+    let mime_type = fields.next().unwrap_or_default().trim();
+    if !fields.any(|field| field.trim().eq_ignore_ascii_case("base64")) {
+        return None;
+    }
+    let mime_type = if mime_type.is_empty() {
+        DEFAULT_IMAGE_MIME_TYPE
+    } else {
+        mime_type
+    };
+    Some((mime_type.to_ascii_lowercase(), data.to_string()))
 }
 
 fn data_url(mime_type: &str, data: &str) -> String {
@@ -1780,12 +1869,14 @@ fn content_text(parts: &[GatewayContentPart]) -> String {
         .iter()
         .filter_map(|part| match part {
             GatewayContentPart::Text(text) => Some(text.clone()),
-            GatewayContentPart::ToolResult { content, .. } => Some(content.clone()),
+            GatewayContentPart::ToolResult { content, .. } => Some(content_text(content)),
             GatewayContentPart::Unknown(value) => {
                 let text = text_from_value(value);
                 (!text.is_empty()).then_some(text)
             }
-            GatewayContentPart::ImageUrl(_) | GatewayContentPart::ImageBase64 { .. } => None,
+            GatewayContentPart::ImageUrl(_)
+            | GatewayContentPart::ImageBase64 { .. }
+            | GatewayContentPart::ImageFile { .. } => None,
         })
         .filter(|text| !text.is_empty())
         .collect::<Vec<_>>()
@@ -1952,6 +2043,24 @@ fn arguments_as_object(value: &Value) -> Value {
     }
 }
 
+/// Render one canonical message as one or more chat messages.
+///
+/// A chat `tool` message cannot carry an image, so an image returned by a tool
+/// is emitted as an extra user turn right after it instead of being dropped.
+pub(in crate::core::gateway) fn openai_chat_message_values(message: &GatewayMessage) -> Vec<Value> {
+    let mut values = vec![openai_chat_message_value(message)];
+    if message.role == "tool" {
+        let images = tool_result_image_parts(&message.content);
+        if !images.is_empty() {
+            values.push(json!({
+                "role": "user",
+                "content": openai_chat_content_blocks(&images),
+            }));
+        }
+    }
+    values
+}
+
 fn openai_chat_message_value(message: &GatewayMessage) -> Value {
     let mut object = Map::new();
     object.insert("role".to_string(), Value::String(message.role.clone()));
@@ -2022,8 +2131,20 @@ fn openai_chat_content_blocks(parts: &[GatewayContentPart]) -> Vec<Value> {
                     "image_url": { "url": data_url(mime_type, data) }
                 }));
             }
-            GatewayContentPart::ToolResult { content, .. } if !content.is_empty() => {
-                blocks.push(json!({ "type": "text", "text": content }));
+            GatewayContentPart::ImageFile { file_id } => {
+                blocks.push(json!({ "type": "file", "file": { "file_id": file_id } }));
+            }
+            GatewayContentPart::ToolResult { content, .. } => {
+                let text = content_text(content);
+                if !text.is_empty() {
+                    blocks.push(json!({ "type": "text", "text": text }));
+                }
+                // This path renders non-`tool` roles, which do accept images.
+                // A `tool` message goes through `openai_chat_message_values`
+                // instead, where images move to a following user turn.
+                blocks.extend(openai_chat_content_blocks(&tool_result_image_parts(
+                    std::slice::from_ref(part),
+                )));
             }
             GatewayContentPart::Unknown(value) => blocks.push(value.clone()),
             _ => {}
@@ -2045,11 +2166,22 @@ fn openai_tool_call_value(tool_call: &GatewayToolCall) -> Value {
 
 fn responses_input_items_for_message(message: &GatewayMessage) -> Vec<Value> {
     if message.role == "tool" {
-        return vec![json!({
+        let mut items = vec![json!({
             "type": "function_call_output",
             "call_id": message.tool_call_id.clone().unwrap_or_else(|| "call_codestudio_unknown".to_string()),
             "output": content_text(&message.content)
         })];
+        // `function_call_output` carries text only, so an image returned by a
+        // tool becomes a following user item instead of being dropped.
+        let images = tool_result_image_parts(&message.content);
+        if !images.is_empty() {
+            items.push(json!({
+                "type": "message",
+                "role": "user",
+                "content": responses_content_parts(&images, false),
+            }));
+        }
+        return items;
     }
 
     let mut items = Vec::new();
@@ -2101,8 +2233,20 @@ fn responses_content_parts(parts: &[GatewayContentPart], output: bool) -> Vec<Va
                     "image_url": data_url(mime_type, data)
                 }));
             }
-            GatewayContentPart::ToolResult { content, .. } if !content.is_empty() => {
-                blocks.push(json!({ "type": text_type, "text": content }));
+            GatewayContentPart::ImageFile { file_id } => {
+                blocks.push(json!({ "type": "input_image", "file_id": file_id }));
+            }
+            GatewayContentPart::ToolResult { content, .. } => {
+                let text = content_text(content);
+                if !text.is_empty() {
+                    blocks.push(json!({ "type": text_type, "text": text }));
+                }
+                // Same split as the chat encoder: a `tool` role is rendered by
+                // `responses_input_items_for_message`, which relocates images.
+                blocks.extend(responses_content_parts(
+                    &tool_result_image_parts(std::slice::from_ref(part)),
+                    output,
+                ));
             }
             GatewayContentPart::Unknown(value) => blocks.push(value.clone()),
             _ => {}
@@ -2185,10 +2329,35 @@ fn anthropic_content_blocks(parts: &[GatewayContentPart]) -> Vec<Value> {
                     }
                 }));
             }
+            GatewayContentPart::ImageFile { file_id } => {
+                blocks.push(json!({
+                    "type": "image",
+                    "source": {
+                        "type": "file",
+                        "file_id": file_id
+                    }
+                }));
+            }
             GatewayContentPart::ToolResult {
                 tool_call_id,
                 content,
             } => {
+                // Anthropic accepts either a string or a block array here, and
+                // the array form is the only one that can carry an image, so
+                // text-only results keep the simpler string shape.
+                let carries_image = content.iter().any(|part| {
+                    matches!(
+                        part,
+                        GatewayContentPart::ImageUrl(_)
+                            | GatewayContentPart::ImageBase64 { .. }
+                            | GatewayContentPart::ImageFile { .. }
+                    )
+                });
+                let content = if carries_image {
+                    Value::Array(anthropic_content_blocks(content))
+                } else {
+                    Value::String(content_text(content))
+                };
                 blocks.push(json!({
                     "type": "tool_result",
                     "tool_use_id": tool_call_id.clone().unwrap_or_else(|| "call_codestudio_unknown".to_string()),
@@ -2252,6 +2421,15 @@ fn gemini_content_parts(parts: &[GatewayContentPart]) -> Vec<Value> {
                     }
                 }));
             }
+            GatewayContentPart::ImageFile { file_id } => {
+                // Gemini addresses uploaded files by URI rather than by id, so
+                // the reference travels in the nearest equivalent slot.
+                blocks.push(json!({
+                    "fileData": {
+                        "fileUri": file_id
+                    }
+                }));
+            }
             GatewayContentPart::ToolResult {
                 tool_call_id,
                 content,
@@ -2259,9 +2437,14 @@ fn gemini_content_parts(parts: &[GatewayContentPart]) -> Vec<Value> {
                 blocks.push(json!({
                     "functionResponse": {
                         "name": tool_call_id.clone().unwrap_or_else(|| "tool".to_string()),
-                        "response": { "content": content }
+                        "response": { "content": content_text(content) }
                     }
                 }));
+                // Gemini has no image slot inside a function response, so any
+                // image the tool returned rides along as a sibling part.
+                blocks.extend(gemini_content_parts(&tool_result_image_parts(
+                    std::slice::from_ref(part),
+                )));
             }
             GatewayContentPart::Unknown(value) => blocks.push(value.clone()),
             _ => {}
@@ -3392,6 +3575,283 @@ mod tests {
             body["messages"][0]["content"][1]["source"]["media_type"].as_str(),
             Some("image/png")
         );
+    }
+
+    #[test]
+    fn large_jpeg_data_url_survives_protocol_conversion() {
+        let data = "A".repeat(2 * 1024 * 1024);
+        let request = json!({
+            "model": "codestudio-default",
+            "messages": [{
+                "role": "user",
+                "content": [{
+                    "type": "image_url",
+                    "image_url": { "url": format!("data:image/jpeg;base64,{data}") }
+                }]
+            }]
+        });
+        let parts =
+            request_parts_from_client(GatewayProtocol::OpenAiChatCompletions, &request, "claude");
+        let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+        let source = &body["messages"][0]["content"][0]["source"];
+
+        assert_eq!(source["type"].as_str(), Some("base64"));
+        assert_eq!(source["media_type"].as_str(), Some("image/jpeg"));
+        assert_eq!(source["data"].as_str().map(str::len), Some(data.len()));
+        assert_eq!(source["data"].as_str(), Some(data.as_str()));
+    }
+
+    /// A tool that returns a screenshot must not have it silently dropped on
+    /// the way to the upstream provider.
+    /// A Files API reference has no portable form, so it is carried across as
+    /// each protocol's own file reference instead of leaking the source
+    /// protocol's raw block into the upstream request.
+    #[test]
+    fn uploaded_file_images_convert_to_each_protocol_file_reference() {
+        let anthropic_request = json!({
+            "messages": [{
+                "role": "user",
+                "content": [{
+                    "type": "image",
+                    "source": { "type": "file", "file_id": "file_123" }
+                }]
+            }]
+        });
+        let parts =
+            request_parts_from_client(GatewayProtocol::AnthropicMessages, &anthropic_request, "m");
+
+        let body = request_body_for_protocol(GatewayProtocol::OpenAiChatCompletions, &parts, false);
+        let block = &body["messages"][0]["content"][0];
+        assert_eq!(block["type"].as_str(), Some("file"));
+        assert_eq!(block["file"]["file_id"].as_str(), Some("file_123"));
+        assert!(
+            block.get("source").is_none(),
+            "the Anthropic block must not leak into a chat request: {body}"
+        );
+
+        let body = request_body_for_protocol(GatewayProtocol::OpenAiResponses, &parts, false);
+        let block = &body["input"][0]["content"][0];
+        assert_eq!(block["type"].as_str(), Some("input_image"));
+        assert_eq!(block["file_id"].as_str(), Some("file_123"));
+
+        let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+        let source = &body["messages"][0]["content"][0]["source"];
+        assert_eq!(source["type"].as_str(), Some("file"));
+        assert_eq!(source["file_id"].as_str(), Some("file_123"));
+    }
+
+    #[test]
+    fn openai_file_references_convert_back_to_an_anthropic_file_source() {
+        // Responses spells it `input_image.file_id`; chat spells it
+        // `file.file_id`. Both are the same canonical reference.
+        for request in [
+            json!({"input": [{"role": "user", "content": [
+                { "type": "input_image", "file_id": "file_123" }
+            ]}]}),
+            json!({"input": [{"role": "user", "content": [
+                { "type": "input_file", "file": { "file_id": "file_123" } }
+            ]}]}),
+        ] {
+            let parts = request_parts_from_client(GatewayProtocol::OpenAiResponses, &request, "m");
+            let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+            let source = &body["messages"][0]["content"][0]["source"];
+
+            assert_eq!(source["type"].as_str(), Some("file"), "{body}");
+            assert_eq!(source["file_id"].as_str(), Some("file_123"), "{body}");
+        }
+
+        let request = json!({"messages": [{"role": "user", "content": [
+            { "type": "file", "file": { "file_id": "file_123" } }
+        ]}]});
+        let parts =
+            request_parts_from_client(GatewayProtocol::OpenAiChatCompletions, &request, "m");
+        let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+        let source = &body["messages"][0]["content"][0]["source"];
+
+        assert_eq!(source["type"].as_str(), Some("file"));
+        assert_eq!(source["file_id"].as_str(), Some("file_123"));
+    }
+
+    #[test]
+    fn tool_result_images_survive_every_protocol_conversion() {
+        let anthropic_request = json!({
+            "messages": [{
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "call_1",
+                    "content": [
+                        { "type": "text", "text": "screenshot:" },
+                        { "type": "image", "source": {
+                            "type": "base64", "media_type": "image/png", "data": "QUJD" } }
+                    ]
+                }]
+            }]
+        });
+        let chat_request = json!({
+            "messages": [{
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": [
+                    { "type": "text", "text": "screenshot:" },
+                    { "type": "image_url", "image_url": { "url": "data:image/png;base64,QUJD" } }
+                ]
+            }]
+        });
+
+        // Anthropic keeps the image inside the tool result, where it belongs.
+        let parts =
+            request_parts_from_client(GatewayProtocol::OpenAiChatCompletions, &chat_request, "m");
+        let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+        let tool_result = &body["messages"][0]["content"][0];
+        assert_eq!(tool_result["type"].as_str(), Some("tool_result"));
+        assert_eq!(
+            tool_result["content"][0]["text"].as_str(),
+            Some("screenshot:")
+        );
+        assert_eq!(
+            tool_result["content"][1]["source"]["data"].as_str(),
+            Some("QUJD"),
+            "the image must ride inside the tool result: {tool_result}"
+        );
+
+        // Chat has no image slot in a tool message, so it moves to a user turn.
+        let parts =
+            request_parts_from_client(GatewayProtocol::AnthropicMessages, &anthropic_request, "m");
+        let body = request_body_for_protocol(GatewayProtocol::OpenAiChatCompletions, &parts, false);
+        let blocks = &body["messages"][0]["content"];
+        assert_eq!(blocks[0]["text"].as_str(), Some("screenshot:"));
+        assert_eq!(
+            blocks[1]["image_url"]["url"].as_str(),
+            Some("data:image/png;base64,QUJD"),
+            "the image must survive as a user-visible block: {body}"
+        );
+
+        // Responses splits the same way.
+        let body = request_body_for_protocol(GatewayProtocol::OpenAiResponses, &parts, false);
+        let blocks = &body["input"][0]["content"];
+        assert_eq!(blocks[0]["text"].as_str(), Some("screenshot:"));
+        assert_eq!(
+            blocks[1]["image_url"].as_str(),
+            Some("data:image/png;base64,QUJD"),
+            "the image must survive as an input_image: {body}"
+        );
+    }
+
+    #[test]
+    fn tool_result_image_moves_out_of_a_tool_role_message() {
+        // A chat `tool` message and a responses `function_call_output` are both
+        // text-only, so the image has to become a following user turn.
+        let request = json!({
+            "messages": [{
+                "role": "tool",
+                "tool_call_id": "call_1",
+                "content": [
+                    { "type": "text", "text": "screenshot:" },
+                    { "type": "image_url", "image_url": { "url": "data:image/png;base64,QUJD" } }
+                ]
+            }]
+        });
+        let parts =
+            request_parts_from_client(GatewayProtocol::OpenAiChatCompletions, &request, "m");
+
+        let body = request_body_for_protocol(GatewayProtocol::OpenAiChatCompletions, &parts, false);
+        assert_eq!(body["messages"][0]["role"].as_str(), Some("tool"));
+        assert_eq!(body["messages"][0]["content"].as_str(), Some("screenshot:"));
+        assert_eq!(body["messages"][1]["role"].as_str(), Some("user"));
+        assert_eq!(
+            body["messages"][1]["content"][0]["image_url"]["url"].as_str(),
+            Some("data:image/png;base64,QUJD"),
+            "the image must follow the tool message: {body}"
+        );
+
+        let body = request_body_for_protocol(GatewayProtocol::OpenAiResponses, &parts, false);
+        assert_eq!(
+            body["input"][0]["type"].as_str(),
+            Some("function_call_output")
+        );
+        assert_eq!(body["input"][0]["output"].as_str(), Some("screenshot:"));
+        assert_eq!(body["input"][1]["role"].as_str(), Some("user"));
+        assert_eq!(
+            body["input"][1]["content"][0]["image_url"].as_str(),
+            Some("data:image/png;base64,QUJD"),
+            "the image must follow the function_call_output: {body}"
+        );
+    }
+
+    #[test]
+    fn text_only_tool_results_keep_the_plain_string_shape() {
+        let request = json!({
+            "messages": [{
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "call_1",
+                    "content": "done"
+                }]
+            }]
+        });
+        let parts = request_parts_from_client(GatewayProtocol::AnthropicMessages, &request, "m");
+        let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+
+        assert_eq!(
+            body["messages"][0]["content"][0]["content"].as_str(),
+            Some("done"),
+            "a text-only result must not grow a block array: {body}"
+        );
+    }
+
+    #[test]
+    fn data_urls_with_parameters_and_mixed_case_keep_a_bare_media_type() {
+        for url in [
+            "data:image/jpeg;base64,QUJD",
+            "data:image/jpeg;charset=utf-8;base64,QUJD",
+            "DATA:IMAGE/JPEG;BASE64,QUJD",
+            "data:image/jpeg;charset=utf-8;BASE64,QUJD",
+        ] {
+            assert_eq!(
+                split_data_url(url),
+                Some(("image/jpeg".to_string(), "QUJD".to_string())),
+                "{url} should decode to a bare media type"
+            );
+        }
+        assert_eq!(
+            split_data_url("data:;base64,QUJD"),
+            Some((DEFAULT_IMAGE_MIME_TYPE.to_string(), "QUJD".to_string()))
+        );
+    }
+
+    #[test]
+    fn non_base64_and_non_data_urls_stay_plain_urls() {
+        // A percent-encoded data URL carries no base64 payload to forward.
+        assert_eq!(split_data_url("data:image/svg+xml,%3Csvg%2F%3E"), None);
+        assert_eq!(split_data_url("https://example.test/a.jpg"), None);
+        assert_eq!(split_data_url("data:image/jpeg;base64"), None);
+        assert!(matches!(
+            image_part_from_url("data:image/svg+xml,%3Csvg%2F%3E"),
+            GatewayContentPart::ImageUrl(_)
+        ));
+    }
+
+    #[test]
+    fn parameterized_jpeg_data_url_reaches_anthropic_with_a_supported_media_type() {
+        let request = json!({
+            "messages": [{
+                "role": "user",
+                "content": [{
+                    "type": "image_url",
+                    "image_url": { "url": "data:image/jpeg;charset=utf-8;base64,QUJD" }
+                }]
+            }]
+        });
+        let parts =
+            request_parts_from_client(GatewayProtocol::OpenAiChatCompletions, &request, "claude");
+        let body = request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+        let source = &body["messages"][0]["content"][0]["source"];
+
+        // Upstream accepts only image/jpeg, image/png, image/gif and image/webp.
+        assert_eq!(source["media_type"].as_str(), Some("image/jpeg"));
+        assert_eq!(source["data"].as_str(), Some("QUJD"));
     }
 
     #[test]

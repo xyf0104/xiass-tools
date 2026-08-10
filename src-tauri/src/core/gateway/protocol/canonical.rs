@@ -28,9 +28,20 @@ pub(in crate::core::gateway) enum GatewayContentPart {
         mime_type: String,
         data: String,
     },
+    /// An image the client uploaded to a provider's Files API and referenced by
+    /// id. File ids are provider-scoped, so a converted request carries the id
+    /// across unchanged: it resolves when the client uploaded to the provider
+    /// the request is ultimately routed to, and is rejected upstream otherwise.
+    /// Carrying it is still better than dropping it or leaking a foreign block.
+    ImageFile {
+        file_id: String,
+    },
     ToolResult {
         tool_call_id: Option<String>,
-        content: String,
+        /// Structured tool output. Kept as parts rather than a flat string so
+        /// an image returned by a tool (a screenshot, a rendered chart) can be
+        /// carried to protocols that accept one instead of being dropped.
+        content: Vec<GatewayContentPart>,
     },
     Unknown(Value),
 }

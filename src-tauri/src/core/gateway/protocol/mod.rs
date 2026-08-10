@@ -18,7 +18,7 @@ use super::{
     anthropic_assistant_content_blocks, anthropic_content_and_tool_calls, anthropic_content_value,
     arguments_as_string, content_parts_from_value, content_text, gemini_assistant_parts,
     gemini_parts_and_tool_calls, gemini_parts_value, openai_chat_content_value,
-    openai_chat_message_value, openai_tool_call_value, openai_tool_calls_from_value,
+    openai_chat_message_values, openai_tool_call_value, openai_tool_calls_from_value,
     responses_function_call_from_value, responses_input_items_for_message,
     responses_output_content_parts, set_optional_u64, set_optional_value, set_tools_for_protocol,
     unix_timestamp, usage_from_response, usage_value_for_protocol,
@@ -59,7 +59,7 @@ pub(in crate::core::gateway) fn encode_request(
             if let Some(system) = parts.system.as_deref() {
                 messages.push(json!({ "role": "system", "content": system }))
             }
-            messages.extend(parts.messages.iter().map(openai_chat_message_value));
+            messages.extend(parts.messages.iter().flat_map(openai_chat_message_values));
             if messages.is_empty() {
                 messages.push(json!({ "role": "user", "content": "" }))
             }
