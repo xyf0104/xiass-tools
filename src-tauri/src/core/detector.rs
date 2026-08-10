@@ -611,7 +611,7 @@ fn detect_claude_desktop_tool(definition: &ToolDefinition) -> ToolStatus {
     claude_desktop_tool_status(definition, detected, duplicate_user_install)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 fn detect_claude_desktop_tool_for_roots(
     definition: &ToolDefinition,
     home: &Path,
@@ -2306,6 +2306,9 @@ mod tests {
         ));
     }
 
+    // `package::detect_macos_app` only reads real `.app` bundles on macOS, so
+    // these scope tests can only assert detection results on that platform.
+    #[cfg(target_os = "macos")]
     #[test]
     fn claude_desktop_macos_detection_prefers_system_and_reports_user_duplicate() {
         let root = std::env::temp_dir().join(format!(
@@ -2332,6 +2335,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn claude_desktop_macos_duplicate_flag_flows_into_tool_status() {
         let root = std::env::temp_dir().join(format!(
@@ -2362,6 +2366,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn claude_desktop_macos_detection_preserves_user_only_launch_path() {
         let root = std::env::temp_dir().join(format!(
@@ -2388,6 +2393,7 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[cfg(target_os = "macos")]
     fn write_claude_macos_test_app(applications: &Path, app_name: &str, version: &str) -> PathBuf {
         let app = applications.join(app_name);
         fs::create_dir_all(app.join("Contents")).unwrap();

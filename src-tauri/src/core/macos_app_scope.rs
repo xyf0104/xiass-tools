@@ -1190,16 +1190,17 @@ fn restore_after_finalize_failure(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "macos")]
+    use super::atomic_rename_noreplace;
     use super::{
-        atomic_rename_noreplace, cleanup_managed_user_bundles_for_roots,
-        codestudio_self_cleanup_helper_execution_plan, complete_codestudio_self_cleanup_with,
-        finalize_staged_user_bundle_to_trash, finalize_staged_user_bundles_for_roots_with,
-        move_user_bundle_to_trash, persist_codestudio_self_cleanup_failure,
-        plan_codestudio_self_cleanup_for_roots, resolve, restore_staged_user_bundle,
-        run_codestudio_self_cleanup_helper_request_with, stage_user_bundle_for_trash,
-        status_for_roots, take_codestudio_self_cleanup_failure, CodestudioSelfCleanupFailure,
-        CodestudioSelfCleanupHelperRequest, CodestudioSelfCleanupMode, MacosInstallScope,
-        MacosManagedApp,
+        cleanup_managed_user_bundles_for_roots, codestudio_self_cleanup_helper_execution_plan,
+        complete_codestudio_self_cleanup_with, finalize_staged_user_bundle_to_trash,
+        finalize_staged_user_bundles_for_roots_with, move_user_bundle_to_trash,
+        persist_codestudio_self_cleanup_failure, plan_codestudio_self_cleanup_for_roots, resolve,
+        restore_staged_user_bundle, run_codestudio_self_cleanup_helper_request_with,
+        stage_user_bundle_for_trash, status_for_roots, take_codestudio_self_cleanup_failure,
+        CodestudioSelfCleanupFailure, CodestudioSelfCleanupHelperRequest,
+        CodestudioSelfCleanupMode, MacosInstallScope, MacosManagedApp,
     };
     use plist::{Dictionary, Value};
     use std::fs;
@@ -1707,13 +1708,14 @@ mod tests {
         assert!(error.contains("open system failed"));
         assert_eq!(launched, vec![system_app, user_app.clone()]);
         assert!(user_app.exists());
-        let failure = fs::read_to_string(
-            root.home()
-                .join(".codestudio-lite/macos-self-cleanup-failure.json"),
-        )
-        .unwrap();
-        assert!(failure.contains("open system failed"));
-        assert!(failure.contains(&user_app.to_string_lossy().to_string()));
+        let failure = take_codestudio_self_cleanup_failure(&root.home())
+            .unwrap()
+            .unwrap();
+        assert!(failure.message.contains("open system failed"));
+        assert_eq!(
+            failure.restored_user_app.as_deref(),
+            Some(user_app.as_path())
+        );
     }
 
     #[test]
@@ -2175,6 +2177,11 @@ mod tests {
         assert!(!staged_path.exists());
     }
 
+    // The no-replace rename contract below is POSIX `renameat_with(NOREPLACE)`
+    // behavior. The Windows `fs::rename` fallback reports `DirectoryNotEmpty`
+    // for an occupied directory, so the collision-avoidance tests only assert
+    // the real contract on macOS.
+    #[cfg(target_os = "macos")]
     #[test]
     fn atomic_noreplace_rename_never_overwrites_an_existing_entry() {
         let root = TestRoot::new("atomic-noreplace");
@@ -2194,6 +2201,7 @@ mod tests {
         assert!(destination.join("destination-marker").is_file());
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn occupied_staging_name_is_preserved_and_the_next_name_is_used() {
         let root = TestRoot::new("staging-collision");
@@ -2219,6 +2227,7 @@ mod tests {
         assert!(!user_app.exists());
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn occupied_trash_name_is_preserved_and_the_next_name_is_used() {
         let root = TestRoot::new("trash-collision");

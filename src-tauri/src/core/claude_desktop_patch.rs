@@ -6,6 +6,7 @@ use crate::core::detector::{
     claude_desktop_windows_stale_msix_manifest,
 };
 use crate::core::download_http::{self, DownloadHttpTransport};
+#[cfg(any(target_os = "macos", test))]
 use crate::core::macos_app_scope::{resolve as resolve_macos_app, MacosManagedApp};
 #[cfg(target_os = "windows")]
 use crate::core::platform::package;
@@ -434,12 +435,11 @@ fn ensure_patch_files() -> Result<PathBuf, String> {
         &patch_dir.join("launch-claude-zh.ps1"),
         &windows_launch_script(true),
     )?;
-    if cfg!(target_os = "macos") {
-        write_if_changed(
-            &patch_dir.join("launch-claude-macos-zh.sh"),
-            &macos_localized_launch_script(),
-        )?;
-    }
+    #[cfg(target_os = "macos")]
+    write_if_changed(
+        &patch_dir.join("launch-claude-macos-zh.sh"),
+        &macos_localized_launch_script(),
+    )?;
     Ok(patch_dir)
 }
 
@@ -2909,12 +2909,14 @@ fn cf_string_to_string(value: CFTypeRef) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn macos_localized_launch_script() -> String {
     let preferred_app =
         preferred_macos_claude_app().unwrap_or_else(|_| PathBuf::from("/Applications/Claude.app"));
     macos_localized_launch_script_for_app(&preferred_app)
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn macos_localized_launch_script_for_app(preferred_app: &Path) -> String {
     r#"#!/bin/sh
 set -eu
@@ -3006,6 +3008,7 @@ fn macos_plain_launch_script() -> String {
     macos_plain_launch_script_for_app(&preferred_app)
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn macos_plain_launch_script_for_app(preferred_app: &Path) -> String {
     r#"set -eu
 if /usr/bin/pgrep -x Claude >/dev/null 2>&1; then
@@ -3031,6 +3034,7 @@ fi
     )
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn preferred_macos_claude_app() -> Result<PathBuf, String> {
     let home = app_paths().map_err(|err| err.to_string())?.home_dir;
     let resolution = resolve_macos_app(
@@ -3043,6 +3047,7 @@ fn preferred_macos_claude_app() -> Result<PathBuf, String> {
         .ok_or_else(|| "Claude Desktop was not detected.".to_string())
 }
 
+#[cfg(any(target_os = "macos", test))]
 fn macos_open_command_for_app(preferred_app: &Path) -> Vec<String> {
     vec![
         "open".to_string(),

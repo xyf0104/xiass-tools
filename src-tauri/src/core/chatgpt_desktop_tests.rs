@@ -1,6 +1,10 @@
+use super::enhancement::{
+    codex_plugin_marketplaces_for_injection_from_home, pick_cdp_target_from_targets, CdpTarget,
+};
 use super::*;
 use reqwest::StatusCode;
 use std::io::Write;
+use std::net::TcpListener;
 
 fn installed(source: &str) -> InstalledChatGptDesktop {
     InstalledChatGptDesktop {
@@ -577,7 +581,8 @@ fn launch_restart_closes_selected_macos_chatgpt_bundle_before_opening() {
 
 #[test]
 fn enhancement_injection_keeps_watching_for_recreated_cdp_targets() {
-    let source = include_str!("chatgpt_desktop.rs");
+    // The CDP watchdog moved into the `chatgpt_desktop::enhancement` submodule.
+    let source = include_str!("chatgpt_desktop/enhancement.rs");
 
     assert!(source.contains("CODEX_PATCH_WATCHDOG_POLL_MS"));
     assert!(source.contains("CODEX_PATCH_WATCHDOG_MAX_MISSES"));

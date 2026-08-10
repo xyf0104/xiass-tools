@@ -331,15 +331,15 @@ fn select_debug_port() -> Result<u16, String> {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CdpTarget {
+pub(super) struct CdpTarget {
     #[serde(rename = "type")]
-    target_type: String,
+    pub(super) target_type: String,
     #[serde(default)]
-    title: String,
+    pub(super) title: String,
     #[serde(default)]
-    url: String,
+    pub(super) url: String,
     #[serde(default, rename = "webSocketDebuggerUrl")]
-    web_socket_debugger_url: Option<String>,
+    pub(super) web_socket_debugger_url: Option<String>,
 }
 
 fn inject_codex_enhancements(
@@ -455,7 +455,7 @@ fn pick_cdp_target(debug_port: u16) -> Result<CdpTarget, String> {
     ))
 }
 
-fn pick_cdp_target_from_targets(targets: &[CdpTarget]) -> Result<CdpTarget, String> {
+pub(super) fn pick_cdp_target_from_targets(targets: &[CdpTarget]) -> Result<CdpTarget, String> {
     targets
         .iter()
         .filter(|target| {
@@ -569,7 +569,7 @@ fn codex_plugin_marketplaces_for_injection() -> serde_json::Value {
     codex_plugin_marketplaces_for_injection_from_home(&home)
 }
 
-fn codex_plugin_marketplaces_for_injection_from_home(home: &Path) -> serde_json::Value {
+pub(super) fn codex_plugin_marketplaces_for_injection_from_home(home: &Path) -> serde_json::Value {
     let marketplace_path = home
         .join(".tmp")
         .join("plugins-remote")

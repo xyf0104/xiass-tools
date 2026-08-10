@@ -1071,7 +1071,7 @@ pub fn tool_status_with_generation() -> (ToolStatus, ChatGptDesktopProductGenera
     tool_status_with_detection(installed, duplicate_user_install)
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 fn tool_status_with_generation_for_macos_roots(
     home: &Path,
     system_applications: &Path,

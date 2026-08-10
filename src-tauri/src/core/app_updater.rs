@@ -1,3 +1,4 @@
+#[cfg(any(target_os = "macos", test))]
 use crate::core::macos_app_scope::{resolve as resolve_macos_app, MacosManagedApp};
 use crate::core::platform::{macos_arm64_hardware_available, native_macos_arch_for_runtime};
 use crate::core::{app_paths, download_http, gateway};
