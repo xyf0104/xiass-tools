@@ -28,7 +28,12 @@ const CLAUDE_ENV_VARS: &[&str] = &[
 ];
 const CODEX_TOOL_ID: &str = "codex";
 const CODEX_TOOL_NAME: &str = "Codex";
-const CODEX_ENV_VARS: &[&str] = &["OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_ORGANIZATION", "OPENAI_MODEL"];
+const CODEX_ENV_VARS: &[&str] = &[
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_MODEL",
+];
 const PATH_REPAIR_DIRS_STATE_KEY: &str = "env_health.path_repair_dirs";
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -258,22 +263,51 @@ pub fn codex_env_conflicts_for_active_config(
     drafts: &[crate::core::types::ProfileDraft],
     active_config: &HashMap<String, String>,
 ) -> Vec<EnvironmentVariableConflict> {
-    let Some(profile_id) = active_config.get(CODEX_TOOL_ID) else { return codex_env_conflicts_without_profile(); };
-    let Some(profile) = drafts.iter().find(|profile| profile.id == *profile_id) else { return codex_env_conflicts_without_profile(); };
+    let Some(profile_id) = active_config.get(CODEX_TOOL_ID) else {
+        return codex_env_conflicts_without_profile();
+    };
+    let Some(profile) = drafts.iter().find(|profile| profile.id == *profile_id) else {
+        return codex_env_conflicts_without_profile();
+    };
     codex_env_conflicts_for_profile(profile)
 }
 
-pub fn codex_env_conflicts_for_profile(profile: &crate::core::types::ProfileDraft) -> Vec<EnvironmentVariableConflict> {
-    if canonical_tool_id(&profile.app) != CODEX_TOOL_ID { return Vec::new(); }
+pub fn codex_env_conflicts_for_profile(
+    profile: &crate::core::types::ProfileDraft,
+) -> Vec<EnvironmentVariableConflict> {
+    if canonical_tool_id(&profile.app) != CODEX_TOOL_ID {
+        return Vec::new();
+    }
     let mut expected = default_expected(CODEX_ENV_VARS);
-    expected.insert("OPENAI_BASE_URL".into(), ExpectedEnvValue::Exact(profile.base_url.trim().into()));
-    if profile.auth_ref.as_deref().is_some_and(|value| !value.trim().is_empty()) { expected.insert("OPENAI_API_KEY".into(), ExpectedEnvValue::StoredSecret); }
-    if profile.model.trim().is_empty() { expected.insert("OPENAI_MODEL".into(), ExpectedEnvValue::Absent); } else { expected.insert("OPENAI_MODEL".into(), ExpectedEnvValue::Exact(profile.model.trim().into())); }
+    expected.insert(
+        "OPENAI_BASE_URL".into(),
+        ExpectedEnvValue::Exact(profile.base_url.trim().into()),
+    );
+    if profile
+        .auth_ref
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty())
+    {
+        expected.insert("OPENAI_API_KEY".into(), ExpectedEnvValue::StoredSecret);
+    }
+    if profile.model.trim().is_empty() {
+        expected.insert("OPENAI_MODEL".into(), ExpectedEnvValue::Absent);
+    } else {
+        expected.insert(
+            "OPENAI_MODEL".into(),
+            ExpectedEnvValue::Exact(profile.model.trim().into()),
+        );
+    }
     conflicts_for(expected, CODEX_ENV_VARS, CODEX_TOOL_ID, CODEX_TOOL_NAME)
 }
 
 pub fn codex_env_conflicts_without_profile() -> Vec<EnvironmentVariableConflict> {
-    conflicts_for(default_expected(CODEX_ENV_VARS), CODEX_ENV_VARS, CODEX_TOOL_ID, CODEX_TOOL_NAME)
+    conflicts_for(
+        default_expected(CODEX_ENV_VARS),
+        CODEX_ENV_VARS,
+        CODEX_TOOL_ID,
+        CODEX_TOOL_NAME,
+    )
 }
 
 pub fn clear_environment_variables(
@@ -285,13 +319,16 @@ pub fn clear_environment_variables(
         );
     }
     let tool_id = canonical_tool_id(&request.tool_id);
-    let (tool_id, tool_name, names) = if tool_id == CLAUDE_TOOL_ID { (CLAUDE_TOOL_ID, CLAUDE_TOOL_NAME, CLAUDE_ENV_VARS) } else if tool_id == CODEX_TOOL_ID { (CODEX_TOOL_ID, CODEX_TOOL_NAME, CODEX_ENV_VARS) } else { return Err("Only Claude and Codex environment variables can be cleared.".to_string()); };
+    let (tool_id, tool_name, names) = if tool_id == CLAUDE_TOOL_ID {
+        (CLAUDE_TOOL_ID, CLAUDE_TOOL_NAME, CLAUDE_ENV_VARS)
+    } else if tool_id == CODEX_TOOL_ID {
+        (CODEX_TOOL_ID, CODEX_TOOL_NAME, CODEX_ENV_VARS)
+    } else {
+        return Err("Only Claude and Codex environment variables can be cleared.".to_string());
+    };
 
     let requested = if request.variables.is_empty() {
-        names
-            .iter()
-            .map(|name| (*name).to_string())
-            .collect()
+        names.iter().map(|name| (*name).to_string()).collect()
     } else {
         request
             .variables
@@ -377,7 +414,10 @@ fn claude_env_conflicts(
 }
 
 fn default_expected(names: &[&str]) -> HashMap<String, ExpectedEnvValue> {
-    names.iter().map(|name| ((*name).to_string(), ExpectedEnvValue::Absent)).collect()
+    names
+        .iter()
+        .map(|name| ((*name).to_string(), ExpectedEnvValue::Absent))
+        .collect()
 }
 
 fn conflicts_for(

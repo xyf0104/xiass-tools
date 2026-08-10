@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { posix } from "node:path";
 
 export const MACOS_TARGETS = Object.freeze({
   "aarch64-apple-darwin": Object.freeze({
@@ -29,16 +29,16 @@ export function macosArtifactPaths(bundleRoot, version, target) {
 
   return {
     raw: {
-      dmg: join(bundleRoot, "dmg", rawDmg),
-      archive: join(bundleRoot, "macos", rawArchive),
-      archiveSignature: join(bundleRoot, "macos", `${rawArchive}.sig`)
+      dmg: posix.join(bundleRoot, "dmg", rawDmg),
+      archive: posix.join(bundleRoot, "macos", rawArchive),
+      archiveSignature: posix.join(bundleRoot, "macos", `${rawArchive}.sig`)
     },
     canonical: {
-      dmg: join(bundleRoot, "dmg", `${canonicalBase}.dmg`),
-      dmgSignature: join(bundleRoot, "dmg", `${canonicalBase}.dmg.sig`),
-      archive: join(bundleRoot, "macos", `${canonicalBase}.app.tar.gz`),
-      archiveSignature: join(bundleRoot, "macos", `${canonicalBase}.app.tar.gz.sig`),
-      app: join(bundleRoot, "macos", "CodeStudio Lite.app")
+      dmg: posix.join(bundleRoot, "dmg", `${canonicalBase}.dmg`),
+      dmgSignature: posix.join(bundleRoot, "dmg", `${canonicalBase}.dmg.sig`),
+      archive: posix.join(bundleRoot, "macos", `${canonicalBase}.app.tar.gz`),
+      archiveSignature: posix.join(bundleRoot, "macos", `${canonicalBase}.app.tar.gz.sig`),
+      app: posix.join(bundleRoot, "macos", "CodeStudio Lite.app")
     },
     canonicalBase
   };
