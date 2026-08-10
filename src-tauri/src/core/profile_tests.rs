@@ -140,11 +140,7 @@ fn sync_codex_config_profile_marks_matching_official_profile_active() {
     let codex_config: toml::Value = toml::from_str(
         r#"
 model_provider = "openai"
-
-[model_providers.openai]
-wire_api = "responses"
-requires_openai_auth = false
-http_headers = { "x-openai-actor-authorization" = "codestudio-lite" }
+cli_auth_credentials_store = "file"
 "#,
     )
     .expect("config should parse");
@@ -158,6 +154,30 @@ http_headers = { "x-openai-actor-authorization" = "codestudio-lite" }
         config.active_profiles_by_mode.config.get("codex"),
         Some(&builtin_official_profile_id("codex"))
     );
+}
+
+#[test]
+fn sync_codex_config_profile_rejects_openai_override_without_base_url() {
+    let mut config = test_app_config();
+    let drafts = builtin_official_profiles();
+    let codex_config: toml::Value = toml::from_str(
+        r#"
+model_provider = "openai"
+
+[model_providers.openai]
+wire_api = "responses"
+requires_openai_auth = false
+http_headers = { "x-openai-actor-authorization" = "codestudio-lite" }
+"#,
+    )
+    .expect("config should parse");
+
+    assert!(!sync_codex_config_profile(
+        &mut config,
+        &drafts,
+        &codex_config
+    ));
+    assert!(!config.active_profiles_by_mode.config.contains_key("codex"));
 }
 
 #[test]
@@ -1043,10 +1063,6 @@ fn codex_review_model_matching_is_exact_for_custom_and_compatible_for_official()
         r#"
 model_provider = "openai"
 review_model = "gpt-5.6-review"
-
-[model_providers.openai]
-requires_openai_auth = false
-http_headers = { "x-openai-actor-authorization" = "codestudio-lite" }
 "#,
     )
     .expect("official config should parse");
@@ -1501,6 +1517,9 @@ model_reasoning_effort = "xhigh"
     assert!(!config.contains("model_providers = {"));
     assert!(!config.contains("model_provider = \"codestudio-"));
     assert!(!config.contains("[model_providers.codestudio-"));
+    assert!(!config.contains("requires_openai_auth = false"));
+    assert!(toml_lookup(&value, "model_providers.openai").is_none());
+    assert!(!config.contains("[model_providers.openai]"));
     assert_codex_managed_provider_contract_lines(&config);
 }
 
@@ -1933,7 +1952,7 @@ fn codex_native_config_uses_auth_json_for_relay_injection() {
 }
 
 #[test]
-fn codex_official_config_uses_managed_auth_contract_without_base_url_override() {
+fn codex_official_config_removes_openai_provider_override() {
     let profile = builtin_official_profiles()
         .into_iter()
         .find(|profile| profile.app == "codex")
@@ -1955,16 +1974,14 @@ base_url = "https://example.invalid/v1"
         read_toml_string(&value, "model_provider").as_deref(),
         Some("openai")
     );
-    assert_codex_managed_provider_contract(&value, "openai");
     assert_eq!(
         read_toml_string(&value, "cli_auth_credentials_store").as_deref(),
         Some("file")
     );
     assert!(toml_lookup(&value, "model_providers.openai.base_url").is_none());
     assert!(toml_lookup(&value, "auth.api_key").is_none());
-    assert!(config.contains("[model_providers.openai]"));
+    assert!(toml_lookup(&value, "model_providers.openai").is_none());
     assert!(!config.contains("base_url ="));
-    assert_codex_managed_provider_contract_lines(&config);
 }
 
 #[test]
@@ -2487,14 +2504,9 @@ fn codex_native_previews_use_managed_actor_authorization_contract() {
     let direct = test_profile("codex", ProviderApplyMode::Config);
     let direct_provider_id = codex_provider_id_for_profile(&direct);
     let gateway = test_profile("codex", ProviderApplyMode::Gateway);
-    let official = builtin_official_profiles()
-        .into_iter()
-        .find(|profile| profile.app == "codex")
-        .expect("codex official profile");
     let cases = [
         (direct, ProviderApplyMode::Config, direct_provider_id),
         (gateway, ProviderApplyMode::Gateway, "custom".to_string()),
-        (official, ProviderApplyMode::Config, "openai".to_string()),
     ];
 
     for (profile, mode, provider_id) in cases {
@@ -2522,6 +2534,96 @@ fn codex_native_previews_use_managed_actor_authorization_contract() {
         assert_eq!(
             preview.changes[headers_index].after.as_deref(),
             Some(CODEX_ACTOR_AUTHORIZATION_INLINE_TOML)
+        );
+    }
+}
+
+#[test]
+fn codex_previews_remove_the_openai_provider_override_for_every_mode() {
+    let paths = test_paths();
+    let config_path = paths.home_dir.join(".codex").join("config.toml");
+    let existing = r#"model_provider = "openai"
+
+[model_providers.openai]
+requires_openai_auth = false
+http_headers = { "x-openai-actor-authorization" = "codestudio-lite" }
+base_url = "https://example.test/v1"
+"#;
+    write_native_config(&config_path, existing).expect("existing config should write");
+    let official = builtin_official_profiles()
+        .into_iter()
+        .find(|profile| profile.app == "codex")
+        .expect("codex official profile");
+
+    for (label, profile, mode) in [
+        ("official", official.clone(), ProviderApplyMode::Config),
+        (
+            "direct",
+            test_profile("codex", ProviderApplyMode::Config),
+            ProviderApplyMode::Config,
+        ),
+        (
+            "gateway",
+            test_profile("codex", ProviderApplyMode::Gateway),
+            ProviderApplyMode::Gateway,
+        ),
+    ] {
+        let preview = build_native_config_preview(&profile, None, &paths, mode)
+            .expect("preview should build")
+            .expect("Codex preview should be available");
+        let change = preview
+            .changes
+            .iter()
+            .find(|change| change.key == "model_providers.openai")
+            .unwrap_or_else(|| panic!("{label} preview should list the openai removal"));
+
+        assert_eq!(
+            change.action, "remove",
+            "{label} preview should remove the openai override"
+        );
+        assert!(
+            change.after.is_none(),
+            "{label} preview must not rewrite the openai override"
+        );
+        assert!(
+            change.before.is_some(),
+            "{label} preview should show the current openai override"
+        );
+        assert!(
+            !preview.changes.iter().any(|change| {
+                change.key.starts_with("model_providers.openai.") && change.after.is_some()
+            }),
+            "{label} preview must not add any openai provider key"
+        );
+    }
+
+    // The preview above must match what the write paths actually render.
+    for (label, content) in [
+        (
+            "official",
+            codex_official_config_content(existing, &official).expect("official config"),
+        ),
+        (
+            "direct",
+            codex_direct_config_content(
+                existing,
+                &test_profile("codex", ProviderApplyMode::Config),
+            )
+            .expect("direct config"),
+        ),
+        (
+            "gateway",
+            codex_gateway_config_content(
+                existing,
+                &test_profile("codex", ProviderApplyMode::Gateway),
+            )
+            .expect("gateway config"),
+        ),
+    ] {
+        let value: toml::Value = toml::from_str(&content).expect("rendered config should parse");
+        assert!(
+            toml_lookup(&value, "model_providers.openai").is_none(),
+            "{label} write should drop the openai override"
         );
     }
 }

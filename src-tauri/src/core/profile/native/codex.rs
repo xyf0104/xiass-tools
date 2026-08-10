@@ -194,26 +194,29 @@ fn preview_config(
             "file",
             "Uses file-backed Codex authentication so managed credentials are read from auth.json.",
         ),
-        diff_line(
+    ];
+    // Every Codex write path drops the whole `[model_providers.openai]` table:
+    // the official profile relies on Codex's built-in OpenAI provider, and
+    // managed profiles route through their own provider entry instead. Preview
+    // the removal for all modes so it matches what is actually written.
+    changes.push(diff_remove_line(
+        &value,
+        "model_providers.openai",
+        "Removes the unsupported OpenAI provider override so Codex uses its built-in provider.",
+    ));
+    if !(provider_is_official(&profile.provider) && mode == ProviderApplyMode::Config) {
+        changes.push(diff_line(
             &value,
             &format!("model_providers.{provider_id}.requires_openai_auth"),
             "true",
             "Enables Codex's built-in OpenAI auth requirement for this managed provider.",
-        ),
-        diff_line(
+        ));
+        changes.push(diff_line(
             &value,
             &format!("model_providers.{provider_id}.http_headers"),
             CODEX_ACTOR_AUTHORIZATION_INLINE_TOML,
             "Adds the CodeStudio Lite actor-authorization header to this managed provider.",
-        ),
-    ];
-    if provider_is_official(&profile.provider) && mode == ProviderApplyMode::Config {
-        changes.push(diff_remove_line(
-            &value,
-            "model_providers.openai.base_url",
-            "Removes any custom OpenAI base URL override for the official provider.",
         ));
-    } else {
         changes.push(diff_line(
             &value,
             &format!("model_providers.{provider_id}.name"),
@@ -493,17 +496,10 @@ pub(in crate::core::profile) fn official_config_matches_profile(
         .unwrap_or(true);
     let model_matches = profile.model.trim().is_empty()
         || read_toml_string(value, "model").as_deref() == Some(profile.model.trim());
-    let base_url_is_absent = toml_lookup(value, "model_providers.openai.base_url")
-        .and_then(|item| item.as_str())
-        .map(|base_url| base_url.trim().is_empty())
-        .unwrap_or(true);
-    let auth_matches = toml_lookup(value, "model_providers.openai.requires_openai_auth").is_none()
-        || managed_provider_auth_matches_legacy_or_current(value, "openai");
     provider_matches
         && model_matches
         && review_model_matches_profile(value, profile, true)
-        && base_url_is_absent
-        && auth_matches
+        && toml_lookup(value, "model_providers.openai").is_none()
 }
 
 fn review_model_matches_profile(
@@ -640,8 +636,7 @@ pub(in crate::core::profile) fn verify_config(
                 && read_toml_string(&value, "model_provider").as_deref() == Some("openai")
                 && model_matches
                 && review_model_matches_profile(&value, profile, false)
-                && toml_lookup(&value, "model_providers.openai.base_url").is_none()
-                && managed_provider_auth_contract_matches(&value, "openai"),
+                && toml_lookup(&value, "model_providers.openai").is_none(),
         );
     }
     let provider_id = provider_id_for_profile(profile);
@@ -678,6 +673,7 @@ pub(in crate::core::profile) fn codex_gateway_config_content(
         .parse::<toml_edit::DocumentMut>()
         .map_err(|err| format!("Existing Codex config could not be parsed: {err}"))?;
     normalize_model_providers_table(&mut document);
+    remove_provider_entry(&mut document, "openai");
     remove_legacy_managed_direct_providers(&mut document);
     let provider_id = client.provider_id;
     let model = gateway_config_model_for_profile(profile);
@@ -706,6 +702,7 @@ pub(in crate::core::profile) fn codex_direct_config_content(
         .parse::<toml_edit::DocumentMut>()
         .map_err(|err| format!("Existing Codex config could not be parsed: {err}"))?;
     normalize_model_providers_table(&mut document);
+    remove_provider_entry(&mut document, "openai");
     remove_legacy_managed_direct_providers(&mut document);
     let provider_id = provider_id_for_profile(profile);
     let model = profile.model.trim();
@@ -739,6 +736,7 @@ pub(in crate::core::profile) fn codex_official_config_content(
         .map_err(|err| format!("Existing Codex config could not be parsed: {err}"))?;
     let provider_id = "openai";
     normalize_model_providers_table(&mut document);
+    remove_provider_entry(&mut document, provider_id);
     document["cli_auth_credentials_store"] = toml_edit::value("file");
     document["model_provider"] = toml_edit::value(provider_id);
     if profile.model.trim().is_empty() {
@@ -747,9 +745,6 @@ pub(in crate::core::profile) fn codex_official_config_content(
         document["model"] = toml_edit::value(profile.model.trim());
     }
     set_review_model(&mut document, profile, profile.model.trim());
-    remove_provider_entry(&mut document, provider_id);
-    document["model_providers"][provider_id] = toml_edit::Item::Table(toml_edit::Table::new());
-    set_managed_provider_auth(&mut document, provider_id);
     repair_codex_preserved_auth_config(&mut document);
     render_valid_document(document)
 }
