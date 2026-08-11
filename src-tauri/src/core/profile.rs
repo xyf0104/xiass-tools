@@ -2239,10 +2239,24 @@ fn looks_like_local_gateway_token(value: &str) -> bool {
     value.trim().starts_with("codestudio-local-")
 }
 
+/// Whether a URL addresses our own local gateway.
+///
+/// Matching on the loopback host and the gateway port is what makes this
+/// robust: the route shape has already changed once (`/tools/<tool>/v1` became
+/// `/<tool>/v1`) and not every tool's base URL carries a `/v1` suffix, so a
+/// path-shaped test silently stops recognising configs we wrote ourselves.
 fn looks_like_local_gateway_url(value: &str) -> bool {
     let trimmed = value.trim().to_ascii_lowercase();
-    trimmed.starts_with("http://127.0.0.1:")
-        && (trimmed.contains("/tools/") || trimmed.ends_with("/v1"))
+    let Some(rest) = trimmed
+        .strip_prefix("http://127.0.0.1:")
+        .or_else(|| trimmed.strip_prefix("http://localhost:"))
+    else {
+        return false;
+    };
+    rest.split('/')
+        .next()
+        .and_then(|port| port.parse::<u16>().ok())
+        .is_some()
 }
 
 fn unique_profile_id(base_id: &str) -> Result<String, String> {

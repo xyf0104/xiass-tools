@@ -1828,6 +1828,75 @@ wire_api = "responses"
     )
     .expect("config should parse");
     assert!(detect_codex_native_profile(&gateway).is_none());
+
+    // The scoped route lost its `/tools` segment; a config written after that
+    // change is just as much ours and must not be detected as a user config.
+    let short_path_gateway: toml::Value = toml::from_str(
+        r#"
+model_provider = "custom"
+model = "codestudio-default"
+
+[model_providers.custom]
+base_url = "http://127.0.0.1:43112/codex/v1"
+wire_api = "responses"
+"#,
+    )
+    .expect("config should parse");
+    assert!(detect_codex_native_profile(&short_path_gateway).is_none());
+}
+
+/// Guards the predicate that keeps gateway-written configs out of the import
+/// funnel, for every tool including the adapters that only inspect the token.
+#[test]
+fn local_gateway_urls_are_recognised_for_every_route_spelling() {
+    for url in [
+        "http://127.0.0.1:43112/v1",
+        "http://127.0.0.1:43112/codex/v1",
+        "http://127.0.0.1:43112/tools/codex/v1",
+        "http://127.0.0.1:43112/claude-desktop",
+        "HTTP://127.0.0.1:43112/CODEX/V1",
+    ] {
+        assert!(
+            looks_like_local_gateway_url(url),
+            "{url} should be treated as the local gateway"
+        );
+    }
+
+    for url in [
+        "https://api.apikey.fun/v1",
+        "https://api.anthropic.com",
+        "http://192.168.1.10:43112/v1",
+    ] {
+        assert!(
+            !looks_like_local_gateway_url(url),
+            "{url} is a real provider and must stay importable"
+        );
+    }
+}
+
+/// Native detection imports user-written tool configs. It must never mint a
+/// gateway profile, or applying the gateway would spawn a rival profile that
+/// competes with it for activation on the next load.
+#[test]
+fn native_detection_only_ever_creates_config_mode_profiles() {
+    let source = include_str!("profile/manager/native_sync.rs");
+    let import = source
+        .split("fn upsert_detected_native_profile")
+        .nth(1)
+        .expect("the import funnel should exist");
+
+    assert!(
+        import.contains("mode: ProviderApplyMode::Config"),
+        "the imported draft must be config mode"
+    );
+    assert!(
+        !import.contains("ProviderApplyMode::Gateway"),
+        "the import funnel must never construct a gateway profile"
+    );
+    assert!(
+        import.contains("looks_like_local_gateway_url"),
+        "the funnel must reject configs pointing at our own gateway"
+    );
 }
 
 #[test]

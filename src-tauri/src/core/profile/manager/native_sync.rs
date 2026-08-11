@@ -378,6 +378,13 @@ fn upsert_detected_native_profile(
         &protocol,
     )?;
     let base_url = validate_base_url(&detected.base_url)?;
+    // A config pointing at the local gateway was written by our own apply
+    // path, not by the user. Importing it would create a config-mode profile
+    // that loops back into the gateway. Only some adapters check this while
+    // detecting, so the single import funnel enforces it for every tool.
+    if looks_like_local_gateway_url(&base_url) {
+        return Err("Detected Provider base URL is the local gateway.".to_string());
+    }
     let api_key = detected.api_key.trim();
     if api_key.is_empty() || looks_like_local_gateway_token(api_key) {
         return Err("Detected Provider API key is not importable.".to_string());
