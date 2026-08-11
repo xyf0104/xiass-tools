@@ -50,7 +50,7 @@ use route::GatewayRouteTarget;
 use server::{
     read_request as read_http_request, spawn_accept_loop,
     write_buffered_response as write_http_response, write_route_response, write_stream_headers,
-    HttpRequest, HttpResponse, RouteResponse, StreamingResponse,
+    HttpRequest, HttpResponse, ResponseOrigin, RouteResponse, StreamingResponse,
 };
 use upstream::{endpoint as upstream_endpoint, headers as upstream_headers_with_passthrough};
 
@@ -220,7 +220,7 @@ fn client_config_with_tool(tool_id: Option<&str>) -> Result<GatewayClientConfig,
     profile::ensure_app_dirs()?;
     let config = load_or_create_gateway_config()?;
     let base_path = tool_id
-        .map(|tool_id| format!("/tools/{tool_id}/v1"))
+        .map(|tool_id| format!("/{tool_id}/v1"))
         .unwrap_or_else(|| "/v1".to_string());
     Ok(GatewayClientConfig {
         provider_id: CLIENT_PROVIDER_ID.to_string(),
@@ -387,11 +387,13 @@ fn handle_connection(mut stream: TcpStream, config: &GatewayConfig) -> Result<()
     let log_context = RequestLogContext::from_request(&request, config);
     let response = route_request(request, config);
     let expected_status = response.status();
+    let origin = response.origin();
     let write_result = write_route_response(&mut stream, response);
     let status = write_result.as_ref().copied().unwrap_or(expected_status);
     log_gateway_request(
         log_context,
         status,
+        origin,
         started.elapsed(),
         write_result.as_ref().err(),
     );
@@ -456,6 +458,7 @@ impl RequestLogContext {
 fn log_gateway_request(
     context: RequestLogContext,
     status: u16,
+    origin: ResponseOrigin,
     latency: Duration,
     write_error: Option<&String>,
 ) {
@@ -464,26 +467,31 @@ fn log_gateway_request(
     }
 
     let mut context = context;
-    let entry = gateway_request_log_entry(&mut context, status, latency, write_error);
+    let entry = gateway_request_log_entry(&mut context, status, origin, latency, write_error);
     let _ = gateway_request_log::append(&entry);
 }
 
 fn gateway_request_log_entry(
     context: &mut RequestLogContext,
     status: u16,
+    origin: ResponseOrigin,
     latency: Duration,
     write_error: Option<&String>,
 ) -> GatewayRequestLogEntry {
     let error_summary = if let Some(err) = write_error {
         Some(format!("Gateway write failed: {err}"))
     } else if status >= 400 {
-        Some(match status {
-            401 => "Unauthorized local gateway request".to_string(),
-            400 if matches!(context.privacy_filter_action, PrivacyFilterAction::Blocked) => {
+        // Say who refused. A relayed status means the provider rejected the
+        // request; anything else means the gateway itself did, and only then
+        // is our own configuration or code the place to look.
+        Some(match (origin, status) {
+            (_, 401) => "Unauthorized local gateway request".to_string(),
+            (_, 400) if matches!(context.privacy_filter_action, PrivacyFilterAction::Blocked) => {
                 "Request blocked by privacy filter".to_string()
             }
-            404 => "Gateway route not implemented".to_string(),
-            _ => format!("Gateway returned HTTP {status}"),
+            (ResponseOrigin::Gateway, 404) => "Gateway route not implemented".to_string(),
+            (ResponseOrigin::Upstream, status) => format!("Upstream returned HTTP {status}"),
+            (ResponseOrigin::Gateway, status) => format!("Gateway returned HTTP {status}"),
         })
     } else {
         None
@@ -1232,6 +1240,7 @@ fn forward_gateway_request(
 
     if response.status >= 400 || client_protocol == upstream_protocol {
         return RouteResponse::Buffered(HttpResponse {
+            origin: ResponseOrigin::Upstream,
             status: response.status,
             reason: reason_for_status(response.status),
             content_type: response.content_type,
@@ -2945,6 +2954,7 @@ fn forward_upstream_json_with_headers(
             let content_type = response.content_type;
 
             RouteResponse::Buffered(HttpResponse {
+                origin: ResponseOrigin::Upstream,
                 status,
                 reason,
                 content_type,
@@ -3003,6 +3013,7 @@ fn unix_timestamp() -> u64 {
 
 fn json_response(status: u16, reason: &'static str, value: serde_json::Value) -> HttpResponse {
     HttpResponse {
+        origin: ResponseOrigin::Gateway,
         status,
         reason,
         content_type: "application/json",
@@ -3013,6 +3024,7 @@ fn json_response(status: u16, reason: &'static str, value: serde_json::Value) ->
 
 fn empty_response(status: u16, reason: &'static str) -> HttpResponse {
     HttpResponse {
+        origin: ResponseOrigin::Gateway,
         status,
         reason,
         content_type: "text/plain",
@@ -3854,6 +3866,56 @@ mod tests {
         assert_eq!(source["data"].as_str(), Some("QUJD"));
     }
 
+    /// The log has to name who refused. Reading "Gateway returned HTTP 503"
+    /// for a status the provider chose sends whoever is debugging into our own
+    /// code for a problem that is not there.
+    #[test]
+    fn error_summary_distinguishes_upstream_status_from_gateway_status() {
+        let mut context = RequestLogContext {
+            client: "Codex".to_string(),
+            method: "POST".to_string(),
+            path: "/codex/v1/responses".to_string(),
+            provider: Some("compatible".to_string()),
+            model: Some("claude-opus-5".to_string()),
+            privacy_filter_mode: PrivacyFilterMode::Off,
+            privacy_filter_hit_count: 0,
+            privacy_filter_action: PrivacyFilterAction::None,
+        };
+        let summary = |context: &mut RequestLogContext, status, origin| {
+            gateway_request_log_entry(context, status, origin, Duration::from_millis(220), None)
+                .error_summary
+        };
+
+        assert_eq!(
+            summary(&mut context, 503, ResponseOrigin::Upstream).as_deref(),
+            Some("Upstream returned HTTP 503")
+        );
+        assert_eq!(
+            summary(&mut context, 502, ResponseOrigin::Gateway).as_deref(),
+            Some("Gateway returned HTTP 502")
+        );
+        // The same status from either side must not read the same.
+        assert_ne!(
+            summary(&mut context, 502, ResponseOrigin::Upstream),
+            summary(&mut context, 502, ResponseOrigin::Gateway)
+        );
+        // Local-only conditions keep their specific wording.
+        assert_eq!(
+            summary(&mut context, 401, ResponseOrigin::Gateway).as_deref(),
+            Some("Unauthorized local gateway request")
+        );
+        assert_eq!(
+            summary(&mut context, 404, ResponseOrigin::Gateway).as_deref(),
+            Some("Gateway route not implemented")
+        );
+        // An upstream 404 is the provider's, not a missing local route.
+        assert_eq!(
+            summary(&mut context, 404, ResponseOrigin::Upstream).as_deref(),
+            Some("Upstream returned HTTP 404")
+        );
+        assert!(summary(&mut context, 200, ResponseOrigin::Upstream).is_none());
+    }
+
     #[test]
     fn anthropic_tool_use_response_converts_to_chat_tool_calls() {
         let upstream = json!({
@@ -4302,7 +4364,13 @@ mod tests {
             privacy_filter_action: PrivacyFilterAction::Redacted,
         };
 
-        let entry = gateway_request_log_entry(&mut context, 200, Duration::from_millis(12), None);
+        let entry = gateway_request_log_entry(
+            &mut context,
+            200,
+            ResponseOrigin::Upstream,
+            Duration::from_millis(12),
+            None,
+        );
 
         assert_eq!(entry.privacy_filter_mode, PrivacyFilterMode::Redact);
         assert_eq!(entry.privacy_filter_hit_count, 2);
@@ -4606,6 +4674,39 @@ mod tests {
         assert_ne!(response.status(), 401);
     }
 
+    /// The tool-scoped route no longer carries a `/tools/` segment. The old
+    /// spelling keeps working so client configs written before the change are
+    /// not broken until they are applied again.
+    #[test]
+    fn scoped_routes_work_with_and_without_the_legacy_tools_prefix() {
+        let config = test_config(true);
+        for path in [
+            "/codex/v1/responses",
+            "/tools/codex/v1/responses",
+            "/claude/v1/messages",
+            "/tools/claude/v1/messages",
+        ] {
+            let response = route_request(post(path, Some(&config.token)), &config);
+            assert_ne!(response.status(), 404, "{path} should route");
+            assert_ne!(response.status(), 401, "{path} should authenticate");
+        }
+
+        // The unscoped routes must not be mistaken for a tool named `v1`.
+        let response = route_request(post("/v1/responses", Some(&config.token)), &config);
+        assert_ne!(response.status(), 404);
+
+        // An unknown first segment is still a 404, not a silent fallthrough.
+        let response = route_request(post("/nope/v1/responses", Some(&config.token)), &config);
+        assert_eq!(response.status(), 404);
+    }
+
+    #[test]
+    fn short_scoped_codex_route_accepts_request_without_local_token() {
+        let config = test_config(true);
+        let response = route_request(post("/codex/v1/responses", None), &config);
+        assert_ne!(response.status(), 401);
+    }
+
     #[test]
     fn codex_scoped_route_accepts_request_without_local_token() {
         let config = test_config(true);
@@ -4666,7 +4767,8 @@ mod tests {
     #[test]
     fn client_config_for_tool_uses_scoped_base_url() {
         let config = client_config_for_tool("codex").expect("client config should render");
-        assert!(config.base_url.ends_with("/tools/codex/v1"));
+        assert!(config.base_url.ends_with("/codex/v1"));
+        assert!(!config.base_url.contains("/tools/"));
     }
 
     #[test]

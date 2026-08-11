@@ -51,7 +51,17 @@ pub(in crate::core::gateway) struct HttpRequest {
     pub(in crate::core::gateway) body: Vec<u8>,
 }
 
+/// Who produced a response. A 4xx/5xx that the gateway generated itself means
+/// something is wrong locally; the same status relayed from the provider means
+/// the upstream refused. The request log has to tell them apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::core::gateway) enum ResponseOrigin {
+    Gateway,
+    Upstream,
+}
+
 pub(in crate::core::gateway) struct HttpResponse {
+    pub(in crate::core::gateway) origin: ResponseOrigin,
     pub(in crate::core::gateway) status: u16,
     pub(in crate::core::gateway) reason: &'static str,
     pub(in crate::core::gateway) content_type: &'static str,
@@ -69,6 +79,15 @@ impl RouteResponse {
         match self {
             Self::Buffered(response) => response.status,
             Self::Stream(response) => response.expected_status,
+        }
+    }
+
+    pub(in crate::core::gateway) fn origin(&self) -> ResponseOrigin {
+        match self {
+            Self::Buffered(response) => response.origin,
+            // A stream that reached the client carried upstream bytes; a
+            // stream that failed before headers is reported by its writer.
+            Self::Stream(_) => ResponseOrigin::Upstream,
         }
     }
 }
