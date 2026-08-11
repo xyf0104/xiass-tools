@@ -101,7 +101,7 @@ function mockClaudeDesktopProfilePath(): string {
 }
 
 function mockClaudeDesktopGatewayBaseUrl(): string {
-  return "http://127.0.0.1:43112/tools/claude-desktop";
+  return "http://127.0.0.1:43112/claude-desktop";
 }
 
 export function mockNativeConfigPreview(
@@ -1491,7 +1491,7 @@ function mockConfigProtocolSupported(profile: ProfileDraft): boolean {
 }
 
 function mockGatewayBaseUrlForTool(toolId: string): string {
-  return `http://127.0.0.1:43112/tools/${canonicalProfileApp(toolId)}/v1`;
+  return `http://127.0.0.1:43112/${canonicalProfileApp(toolId)}/v1`;
 }
 
 function requireMockField(label: string, value: unknown): string {

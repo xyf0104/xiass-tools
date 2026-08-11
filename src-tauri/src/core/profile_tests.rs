@@ -1595,7 +1595,7 @@ model_providers = { codestudio-local = { name = "CodeStudio Lite Local Gateway",
     );
     assert_eq!(
         toml_lookup(&value, "model_providers.custom.base_url").and_then(|item| item.as_str()),
-        Some("http://127.0.0.1:43112/tools/codex/v1")
+        Some("http://127.0.0.1:43112/codex/v1")
     );
     assert!(config.contains("[model_providers]\n"));
     assert!(config.contains("[model_providers.custom]\n"));
@@ -1946,7 +1946,7 @@ fn codex_native_config_uses_auth_json_for_relay_injection() {
     );
     assert_eq!(
         toml_lookup(&value, "model_providers.custom.base_url").and_then(|item| item.as_str()),
-        Some("http://127.0.0.1:43112/tools/codex/v1")
+        Some("http://127.0.0.1:43112/codex/v1")
     );
     assert_codex_managed_provider_contract_lines(&config);
 }
@@ -2174,7 +2174,7 @@ OTHER = "keep"
 #[test]
 fn claude_desktop_profile_uses_3p_gateway_shape() {
     let value = claude_desktop_gateway_profile_value(
-        "http://127.0.0.1:43112/tools/claude-desktop",
+        "http://127.0.0.1:43112/claude-desktop",
         "local-token",
         Some(&[ClaudeDesktopInferenceModelSpec {
             name: "claude-sonnet-4-6".to_string(),
@@ -2186,7 +2186,7 @@ fn claude_desktop_profile_uses_3p_gateway_shape() {
     assert_eq!(value["inferenceProvider"].as_str(), Some("gateway"));
     assert_eq!(
         value["inferenceGatewayBaseUrl"].as_str(),
-        Some("http://127.0.0.1:43112/tools/claude-desktop")
+        Some("http://127.0.0.1:43112/claude-desktop")
     );
     assert_eq!(
         value["inferenceGatewayApiKey"].as_str(),
@@ -2316,8 +2316,8 @@ fn claude_desktop_macos_developer_settings_cover_normal_and_threep_dirs() {
 #[test]
 fn claude_desktop_gateway_base_url_strips_v1_suffix() {
     assert_eq!(
-        claude_desktop_gateway_profile_base_url("http://127.0.0.1:43112/tools/claude-desktop/v1"),
-        "http://127.0.0.1:43112/tools/claude-desktop"
+        claude_desktop_gateway_profile_base_url("http://127.0.0.1:43112/claude-desktop/v1"),
+        "http://127.0.0.1:43112/claude-desktop"
     );
 }
 

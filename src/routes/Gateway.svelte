@@ -64,7 +64,6 @@
 
   $: gatewayState = gatewayStatus?.running ? $t("common.running") : $t("common.stopped");
   $: gatewayTone = (gatewayStatus?.running ? "online" : "offline") as GatewayTone;
-  $: activeProfileName = gatewayStatus?.activeProfileName ?? $t("dashboard.notConfigured");
   $: activeModel = gatewayStatus?.activeModel ?? $t("common.none");
   $: baseUrl = gatewayStatus?.baseUrl ?? "http://127.0.0.1:43112/v1";
   $: privacyFilterMode = gatewayStatus?.privacyFilterMode ?? "off";
@@ -159,10 +158,6 @@
       <div>
         <span>{$t("common.url")}</span>
         <code>{baseUrl}</code>
-      </div>
-      <div>
-        <span>{$t("dashboard.activeProfile")}</span>
-        <strong>{activeProfileName}</strong>
       </div>
       <div>
         <span>{$t("dashboard.currentVirtualModel")}</span>

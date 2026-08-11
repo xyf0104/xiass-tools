@@ -12,8 +12,13 @@ pub(super) struct GatewayRouteTarget {
 impl GatewayRouteTarget {
     pub(super) fn resolve(path: &str, headers: &HashMap<String, String>) -> Self {
         let original_path = path.split('?').next().unwrap_or(path).to_string();
+        // A tool-scoped route is `/<tool-id>/<route>`. No tool id collides with
+        // a route prefix (`v1`, `v1beta`, `health`), so the first segment is
+        // unambiguous. The older `/tools/<tool-id>/<route>` spelling is still
+        // accepted because client configs written before the change carry it.
         if let Some((raw_tool_id, route_path)) = original_path
             .strip_prefix("/tools/")
+            .or_else(|| original_path.strip_prefix('/'))
             .and_then(|rest| rest.split_once('/'))
         {
             if let Some(tool_id) = canonical_profile_tool_id(raw_tool_id) {
