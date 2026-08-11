@@ -59,6 +59,7 @@
   let snapshot: DetectionSnapshot | null = null;
   let gatewayStatus: GatewayStatus | null = null;
   let profileSummary: ProfileSummary | null = null;
+  let profileRescanning = false;
   let error: string | null = null;
   let gatewayBusy = false;
   let wizardPrefill: WizardPrefill | null = null;
@@ -381,6 +382,25 @@
     }
   }
 
+  /// Detection runs once on mount, so a tool config edited outside the app
+  /// stayed invisible for the rest of the session. This is the explicit way to
+  /// run it again — deliberately a user action, because the same pass imports
+  /// drafts and must not fire on its own after a profile mutation.
+  async function rescanNativeConfigs() {
+    if (profileRescanning) {
+      return;
+    }
+    profileRescanning = true;
+    error = null;
+    try {
+      applyProfileSummary(await loadProfileSummary());
+    } catch (err) {
+      error = err instanceof Error ? err.message : String(err);
+    } finally {
+      profileRescanning = false;
+    }
+  }
+
   async function refreshAfterProfileChange(profile?: ProfileDraft) {
     if (profile) {
       applySavedProfile(profile);
@@ -573,6 +593,8 @@
             summary={profileSummary}
             {snapshot}
             bind:modeFilter={profileManagementMode}
+            rescanning={profileRescanning}
+            onRescan={rescanNativeConfigs}
             onProfileSwitched={refreshAfterProfileChange}
             onCreateProfile={(prefill) => openWizard(prefill ?? null)}
           />

@@ -97,6 +97,8 @@
   export let snapshot: DetectionSnapshot | null = null;
   export let modeFilter: ProviderApplyMode = "config";
   export let embedded = false;
+  export let rescanning = false;
+  export let onRescan: () => void | Promise<void> = () => {};
   export let onProfileSwitched: (profile?: ProfileDraft) => void | Promise<void> = () => {};
   export let onCreateProfile: (prefill?: WizardPrefill) => void = () => {};
 
@@ -1304,6 +1306,21 @@
             </button>
           {/each}
         </div>
+        <button
+          class={actionButtonRecipe()}
+          type="button"
+          data-rescan-button="true"
+          disabled={rescanning}
+          title={$t("profiles.rescanHint")}
+          on:click={onRescan}
+        >
+          <AppIcon
+            name={rescanning ? "loading" : "refresh"}
+            size={15}
+            class={rescanning ? spinRecipe() : ""}
+          />
+          {$t(rescanning ? "profiles.rescanning" : "profiles.rescan")}
+        </button>
         <button
           class={actionButtonRecipe()}
           title={$t("common.createConfig")}
