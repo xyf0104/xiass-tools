@@ -1159,6 +1159,9 @@ fn forward_gateway_request(
         if requested_model.as_deref() != Some(upstream_model.as_str()) {
             request_body["model"] = Value::String(upstream_model.clone());
         }
+        if upstream_protocol == GatewayProtocol::AnthropicMessages {
+            ensure_anthropic_request_identity(&mut request_body);
+        }
         let endpoint = upstream_endpoint(upstream_protocol, &profile, &upstream_model, stream);
         let headers =
             upstream_headers_with_passthrough(upstream_protocol, &api_key, request_headers);
@@ -1361,6 +1364,51 @@ fn load_gateway_profile_api_key(profile: &ProfileDraft) -> Result<String, RouteR
     })
 }
 
+/// Anthropic-compatible resellers commonly pick the backing account from
+/// `metadata.user_id`, and reject anything without it as a bare 503 that names
+/// no cause. The check is structural: the value must be a JSON object carrying
+/// `device_id`, `account_uuid`, and a `session_id` that parses as a UUID, while
+/// the values themselves go unread. A converted request never has one, because
+/// the body is rebuilt from protocol-neutral parts, so attach one here. A
+/// client that supplies its own identity keeps it — that field belongs to the
+/// caller, and official Anthropic reads it for abuse signals.
+fn ensure_anthropic_request_identity(body: &mut Value) {
+    let Some(object) = body.as_object_mut() else {
+        return;
+    };
+    let has_identity = object
+        .get("metadata")
+        .and_then(|metadata| metadata.get("user_id"))
+        .and_then(|user_id| user_id.as_str())
+        .is_some_and(|user_id| !user_id.trim().is_empty());
+    if has_identity {
+        return;
+    }
+
+    let identity = json!({
+        "device_id": gateway_device_id(),
+        "account_uuid": "",
+        "session_id": Uuid::new_v4().to_string(),
+    })
+    .to_string();
+    match object.get_mut("metadata").and_then(Value::as_object_mut) {
+        Some(metadata) => {
+            metadata.insert("user_id".to_string(), Value::String(identity));
+        }
+        None => {
+            object.insert("metadata".to_string(), json!({ "user_id": identity }));
+        }
+    }
+}
+
+/// Stable for the life of the process, matching the 64-hex shape these
+/// upstreams expect. The value is never validated, so it only has to look like
+/// a device rather than identify one.
+fn gateway_device_id() -> &'static str {
+    static DEVICE_ID: OnceLock<String> = OnceLock::new();
+    DEVICE_ID.get_or_init(|| format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple()))
+}
+
 fn convert_gateway_request(
     client_protocol: GatewayProtocol,
     upstream_protocol: GatewayProtocol,
@@ -1373,7 +1421,10 @@ fn convert_gateway_request(
 ) -> ConvertedGatewayRequest {
     let model = effective_upstream_model(request_body, profile, config);
     let parts = request_parts_from_client(client_protocol, request_body, &model);
-    let body = request_body_for_protocol(upstream_protocol, &parts, stream);
+    let mut body = request_body_for_protocol(upstream_protocol, &parts, stream);
+    if upstream_protocol == GatewayProtocol::AnthropicMessages {
+        ensure_anthropic_request_identity(&mut body);
+    }
     let endpoint = upstream_endpoint(upstream_protocol, profile, &model, stream);
     let headers = upstream_headers_with_passthrough(upstream_protocol, api_key, request_headers);
 
@@ -3505,6 +3556,129 @@ mod tests {
             .filter_map(|line| line.split_once(':'))
             .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
             .map(|(_, value)| value.trim().to_string())
+    }
+
+    fn identity_object(body: &Value) -> Value {
+        let user_id = body["metadata"]["user_id"]
+            .as_str()
+            .expect("identity metadata should be a JSON string");
+        serde_json::from_str(user_id).expect("identity metadata should parse as JSON")
+    }
+
+    #[test]
+    fn anthropic_upstream_headers_present_the_claude_code_client_identity() {
+        let request_headers = header_map(&[
+            ("user-agent", "codex-cli/0.9"),
+            ("x-app", "codex"),
+            ("x-stainless-os", "MacOS"),
+        ]);
+        let headers = upstream_headers_with_passthrough(
+            GatewayProtocol::AnthropicMessages,
+            "upstream-key",
+            &request_headers,
+        );
+
+        // Every one of these is load-bearing: the upstream answers 503 when any
+        // single header is missing.
+        assert_eq!(
+            header_value(&headers, "user-agent").as_deref(),
+            Some("claude-cli/2.1.226 (external, sdk-cli)")
+        );
+        assert_eq!(header_value(&headers, "x-app").as_deref(), Some("cli"));
+        assert_eq!(
+            header_value(&headers, "x-stainless-lang").as_deref(),
+            Some("js")
+        );
+        // The platform is reported, not chosen: an upstream with no account for
+        // this host must be able to say so.
+        assert_eq!(
+            header_value(&headers, "x-stainless-os").as_deref(),
+            Some(upstream_http::stainless_os())
+        );
+        // The client's own identity must not survive alongside ours.
+        assert!(!contains_header(&headers, "user-agent", "codex-cli/0.9"));
+        assert_eq!(
+            headers
+                .lines()
+                .filter(|line| line.to_ascii_lowercase().starts_with("x-stainless-os:"))
+                .count(),
+            1,
+            "the client's platform claim must not survive as a second header"
+        );
+    }
+
+    #[test]
+    fn other_upstream_protocols_keep_their_own_client_identity() {
+        let request_headers = header_map(&[("user-agent", "codex-cli/0.9")]);
+        for protocol in [
+            GatewayProtocol::OpenAiResponses,
+            GatewayProtocol::OpenAiChatCompletions,
+            GatewayProtocol::GoogleGemini,
+        ] {
+            let headers =
+                upstream_headers_with_passthrough(protocol, "upstream-key", &request_headers);
+            assert!(
+                header_value(&headers, "x-app").is_none(),
+                "{protocol:?} should not claim to be the Claude Code CLI"
+            );
+            assert!(contains_header(&headers, "user-agent", "codex-cli/0.9"));
+        }
+    }
+
+    #[test]
+    fn anthropic_upstream_requests_carry_reseller_identity_metadata() {
+        let mut body = json!({ "model": "claude", "messages": [] });
+        ensure_anthropic_request_identity(&mut body);
+
+        let identity = identity_object(&body);
+        assert!(identity.get("device_id").is_some());
+        assert_eq!(identity["account_uuid"].as_str(), Some(""));
+        let session_id = identity["session_id"].as_str().unwrap_or_default();
+        assert!(
+            Uuid::parse_str(session_id).is_ok(),
+            "session_id must parse as a UUID, got {session_id:?}"
+        );
+    }
+
+    #[test]
+    fn anthropic_identity_keeps_a_client_supplied_user_id() {
+        let mut body = json!({
+            "model": "claude",
+            "metadata": { "user_id": "caller-owned-identity" }
+        });
+        ensure_anthropic_request_identity(&mut body);
+
+        assert_eq!(
+            body["metadata"]["user_id"].as_str(),
+            Some("caller-owned-identity")
+        );
+    }
+
+    #[test]
+    fn anthropic_identity_fills_a_metadata_object_without_a_user_id() {
+        let mut body = json!({ "model": "claude", "metadata": { "trace": "keep" } });
+        ensure_anthropic_request_identity(&mut body);
+
+        assert_eq!(body["metadata"]["trace"].as_str(), Some("keep"));
+        assert!(identity_object(&body).get("session_id").is_some());
+    }
+
+    #[test]
+    fn converting_to_anthropic_attaches_identity_but_other_upstreams_do_not() {
+        let request = json!({
+            "model": "codestudio-default",
+            "messages": [{ "role": "user", "content": "Ping" }]
+        });
+        let parts =
+            request_parts_from_client(GatewayProtocol::OpenAiChatCompletions, &request, "claude");
+
+        let mut anthropic =
+            request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
+        ensure_anthropic_request_identity(&mut anthropic);
+        assert!(identity_object(&anthropic).get("device_id").is_some());
+
+        let openai = request_body_for_protocol(GatewayProtocol::OpenAiResponses, &parts, false);
+        assert!(openai.get("metadata").is_none());
     }
 
     #[test]

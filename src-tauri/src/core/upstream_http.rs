@@ -91,9 +91,58 @@ pub fn bearer_json_headers(bearer_token: &str) -> String {
     )
 }
 
+/// Anthropic-compatible resellers that front Claude Code subscription seats only
+/// serve requests carrying the first-party CLI's client identity, and refuse
+/// everything else with a bare 503 that names no cause. These three headers plus
+/// the `x-stainless-os` appended below are the minimum such an upstream accepts,
+/// established by bisection against a live endpoint: dropping any one of the four
+/// brings the 503 back. Official Anthropic ignores them, so they are safe to send
+/// unconditionally.
+///
+/// `x-stainless-os` reports the real platform, so an upstream that cannot serve
+/// this host says so instead of being told what it wants to hear. That choice
+/// has a visible consequence: these upstreams pick the backing account partly
+/// from this value, and a pool holding only Windows- and Linux-registered
+/// accounts answers 503 for macOS callers. That 503 is the upstream's own
+/// "no account available" — application-level, carrying a request id, unlike the
+/// edge-level 502 a malformed identity produces — and reporting `Windows` from a
+/// Mac would paper over it rather than fix it.
+///
+/// Account matching is what this is, not a consistency check against the
+/// caller's environment: `Linux` is served to a Windows host, and a plain HTTPS
+/// client leaks no operating system for the upstream to verify against. Pair
+/// this with the `metadata.user_id` object the gateway attaches; neither half
+/// works alone.
+const CLAUDE_CODE_CLIENT_IDENTITY: &str = concat!(
+    "user-agent: claude-cli/2.1.226 (external, sdk-cli)\r\n",
+    "x-app: cli\r\n",
+    "x-stainless-lang: js\r\n",
+);
+
+/// The spelling the Anthropic SDK derives from the host platform. Kept as a
+/// mapping over a caller-supplied name so every arm stays reachable from tests
+/// on any build target.
+fn stainless_os_name(os: &str) -> &'static str {
+    match os {
+        "windows" => "Windows",
+        "macos" => "MacOS",
+        "linux" => "Linux",
+        "freebsd" => "FreeBSD",
+        "openbsd" => "OpenBSD",
+        "android" => "Android",
+        "ios" => "iOS",
+        _ => "Unknown",
+    }
+}
+
+pub fn stainless_os() -> &'static str {
+    stainless_os_name(std::env::consts::OS)
+}
+
 pub fn anthropic_json_headers(api_key: &str) -> String {
+    let os = stainless_os();
     format!(
-        "x-api-key: {api_key}\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nAccept: application/json\r\n"
+        "x-api-key: {api_key}\r\nanthropic-version: 2023-06-01\r\nContent-Type: application/json\r\nAccept: application/json\r\n{CLAUDE_CODE_CLIENT_IDENTITY}x-stainless-os: {os}\r\n"
     )
 }
 
@@ -732,6 +781,31 @@ mod platform {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stainless_os_uses_the_sdk_spelling_for_each_platform() {
+        assert_eq!(stainless_os_name("windows"), "Windows");
+        assert_eq!(stainless_os_name("macos"), "MacOS");
+        assert_eq!(stainless_os_name("linux"), "Linux");
+        assert_eq!(stainless_os_name("freebsd"), "FreeBSD");
+        assert_eq!(stainless_os_name("ios"), "iOS");
+        assert_eq!(stainless_os_name("solaris"), "Unknown");
+    }
+
+    #[test]
+    fn anthropic_headers_report_the_real_platform_rather_than_a_convenient_one() {
+        let headers = anthropic_json_headers("secret-key");
+
+        assert!(headers.contains(&format!("x-stainless-os: {}\r\n", stainless_os())));
+        assert_eq!(
+            stainless_os(),
+            stainless_os_name(std::env::consts::OS),
+            "the header must follow the build target, never a pinned value"
+        );
+        assert!(headers.contains("user-agent: claude-cli/2.1.226 (external, sdk-cli)\r\n"));
+        assert!(headers.contains("x-app: cli\r\n"));
+        assert!(headers.contains("x-stainless-lang: js\r\n"));
+    }
 
     #[test]
     fn curl_config_escapes_headers_without_losing_secrets() {
