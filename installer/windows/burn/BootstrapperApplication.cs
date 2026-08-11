@@ -39,6 +39,11 @@ namespace CodeStudioLite.Installer
 
     public sealed class CodeStudioBootstrapperApplication : BootstrapperApplication
     {
+        /// Matches the grace period the application itself uses when closing
+        /// other tools before updating them.
+        private const int GracefulExitMilliseconds = 8000;
+        private const int ForcedExitMilliseconds = 3000;
+
         private InstallerWindow form;
         private LaunchAction plannedAction;
         private string selectedLanguage = "en-US";
@@ -47,6 +52,7 @@ namespace CodeStudioLite.Installer
         private bool hasFolderOverride;
         private bool verifyPlanOnly;
         private bool launchAfterInstall;
+        private bool removeUserData;
         private readonly HashSet<string> sameVersionRelatedBundles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         protected override void Run()
@@ -90,6 +96,11 @@ namespace CodeStudioLite.Installer
             hasFolderOverride = !string.IsNullOrWhiteSpace(configuredFolder);
             verifyPlanOnly = CommandLineValue("VerifyPlanOnly") == "1" || Engine.NumericVariables["VerifyPlanOnly"] == 1;
             launchAfterInstall = CommandLineValue("LaunchAfterInstall") == "1";
+            // A silent run never removes user data on its own: the in-app
+            // updater uses that path, and it must not take the data with it.
+            // A script can still ask for it explicitly.
+            removeUserData = CommandLineValue("RemoveUserData") == "1"
+                || Engine.NumericVariables["RemoveUserData"] == 1;
 
             selectedLanguage = ResolveLanguageCode(configuredLanguage);
             ApplySupportedUiCulture(selectedLanguage);
@@ -127,6 +138,7 @@ namespace CodeStudioLite.Installer
             }
 
             selectedLanguage = IsSupportedLanguage(languageCode) ? languageCode : "en-US";
+            removeUserData = form.RemoveUserDataRequested;
             this.installFolder = normalizedFolder;
             Engine.StringVariables["SelectedLanguage"] = selectedLanguage;
             Engine.StringVariables["InstallFolder"] = this.installFolder;
@@ -245,6 +257,7 @@ namespace CodeStudioLite.Installer
 
             applying = true;
             form.ShowApplying();
+            CloseRunningApplication();
             Engine.Apply(applyWindowHandle);
         }
 
@@ -253,6 +266,10 @@ namespace CodeStudioLite.Installer
         private void OnApplyComplete(object sender, ApplyCompleteEventArgs e)
         {
             applying = false;
+            if (e.Status >= 0 && plannedAction == LaunchAction.Uninstall && removeUserData)
+            {
+                RemoveUserDataFolder();
+            }
             form.ExitCode = e.Status;
             form.ShowComplete(e.Status, e.Restart);
             if (Command.Display != Display.Full)
@@ -322,6 +339,131 @@ namespace CodeStudioLite.Installer
             throw new FileNotFoundException(
                 "The installed application executable was not found. " + attempted,
                 attemptedLocations.Count > 0 ? attemptedLocations[0] : null);
+        }
+
+        /// <summary>
+        /// Deletes the user data folder after a successful uninstall, when the
+        /// user asked for it. Failing to delete it does not fail the uninstall
+        /// that already succeeded, so this only logs.
+        /// </summary>
+        private void RemoveUserDataFolder()
+        {
+            string folder = InstallerWindow.UserDataFolder;
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            // Guard the path before a recursive delete: it has to be the
+            // folder we own, directly inside this user's profile. A blank or
+            // unexpected value must never reach Directory.Delete.
+            bool isExpectedFolder = !string.IsNullOrEmpty(userProfile)
+                && string.Equals(
+                    folder,
+                    Path.Combine(userProfile, ".codestudio-lite"),
+                    StringComparison.OrdinalIgnoreCase);
+            if (!isExpectedFolder)
+            {
+                Engine.Log(LogLevel.Error, "Refusing to delete an unexpected user data folder: " + folder);
+                return;
+            }
+
+            try
+            {
+                if (Directory.Exists(folder))
+                {
+                    Directory.Delete(folder, true);
+                    Engine.Log(LogLevel.Standard, "Removed the CodeStudio Lite user data folder.");
+                }
+            }
+            catch (Exception error)
+            {
+                Engine.Log(LogLevel.Error, "Could not remove the user data folder: " + error.Message);
+            }
+        }
+
+        /// <summary>
+        /// Ends any running copy of the application before the engine touches
+        /// its files. Uninstall used to leave it resident, and an update
+        /// replaced files underneath a live process, because nothing in the
+        /// chain closed it: the bundle has no CloseApplication element and the
+        /// MSI runs with its internal UI suppressed, so the files-in-use
+        /// prompt never appears. Only the copy in the install folder we are
+        /// operating on is touched.
+        /// </summary>
+        private void CloseRunningApplication()
+        {
+            if (plannedAction == LaunchAction.Layout || plannedAction == LaunchAction.Cache)
+            {
+                return;
+            }
+
+            string installRoot;
+            try
+            {
+                installRoot = Path.GetDirectoryName(ResolveInstalledExecutablePath());
+            }
+            catch (Exception error)
+            {
+                // A first install has nothing to close, and a missing
+                // executable must never block the action.
+                Engine.Log(LogLevel.Standard, "No installed executable to close: " + error.Message);
+                return;
+            }
+
+            foreach (Process process in Process.GetProcessesByName("codestudio-lite"))
+            {
+                using (process)
+                {
+                    try
+                    {
+                        if (!IsProcessInFolder(process, installRoot))
+                        {
+                            continue;
+                        }
+
+                        Engine.Log(LogLevel.Standard, "Closing CodeStudio Lite process " + process.Id + " before applying changes.");
+                        if (process.CloseMainWindow() && process.WaitForExit(GracefulExitMilliseconds))
+                        {
+                            continue;
+                        }
+
+                        process.Kill();
+                        process.WaitForExit(ForcedExitMilliseconds);
+                    }
+                    catch (Exception error)
+                    {
+                        // Access denied, or the process exited between the
+                        // enumeration and the call. Neither is fatal: the
+                        // engine still gets its normal chance to proceed.
+                        Engine.Log(LogLevel.Error, "Could not close a running CodeStudio Lite process: " + error.Message);
+                    }
+                }
+            }
+        }
+
+        private static bool IsProcessInFolder(Process process, string folder)
+        {
+            if (string.IsNullOrEmpty(folder))
+            {
+                return false;
+            }
+
+            string executablePath;
+            try
+            {
+                executablePath = process.MainModule.FileName;
+            }
+            catch
+            {
+                // Reading the module of a process owned by another user or a
+                // different bitness throws. Skip it rather than guess.
+                return false;
+            }
+
+            string processFolder = Path.GetDirectoryName(executablePath);
+            return !string.IsNullOrEmpty(processFolder)
+                && string.Equals(
+                    processFolder.TrimEnd(Path.DirectorySeparatorChar),
+                    folder.TrimEnd(Path.DirectorySeparatorChar),
+                    StringComparison.OrdinalIgnoreCase);
         }
 
         private void CloseIfUnattended()

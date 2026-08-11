@@ -29,8 +29,8 @@
 
     <Style x:Key="BaseButtonStyle" TargetType="Button">
       <Setter Property="Height" Value="38" />
-      <Setter Property="MinWidth" Value="92" />
-      <Setter Property="Padding" Value="18,0" />
+      <Setter Property="MinWidth" Value="104" />
+      <Setter Property="Padding" Value="26,0" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
       <Setter Property="Background" Value="{StaticResource SoftBrush}" />
@@ -45,7 +45,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="5">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
@@ -75,7 +75,7 @@
                     BorderBrush="{TemplateBinding BorderBrush}"
                     BorderThickness="1"
                     CornerRadius="5">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
@@ -103,6 +103,49 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!-- The stock Windows template renders a light control on this dark
+         surface, the same way the ComboBox did, so the box is drawn here. -->
+    <Style x:Key="OptionCheckBoxStyle" TargetType="CheckBox">
+      <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <StackPanel Orientation="Horizontal" Background="Transparent">
+              <Border x:Name="Box"
+                      Width="18" Height="18"
+                      VerticalAlignment="Center"
+                      Background="{StaticResource StrongBrush}"
+                      BorderBrush="{StaticResource BorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="4">
+                <TextBlock x:Name="Tick"
+                           Text="&#x2713;"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Foreground="White"
+                           Visibility="Collapsed"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+              </Border>
+              <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
 
     <Style TargetType="ComboBoxItem">
@@ -306,6 +349,11 @@
                     <TextBlock x:Name="SummaryFolderLabel" Foreground="{StaticResource MutedBrush}" />
                     <TextBlock x:Name="SummaryFolderValue" Grid.Column="1" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
                   </Grid>
+                  <StackPanel x:Name="RemoveUserDataSection" Visibility="Collapsed">
+                    <Border Height="1" Margin="0,14" Background="#2A2E36" />
+                    <CheckBox x:Name="RemoveUserDataCheck" Style="{StaticResource OptionCheckBoxStyle}" IsChecked="False" />
+                    <TextBlock x:Name="RemoveUserDataHint" Margin="28,8,0,0" FontSize="12" Foreground="#7D818C" TextWrapping="Wrap" />
+                  </StackPanel>
                 </StackPanel>
               </Border>
             </Grid>

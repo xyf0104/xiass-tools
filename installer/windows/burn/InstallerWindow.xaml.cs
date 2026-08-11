@@ -68,6 +68,19 @@ namespace CodeStudioLite.Installer
 
         internal IntPtr Handle => windowHandle;
 
+        /// The folder the application keeps profiles, credential references
+        /// and its state database in. It lives under the user profile rather
+        /// than the install folder, so uninstalling the program never removed
+        /// it and the user was given no say in the matter.
+        internal static string UserDataFolder => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".codestudio-lite");
+
+        /// Whether the user asked for that folder to go as well. Only the
+        /// interactive uninstall can set this; a silent run keeps the data.
+        internal bool RemoveUserDataRequested =>
+            commandAction == LaunchAction.Uninstall && RemoveUserDataCheck.IsChecked == true;
+
         private void BringToForeground()
         {
             if (!showFullUi || windowHandle == IntPtr.Zero)
@@ -398,13 +411,25 @@ namespace CodeStudioLite.Installer
                     PrimaryButton.Content = T("Next", "下一步", "下一步");
                     break;
                 case InstallerPage.Confirm:
+                    bool uninstalling = commandAction == LaunchAction.Uninstall;
                     HeadingLabel.Text = T("Ready to continue", "准备继续", "準備繼續");
                     DescriptionLabel.Text = T("Review the settings before setup makes changes.", "请在安装程序进行更改前检查设置。", "請在安裝程式進行變更前檢查設定。");
-                    SummaryTitle.Text = T("Installation summary", "安装摘要", "安裝摘要");
+                    SummaryTitle.Text = uninstalling
+                        ? T("Uninstall summary", "卸载摘要", "解除安裝摘要")
+                        : T("Installation summary", "安装摘要", "安裝摘要");
                     SummaryLanguageLabel.Text = T("Language", "语言", "語言");
                     SummaryFolderLabel.Text = T("Location", "位置", "位置");
                     SummaryLanguageValue.Text = ((InstallerLanguage)LanguageSelector.SelectedItem).Label;
                     SummaryFolderValue.Text = FolderTextBox.Text;
+                    RemoveUserDataSection.Visibility = uninstalling ? Visibility.Visible : Visibility.Collapsed;
+                    RemoveUserDataCheck.Content = T(
+                        "Also delete my settings and data",
+                        "同时删除我的设置和数据",
+                        "同時刪除我的設定和資料");
+                    RemoveUserDataHint.Text = T(
+                        "Removes profiles, credential references and local history from " + UserDataFolder + ". This cannot be undone. Leave it unchecked to keep everything for a future install.",
+                        "将从 " + UserDataFolder + " 删除档案、凭据引用和本地记录。此操作不可恢复。保持未勾选可为将来重新安装保留全部数据。",
+                        "將從 " + UserDataFolder + " 刪除設定檔、憑證參考與本機紀錄。此操作無法復原。保持未勾選可為將來重新安裝保留全部資料。");
                     PrimaryButton.Content = ActionLabel();
                     break;
                 case InstallerPage.Progress:
