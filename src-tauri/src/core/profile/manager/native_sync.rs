@@ -234,6 +234,25 @@ where
     G: FnOnce() -> Option<DetectedNativeProfile>,
 {
     let app = canonical_profile_app(app);
+    // When the gateway is the active routing mode for this tool, the on-disk
+    // config was written by the gateway apply path. Reading it back and
+    // treating it as a config-mode profile would create a phantom duplicate
+    // that fights the gateway profile for activation on every load.
+    let gateway_is_active = config
+        .active_profiles_by_mode
+        .gateway
+        .get(&app)
+        .map(|active_id| {
+            drafts.iter().any(|profile| {
+                profile.id == *active_id
+                    && canonical_profile_app(&profile.app) == app
+                    && profile.mode == ProviderApplyMode::Gateway
+            })
+        })
+        .unwrap_or(false);
+    if gateway_is_active {
+        return Ok(false);
+    }
     let current_active_id = config.active_profiles_by_mode.config.get(&app).cloned();
     let detected = detect_profile();
     let (selected_profile_id, should_correct_detected_profile) = {
