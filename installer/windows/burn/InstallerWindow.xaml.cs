@@ -27,6 +27,12 @@ namespace CodeStudioLite.Installer
         private bool detectionComplete;
         private bool canLaunchInstalledApp;
         private bool canRetryInstallation;
+        private bool applyingChanges;
+        private bool cancelling;
+
+        /// ERROR_INSTALL_USEREXIT as the engine reports it: the run stopped
+        /// because it was asked to.
+        private const int UserCancelledHResult = unchecked((int)0x80070642);
         private int progressPercentage;
         private IntPtr windowHandle;
 
@@ -58,7 +64,6 @@ namespace CodeStudioLite.Installer
 
             if (!showFullUi)
             {
-                Opacity = 0;
                 ShowInTaskbar = false;
                 ShowActivated = false;
             }
@@ -78,8 +83,28 @@ namespace CodeStudioLite.Installer
 
         /// Whether the user asked for that folder to go as well. Only the
         /// interactive uninstall can set this; a silent run keeps the data.
-        internal bool RemoveUserDataRequested =>
-            commandAction == LaunchAction.Uninstall && RemoveUserDataCheck.IsChecked == true;
+        ///
+        /// A silent run answers without consulting the checkbox at all. The
+        /// engine calls this from its own thread there — an interactive run
+        /// reaches it from a button click, on the UI thread — and a WPF control
+        /// belongs to the thread that created it. Reading one from the engine
+        /// thread threw, which killed that thread mid-detect: the run then
+        /// planned nothing, applied nothing, and never exited, leaving whoever
+        /// spawned it waiting on a process that would never finish.
+        internal bool RemoveUserDataRequested
+        {
+            get
+            {
+                if (commandAction != LaunchAction.Uninstall || !showFullUi)
+                {
+                    return false;
+                }
+
+                return Dispatcher.CheckAccess()
+                    ? RemoveUserDataCheck.IsChecked == true
+                    : Dispatcher.Invoke(() => RemoveUserDataCheck.IsChecked == true);
+            }
+        }
 
         private void BringToForeground()
         {
@@ -159,9 +184,10 @@ namespace CodeStudioLite.Installer
             {
                 page = InstallerPage.Progress;
                 progressPercentage = 0;
+                applyingChanges = false;
+                cancelling = false;
                 ApplyLocalization();
                 StatusLabel.Text = T("Preparing to make changes...", "正在准备更改...", "正在準備變更...");
-                CancelButton.IsEnabled = false;
             });
         }
 
@@ -170,8 +196,26 @@ namespace CodeStudioLite.Installer
             OnUiThread(() =>
             {
                 page = InstallerPage.Progress;
+                applyingChanges = true;
+                cancelling = false;
                 ApplyLocalization();
                 StatusLabel.Text = T("Applying changes...", "正在应用更改...", "正在套用變更...");
+            });
+        }
+
+        /// The engine has been asked to stop and is unwinding what it did.
+        /// Asking twice achieves nothing, so the button goes quiet while the
+        /// status says what is happening.
+        internal void ShowCancelling()
+        {
+            OnUiThread(() =>
+            {
+                cancelling = true;
+                ApplyLocalization();
+                StatusLabel.Text = T(
+                    "Cancelling and undoing changes...",
+                    "正在取消并撤销更改...",
+                    "正在取消並復原變更...");
             });
         }
 
@@ -188,21 +232,29 @@ namespace CodeStudioLite.Installer
         {
             OnUiThread(() =>
             {
+                bool succeeded = status >= 0;
+                // A run the user stopped is not a fault, and reporting it as
+                // one — with an error code to look up — would say the installer
+                // broke when it did exactly what it was told.
+                bool cancelled = status == UserCancelledHResult;
                 operationComplete = true;
-                canLaunchInstalledApp = status >= 0 && (commandAction == LaunchAction.Install || commandAction == LaunchAction.Repair);
-                canRetryInstallation = status < 0;
+                applyingChanges = false;
+                cancelling = false;
+                canLaunchInstalledApp = succeeded && (commandAction == LaunchAction.Install || commandAction == LaunchAction.Repair);
+                canRetryInstallation = !succeeded;
                 page = InstallerPage.Complete;
-                progressPercentage = status >= 0 ? 100 : progressPercentage;
+                progressPercentage = succeeded ? 100 : progressPercentage;
                 ApplyLocalization();
 
-                bool succeeded = status >= 0;
                 CompleteGlyph.Text = succeeded ? "✓" : "!";
-                CompleteGlyph.Foreground = BrushFrom(succeeded ? "#65D69B" : "#FF9A93");
+                CompleteGlyph.Foreground = BrushFrom(succeeded ? "#65D69B" : (cancelled ? "#F4D94E" : "#FF9A93"));
                 CompleteMessage.Text = succeeded
                     ? (restart == ApplyRestart.RestartRequired
                         ? T("Restart Windows to finish setup.", "请重启 Windows 以完成安装。", "請重新啟動 Windows 以完成安裝。")
                         : T("Setup completed successfully.", "安装已成功完成。", "安裝已成功完成。"))
-                    : T("Setup failed", "安装失败", "安裝失敗") + " (0x" + status.ToString("X8") + ").";
+                    : cancelled
+                        ? T("Setup was cancelled and no changes were kept.", "安装已取消，未保留任何更改。", "安裝已取消，未保留任何變更。")
+                        : T("Setup failed", "安装失败", "安裝失敗") + " (0x" + status.ToString("X8") + ").";
             });
         }
 
@@ -238,7 +290,12 @@ namespace CodeStudioLite.Installer
             });
         }
 
-        internal void CloseOnUiThread() => OnUiThread(Close);
+        /// Builds the window handle without showing the window, so a silent run
+        /// can hand Burn a handle for Apply while leaving the desktop alone.
+        internal void EnsureHandleWithoutShowing() =>
+            windowHandle = new WindowInteropHelper(this).EnsureHandle();
+
+        internal void CloseOnUiThread() => OnUiThread(EndSession);
 
         internal void CloseAfterPlanVerification()
         {
@@ -246,8 +303,24 @@ namespace CodeStudioLite.Installer
             {
                 operationComplete = true;
                 ExitCode = 0;
-                Close();
+                EndSession();
             });
+        }
+
+        /// Ends the run whether or not a window was ever shown. Closing is what
+        /// stops an interactive run; a silent one has no shown window to close,
+        /// so its message loop has to be told to stop explicitly or the process
+        /// lingers after its work is done — and whoever spawned it keeps
+        /// waiting.
+        private void EndSession()
+        {
+            if (showFullUi)
+            {
+                Close();
+                return;
+            }
+
+            Application.Current?.Shutdown();
         }
 
         private void ShowDetecting()
@@ -467,7 +540,14 @@ namespace CodeStudioLite.Installer
                 ? (canLaunchInstalledApp || canRetryInstallation ? Visibility.Visible : Visibility.Collapsed)
                 : (page != InstallerPage.Progress ? Visibility.Visible : Visibility.Collapsed);
             PrimaryButton.IsEnabled = detectionComplete && page != InstallerPage.Progress;
-            CancelButton.IsEnabled = page != InstallerPage.Progress || operationComplete;
+            // Stopping a running install is the user's call, not something to
+            // take away from them: the engine supports cancellation and rolls
+            // back what it has done. The button only goes quiet once a
+            // cancellation is already under way, or while planning, which
+            // finishes on its own in a moment.
+            CancelButton.IsEnabled = page != InstallerPage.Progress
+                || operationComplete
+                || (applyingChanges && !cancelling);
         }
 
         private void UpdateStepIndicator()
@@ -559,16 +639,30 @@ namespace CodeStudioLite.Installer
 
         private void OnWindowClosing(object sender, CancelEventArgs e)
         {
-            if (!operationComplete && !CancelButton.IsEnabled)
+            if (operationComplete)
+            {
+                return;
+            }
+
+            if (applyingChanges)
+            {
+                // Closing the window cannot end an install that is already
+                // writing to disk. Treat it as the cancellation it plainly
+                // means, and stay open until the engine has finished undoing
+                // its work — vanishing mid-rollback would leave the machine in
+                // a state nobody asked for.
+                e.Cancel = true;
+                bootstrapper.Cancel();
+                return;
+            }
+
+            if (!CancelButton.IsEnabled)
             {
                 e.Cancel = true;
                 return;
             }
 
-            if (!operationComplete)
-            {
-                ExitCode = 1602;
-            }
+            ExitCode = 1602;
         }
 
         private void LoadBrandIcon()

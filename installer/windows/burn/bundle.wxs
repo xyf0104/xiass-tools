@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
      xmlns:bal="http://schemas.microsoft.com/wix/BalExtension">
-  <Bundle Name="CodeStudio Lite"
+  <!-- Names the installer, not the product: this becomes the executable's file
+       description, which is what Windows shows for the running process. The
+       entry left in installed programs is named separately, by setting
+       WixBundleName before the install registers itself. -->
+  <Bundle Name="CodeStudio Lite Installer"
           Manufacturer="CodeStudio"
           Version="$(var.BundleVersion)"
           UpgradeCode="{6B78C4D8-8C90-4C11-A1D8-893160DA17A7}"

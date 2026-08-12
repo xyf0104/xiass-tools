@@ -1,0 +1,135 @@
+<h2>操作页信息架构重做方向</h2>
+<p class="subtitle">这一轮不再包含当前的单列容器流。重点比较：主操作怎么放、状态和设置是否分离、日志/详情是否默认占空间。</p>
+
+<div class="cards">
+  <div class="card" data-choice="workbench" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#f5f6f8;border:1px solid #d9dee5;border-radius:10px;min-height:390px;font-family:Inter,system-ui,sans-serif;color:#1f252c">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px">
+          <main style="display:grid;gap:16px">
+            <section style="display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px;background:white;border:1px solid #dfe3e8;border-radius:9px">
+              <div>
+                <div style="font-size:10px;font-weight:800;color:#6d7680;letter-spacing:.08em">DESKTOP CLIENT</div>
+                <div style="font-size:22px;font-weight:760;margin-top:6px">Codex Desktop</div>
+                <div style="font-size:13px;color:#68717b;margin-top:5px">主操作区只放启动、更新、修复这种高频动作</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+                <span style="padding:9px 14px;background:#111;color:white;border-radius:7px;font-size:12px;font-weight:700">启动</span>
+                <span style="padding:9px 14px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px;font-weight:700">刷新</span>
+              </div>
+            </section>
+            <section style="background:white;border:1px solid #dfe3e8;border-radius:9px;overflow:hidden">
+              <div style="padding:15px 18px;border-bottom:1px solid #e5e8ec;font-weight:750">安装与更新</div>
+              <div style="display:grid;gap:12px;padding:18px">
+                <div style="display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:14px;background:#f8fafb;border:1px solid #e5e9ed;border-radius:8px">
+                  <div><b>1.2.4 可用</b><div style="font-size:12px;color:#68717b;margin-top:4px">Windows App 安装包已缓存，SHA-256 已校验</div></div>
+                  <span style="padding:9px 13px;background:#111;color:white;border-radius:7px;font-size:12px">更新</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:14px;background:#f8fafb;border:1px solid #e5e9ed;border-radius:8px">
+                  <div><b>运行时修复</b><div style="font-size:12px;color:#68717b;margin-top:4px">路径、注册、缓存检测集中在这里</div></div>
+                  <span style="padding:9px 13px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">修复</span>
+                </div>
+              </div>
+            </section>
+            <section style="background:white;border:1px solid #dfe3e8;border-radius:9px;overflow:hidden">
+              <div style="padding:15px 18px;border-bottom:1px solid #e5e8ec;font-weight:750">最近输出</div>
+              <div style="margin:18px;padding:14px;background:#111827;color:#d7dde6;border-radius:8px;font-size:12px;height:64px">stage / Codex Desktop<br>Verification complete.</div>
+            </section>
+          </main>
+          <aside style="display:grid;gap:16px;align-content:start">
+            <section style="padding:16px;background:white;border:1px solid #dfe3e8;border-radius:9px">
+              <b>状态摘要</b>
+              <div style="display:grid;gap:10px;margin-top:14px">
+                <div style="padding:12px;background:#f8fafb;border-radius:8px"><span style="font-size:11px;color:#68717b">当前</span><br><b>1.2.3</b></div>
+                <div style="padding:12px;background:#f8fafb;border-radius:8px"><span style="font-size:11px;color:#68717b">最新</span><br><b>1.2.4</b></div>
+                <div style="padding:12px;background:#f8fafb;border-radius:8px"><span style="font-size:11px;color:#68717b">安装方式</span><br><b>Windows App</b></div>
+              </div>
+            </section>
+            <section style="padding:16px;background:white;border:1px solid #dfe3e8;border-radius:9px">
+              <b>设置</b>
+              <div style="margin-top:14px;padding:12px;background:#f8fafb;border-radius:8px">启动时汉化界面</div>
+              <div style="margin-top:10px;padding:12px;background:#f8fafb;border-radius:8px">配置写入策略</div>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 双栏工作台</h3>
+      <p>真正改变结构：左边只处理主流程，右边固定状态与设置。适合桌面宽屏，能明显减少“所有东西挤在一列里”的感觉。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="tabs" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#f5f6f8;border:1px solid #d9dee5;border-radius:10px;min-height:390px;font-family:Inter,system-ui,sans-serif;color:#1f252c">
+        <section style="padding:20px;background:white;border:1px solid #dfe3e8;border-radius:9px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start">
+            <div><div style="font-size:10px;font-weight:800;color:#6d7680;letter-spacing:.08em">CLAUDE DESKTOP</div><div style="font-size:22px;font-weight:760;margin-top:6px">任务中心</div><div style="font-size:13px;color:#68717b;margin-top:5px">把页面拆成 Overview / Install / Settings / Logs</div></div>
+            <span style="padding:9px 14px;background:#111;color:white;border-radius:7px;font-size:12px;font-weight:700">启动</span>
+          </div>
+        </section>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <span style="padding:10px 16px;background:#111;color:white;border-radius:999px;font-size:12px;font-weight:800">概览</span>
+          <span style="padding:10px 16px;background:white;border:1px solid #dfe3e8;border-radius:999px;font-size:12px;font-weight:800">安装</span>
+          <span style="padding:10px 16px;background:white;border:1px solid #dfe3e8;border-radius:999px;font-size:12px;font-weight:800">设置</span>
+          <span style="padding:10px 16px;background:white;border:1px solid #dfe3e8;border-radius:999px;font-size:12px;font-weight:800">日志</span>
+        </div>
+        <section style="background:white;border:1px solid #dfe3e8;border-radius:9px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:18px">
+            <div style="padding:16px;background:#f8fafb;border:1px solid #e5e9ed;border-radius:8px"><span style="font-size:11px;color:#68717b">安装状态</span><br><b>已安装</b></div>
+            <div style="padding:16px;background:#f8fafb;border:1px solid #e5e9ed;border-radius:8px"><span style="font-size:11px;color:#68717b">更新</span><br><b>可用</b></div>
+            <div style="padding:16px;background:#f8fafb;border:1px solid #e5e9ed;border-radius:8px"><span style="font-size:11px;color:#68717b">运行</span><br><b>未运行</b></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:0 18px 18px">
+            <div style="padding:15px;background:#f8fafb;border:1px solid #e5e9ed;border-radius:8px">当前页只展示概览，其它细节移到对应标签页，默认不占空间。</div>
+            <div style="display:flex;gap:8px"><span style="padding:9px 13px;background:#111;color:white;border-radius:7px;font-size:12px">更新</span><span style="padding:9px 13px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">打开目录</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>D. 任务分面 Tabs</h3>
+      <p>把拥挤内容分面管理，常驻页只保留当前任务。适合“安装、设置、日志”内容多但不需要同时看的场景。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="drawer" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#f5f6f8;border:1px solid #d9dee5;border-radius:10px;min-height:390px;font-family:Inter,system-ui,sans-serif;color:#1f252c">
+        <section style="padding:20px;background:white;border:1px solid #dfe3e8;border-radius:9px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start">
+            <div><div style="font-size:10px;font-weight:800;color:#6d7680;letter-spacing:.08em">DESKTOP CLIENT</div><div style="font-size:22px;font-weight:760;margin-top:6px">操作列表 + 详情抽屉</div><div style="font-size:13px;color:#68717b;margin-top:5px">列表紧凑，点击后在右侧/底部展开完整详情</div></div>
+            <span style="padding:9px 14px;background:#111;color:white;border-radius:7px;font-size:12px;font-weight:700">启动</span>
+          </div>
+        </section>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px">
+          <section style="display:grid;gap:10px">
+            <div style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;padding:14px 16px;background:white;border:1px solid #dfe3e8;border-radius:9px"><div style="height:34px;width:34px;border-radius:8px;background:#111;color:white;display:grid;place-items:center">▶</div><div><b>启动 Codex Desktop</b><div style="font-size:12px;color:#68717b;margin-top:3px">使用当前配置启动</div></div><span style="font-size:12px;color:#68717b">可用</span></div>
+            <div style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;padding:14px 16px;background:white;border:1px solid #111;border-radius:9px"><div style="height:34px;width:34px;border-radius:8px;background:#111;color:white;display:grid;place-items:center">⬇</div><div><b>更新到 1.2.4</b><div style="font-size:12px;color:#68717b;margin-top:3px">选中项，详情在右侧</div></div><span style="padding:8px 12px;background:#111;color:white;border-radius:7px;font-size:12px">更新</span></div>
+            <div style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;padding:14px 16px;background:white;border:1px solid #dfe3e8;border-radius:9px"><div style="height:34px;width:34px;border-radius:8px;background:#edf0f4;display:grid;place-items:center">⚙</div><div><b>启动设置</b><div style="font-size:12px;color:#68717b;margin-top:3px">汉化、配置写入、路径</div></div><span style="font-size:12px;color:#68717b">2 项</span></div>
+            <div style="display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;padding:14px 16px;background:white;border:1px solid #dfe3e8;border-radius:9px"><div style="height:34px;width:34px;border-radius:8px;background:#edf0f4;display:grid;place-items:center">≡</div><div><b>日志与结果</b><div style="font-size:12px;color:#68717b;margin-top:3px">执行时自动打开</div></div><span style="font-size:12px;color:#68717b">收起</span></div>
+          </section>
+          <aside style="padding:16px;background:white;border:1px solid #dfe3e8;border-radius:9px">
+            <b>更新详情</b>
+            <div style="display:grid;gap:10px;margin-top:14px">
+              <div style="padding:12px;background:#f8fafb;border-radius:8px">当前版本 1.2.3</div>
+              <div style="padding:12px;background:#f8fafb;border-radius:8px">目标版本 1.2.4</div>
+              <div style="padding:12px;background:#f8fafb;border-radius:8px">下载 124 MB</div>
+              <div style="padding:12px;background:#111827;color:#d7dde6;border-radius:8px;font-size:12px">latest package verified</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>E. 操作列表 + 详情抽屉</h3>
+      <p>把页面变成命令列表，详情按需展开。最能消除贴边和大块内容堆叠，但实现会明显改动组件组织。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>这轮的关键选择</h3>
+  <p>B 适合桌面端长期操作，D 适合内容分区和低风险渐进重做，E 最像一次真正的交互重构。你可以直接点一个，也可以说想把两种混合。</p>
+</div>

@@ -50,13 +50,22 @@ test("tool install dialog does not show advisory install warnings", () => {
 test("tool updates require the same confirmation dialog as installs", () => {
   const dashboard = read("src/routes/Dashboard.svelte");
 
-  assert.match(dashboard, /let installMode:\s*"install"\s*\|\s*"update"\s*=/);
-  assert.match(dashboard, /async function openToolActionPlan\(tool: ToolStatus,\s*mode:\s*"install"\s*\|\s*"update"\)/);
+  // Uninstall joined install and update in the same dialog, so the mode is now
+  // three-valued; the point of this test is that all three share one flow.
+  assert.match(dashboard, /let installMode:\s*"install"\s*\|\s*"update"\s*\|\s*"uninstall"\s*=/);
+  assert.match(
+    dashboard,
+    /async function openToolActionPlan\(tool: ToolStatus,\s*mode:\s*"install"\s*\|\s*"update"\s*\|\s*"uninstall"\)/
+  );
   assert.doesNotMatch(dashboard, /on:click=\{\(\) => confirmUpdate\(tool\)\}/);
   assert.match(dashboard, /on:click=\{\(\) => openToolActionPlan\(tool,\s*"update"\)\}/);
-  assert.match(dashboard, /installMode === "update"\s*\?\s*planToolUpdate\(planTool\.id\)\s*:\s*planToolInstall\(planTool\.id\)/);
-  assert.match(dashboard, /installMode === "update"\s*\?\s*updateTool/);
+  assert.match(dashboard, /planToolUninstall\(planTool\.id\)/);
+  assert.match(dashboard, /installMode === "update"\s*\?\s*planToolUpdate\(planTool\.id\)/);
+  assert.match(dashboard, /installMode === "update" \? updateTool : installTool/);
   assert.match(dashboard, /installMode === "update"\s*\?\s*"toolInstall\.confirmUpdate"/);
+  // Both cleanups destroy something and must never default to on.
+  assert.match(dashboard, /let uninstallRemoveConfig = false;/);
+  assert.match(dashboard, /let uninstallRemovePath = false;/);
 
   const api = read("src/lib/api.ts");
   assert.match(api, /export async function planToolUpdate\(toolId: string\): Promise<ToolInstallPlan>/);

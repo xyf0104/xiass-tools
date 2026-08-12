@@ -57,11 +57,6 @@ test("managed Burn UI exposes the three-language selector", () => {
   assert.match(source, /English/);
   assert.match(source, /StringVariables\["SelectedLanguage"\]/);
   assert.match(source, /Engine\.Detect\(\)/);
-  assert.match(source, /DetectRelatedBundle \+=/);
-  assert.match(source, /PlanRelatedBundle \+=/);
-  assert.match(source, /RelatedOperation\.None/);
-  assert.match(source, /RelationType\.Upgrade/);
-  assert.match(source, /e\.State = RequestState\.Absent/);
   assert.match(source, /Engine\.Plan\(/);
   assert.match(source, /Engine\.Apply\(/);
   assert.match(source, /applyWindowHandle == IntPtr\.Zero/);
@@ -268,5 +263,126 @@ test("Burn verification inspects the built manifest instead of trusting source a
   assert.match(script, /Variable: InstallFolder/);
   assert.match(script, /Variable: SelectedLanguage/);
   assert.doesNotMatch(script, /-SelectedLanguage=zh-CN/);
-  assert.match(script, /ba requested: Absent/);
+  // The plan must never ask for a related bundle to go: that is what makes the
+  // engine launch a second installer process.
+  assert.match(script, /if \(\$planLogContent -match 'ba requested: Absent'\)/);
+  assert.match(script, /spawns a second installer process/);
+});
+
+test("Burn locates a running app across the 32/64-bit gap before touching its files", () => {
+  const source = fs.readFileSync(bootstrapperSourcePath, "utf8");
+
+  // Burn hosts a 32-bit bootstrapper while the product ships 64-bit, and
+  // Process.MainModule throws across that boundary. Reaching for it made every
+  // running copy look like an unrelated process, so the installer left the app
+  // open and then stalled on files it still held.
+  assert.doesNotMatch(source, /MainModule\.FileName/);
+  assert.match(source, /QueryFullProcessImageName/);
+  assert.match(source, /OpenProcess/);
+  assert.match(source, /CloseHandle/);
+  assert.match(source, /ProcessQueryLimitedInformation\s*=\s*0x1000/);
+
+  // The close runs for real installs and upgrades, not only for uninstall.
+  assert.match(source, /CloseRunningApplication\(\);\s*\n\s*Engine\.Apply\(/);
+
+  // A process whose location cannot be read must be reported, never skipped in
+  // silence: that silence is what made the original stall undiagnosable.
+  assert.match(source, /Could not read the location of process/);
+});
+
+test("silent Burn runs neither draw a window nor read controls off the UI thread", () => {
+  const source = fs.readFileSync(installerWindowSourcePath, "utf8");
+
+  const bootstrapper = fs.readFileSync(bootstrapperSourcePath, "utf8");
+
+  // A silent run must not put a window on screen at all. Hiding one after the
+  // fact does not work — Opacity needs AllowsTransparency, and Visibility set
+  // during Show is overwritten by that same Show — so every child bundle the
+  // engine spawned left an unpainted frame on the desktop.
+  assert.doesNotMatch(source, /Opacity\s*=\s*0/);
+  assert.match(bootstrapper, /EnsureHandleWithoutShowing\(\)/);
+  assert.match(source, /EnsureHandleWithoutShowing\(\)[\s\S]{0,160}EnsureHandle\(\)/);
+  assert.match(bootstrapper, /ShutdownMode\.OnExplicitShutdown/);
+  // Loaded never fires for a window that is never shown, so detection cannot
+  // hang off it, and the run has to be told to stop explicitly or it lingers.
+  assert.match(bootstrapper, /if \(interactive\)[\s\S]{0,200}form\.Loaded \+=/);
+  assert.match(bootstrapper, /Dispatcher\.BeginInvoke[\s\S]{0,80}Engine\.Detect\(\)/);
+  assert.match(source, /Application\.Current\?\.Shutdown\(\)/);
+
+  // A silent run reaches RemoveUserDataRequested from the engine thread, where
+  // touching a WPF control throws and takes that thread down with it.
+  const property = source.match(
+    /internal bool RemoveUserDataRequested[\s\S]*?\n        \}/,
+  );
+  assert.ok(property, "RemoveUserDataRequested should still exist");
+  assert.match(property[0], /Dispatcher\.CheckAccess\(\)/);
+  assert.match(property[0], /!showFullUi/);
+});
+
+test("a running install can be cancelled and reports itself as cancelled", () => {
+  const bootstrapper = fs.readFileSync(bootstrapperSourcePath, "utf8");
+  const window = fs.readFileSync(installerWindowSourcePath, "utf8");
+
+  // Cancelling mid-apply is a request to the engine, which then rolls back.
+  assert.match(bootstrapper, /e\.Result = Result\.Cancel/);
+  assert.match(bootstrapper, /cancelRequested = true/);
+  assert.match(bootstrapper, /form\.ShowCancelling\(\)/);
+  // Retry must not inherit the cancellation that ended the last attempt.
+  assert.match(bootstrapper, /cancelRequested = false/);
+
+  // The button stays live while changes are being applied. Taking it away is
+  // what left the user watching a progress bar with no way out.
+  assert.match(window, /applyingChanges && !cancelling/);
+  assert.doesNotMatch(window, /CancelButton\.IsEnabled = false/);
+  assert.match(window, /internal void ShowCancelling\(\)/);
+
+  // Closing the window mid-apply means cancel, not "disappear and leave the
+  // machine half-written".
+  assert.match(window, /if \(applyingChanges\)[\s\S]{0,600}bootstrapper\.Cancel\(\)/);
+
+  // A cancelled run is not a failure and must not be reported with an error
+  // code the user is invited to look up.
+  assert.match(window, /UserCancelledHResult\s*=\s*unchecked\(\(int\)0x80070642\)/);
+  assert.match(window, /Setup was cancelled and no changes were kept\./);
+  assert.match(window, /安装已取消，未保留任何更改。/);
+  assert.match(window, /安裝已取消，未保留任何變更。/);
+});
+
+test("one install is one process", () => {
+  const source = fs.readFileSync(bootstrapperSourcePath, "utf8");
+
+  // Asking the engine to remove a same-version sibling makes it run that
+  // sibling's own cached installer as a separate process. A machine holding
+  // several stale registrations then gets one extra process each, every one of
+  // them running the code it shipped with rather than this build's — so no fix
+  // here can reach them, and any that hangs hangs the install that spawned it.
+  // Duplicate entries in the installed-programs list, which only repeat
+  // installs of a single version produce, are the smaller problem.
+  // Uninstall still plans the product's own package absent; what must not come
+  // back is doing that to a *related bundle*.
+  assert.doesNotMatch(source, /PlanRelatedBundle \+=/);
+  assert.doesNotMatch(source, /e\.State = RequestState\.Absent;\s*\n\s*\}\s*\n\s*\}\s*\n\s*private void OnPlanComplete/);
+  assert.match(source, /One install is one process\./);
+
+  // Same-version leftovers are still cleared, but in this process: the
+  // registration is deleted directly, which also reaches leftovers whose own
+  // cached installer no longer works.
+  assert.match(source, /RemoveStaleBundleRegistrations\(\)/);
+  assert.match(source, /staleBundleRegistrations\.Add\(e\.ProductCode\)/);
+  assert.match(source, /DeleteSubKeyTree\(bundleId, false\)/);
+  assert.match(source, /BundleCachePath/);
+  // Only after the new install is registered and working.
+  assert.match(source, /e\.Status >= 0 && \(plannedAction == LaunchAction\.Install[\s\S]{0,120}RemoveStaleBundleRegistrations/);
+});
+
+test("the installer names itself, and the installed entry names the product", () => {
+  const bundle = fs.readFileSync(bundleSourcePath, "utf8");
+  const source = fs.readFileSync(bootstrapperSourcePath, "utf8");
+
+  // Bundle/@Name becomes the executable's file description, which is what
+  // Windows shows for the running process — "CodeStudio Lite" there reads as
+  // the application itself rather than its installer.
+  assert.match(bundle, /<Bundle Name="CodeStudio Lite Installer"/);
+  // The registration is the product, so it keeps the product's name.
+  assert.match(source, /StringVariables\["WixBundleName"\] = "CodeStudio Lite"/);
 });

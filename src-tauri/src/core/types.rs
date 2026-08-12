@@ -63,6 +63,11 @@ pub struct RepairToolPathResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolInstallPlan {
+    /// PATH entries the tool's own installer added, which the optional PATH
+    /// cleanup would remove. Empty means the installer never touched PATH, so
+    /// the option is not offered rather than being a no-op checkbox.
+    #[serde(default)]
+    pub uninstall_path_entries: Vec<String>,
     pub tool_id: String,
     pub tool_name: String,
     pub manager: String,
@@ -130,6 +135,12 @@ pub struct ToolUninstallRequest {
     /// When None, the backend falls back to the detected install kind.
     #[serde(default)]
     pub install_kind: Option<String>,
+    /// Also back up and delete the tool's configuration file.
+    #[serde(default)]
+    pub remove_config: bool,
+    /// Also remove the PATH entries the tool's own installer added.
+    #[serde(default)]
+    pub remove_path: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1051,6 +1062,12 @@ pub struct GatewayStatus {
     pub auth_enabled: bool,
     pub token_preview: String,
     pub privacy_filter_mode: PrivacyFilterMode,
+    /// What the user pinned, if anything. Blank means the gateway works the
+    /// identity out for itself.
+    pub upstream_device_id: String,
+    /// The identity actually in use, whatever its source, so the page can show
+    /// what upstreams will see rather than only what was typed.
+    pub effective_upstream_device_id: String,
     pub active_profile_id: Option<String>,
     pub active_profile_name: Option<String>,
     pub active_model: Option<String>,
@@ -1069,6 +1086,10 @@ pub struct GatewayControlResult {
 pub struct UpdateGatewaySettingsRequest {
     #[serde(default)]
     pub privacy_filter_mode: Option<PrivacyFilterMode>,
+    /// Blank asks the gateway to work the identity out for itself, which
+    /// prefers the one Claude Code already uses on this machine.
+    #[serde(default)]
+    pub upstream_device_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

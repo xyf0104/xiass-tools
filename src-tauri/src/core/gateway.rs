@@ -13,6 +13,7 @@ use crate::core::upstream_http;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -86,6 +87,9 @@ struct GatewayConfig {
     auth_enabled: bool,
     model_override: bool,
     privacy_filter_mode: PrivacyFilterMode,
+    /// Overrides the device identity sent to upstreams that select an account
+    /// from it. Empty means "work it out", which prefers Claude Code's own.
+    upstream_device_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,6 +100,7 @@ struct PartialGatewayConfig {
     auth_enabled: Option<bool>,
     model_override: Option<bool>,
     privacy_filter_mode: Option<PrivacyFilterMode>,
+    upstream_device_id: Option<String>,
 }
 
 static GATEWAY_CONFIG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -192,6 +197,9 @@ pub fn update_gateway_settings(
     if let Some(mode) = request.privacy_filter_mode {
         config.privacy_filter_mode = mode;
     }
+    if let Some(device_id) = request.upstream_device_id {
+        config.upstream_device_id = device_id.trim().to_string();
+    }
     persist_gateway_config(&config)?;
 
     Ok(GatewayControlResult {
@@ -274,6 +282,8 @@ fn build_status(config: &GatewayConfig) -> Result<GatewayStatus, String> {
         auth_enabled: config.auth_enabled,
         token_preview: mask_token(&config.token),
         privacy_filter_mode: config.privacy_filter_mode,
+        upstream_device_id: config.upstream_device_id.clone(),
+        effective_upstream_device_id: anthropic_device_id(Some(config.upstream_device_id.as_str())),
         active_profile_id: active.as_ref().map(|profile| profile.id.clone()),
         active_profile_name: active.as_ref().map(|profile| profile.name.clone()),
         active_model: active.as_ref().and_then(|profile| profile_model(&profile)),
@@ -329,6 +339,7 @@ fn load_or_create_gateway_config() -> Result<GatewayConfig, String> {
                 auth_enabled: partial.auth_enabled.unwrap_or(true),
                 model_override: partial.model_override.unwrap_or(true),
                 privacy_filter_mode: partial.privacy_filter_mode.unwrap_or_default(),
+                upstream_device_id: partial.upstream_device_id.unwrap_or_default(),
             };
             persist_gateway_config(&config)?;
             return Ok(config);
@@ -342,6 +353,7 @@ fn load_or_create_gateway_config() -> Result<GatewayConfig, String> {
         auth_enabled: true,
         model_override: true,
         privacy_filter_mode: PrivacyFilterMode::default(),
+        upstream_device_id: String::new(),
     };
     persist_gateway_config(&config)?;
     Ok(config)
@@ -1160,7 +1172,10 @@ fn forward_gateway_request(
             request_body["model"] = Value::String(upstream_model.clone());
         }
         if upstream_protocol == GatewayProtocol::AnthropicMessages {
-            ensure_anthropic_request_identity(&mut request_body);
+            ensure_anthropic_request_identity(
+                &mut request_body,
+                Some(config.upstream_device_id.as_str()),
+            );
         }
         let endpoint = upstream_endpoint(upstream_protocol, &profile, &upstream_model, stream);
         let headers =
@@ -1372,7 +1387,7 @@ fn load_gateway_profile_api_key(profile: &ProfileDraft) -> Result<String, RouteR
 /// the body is rebuilt from protocol-neutral parts, so attach one here. A
 /// client that supplies its own identity keeps it — that field belongs to the
 /// caller, and official Anthropic reads it for abuse signals.
-fn ensure_anthropic_request_identity(body: &mut Value) {
+fn ensure_anthropic_request_identity(body: &mut Value, configured_device_id: Option<&str>) {
     let Some(object) = body.as_object_mut() else {
         return;
     };
@@ -1386,7 +1401,7 @@ fn ensure_anthropic_request_identity(body: &mut Value) {
     }
 
     let identity = json!({
-        "device_id": gateway_device_id(),
+        "device_id": anthropic_device_id(configured_device_id),
         "account_uuid": "",
         "session_id": Uuid::new_v4().to_string(),
     })
@@ -1401,12 +1416,58 @@ fn ensure_anthropic_request_identity(body: &mut Value) {
     }
 }
 
-/// Stable for the life of the process, matching the 64-hex shape these
-/// upstreams expect. The value is never validated, so it only has to look like
-/// a device rather than identify one.
-fn gateway_device_id() -> &'static str {
+/// The device identity to present to an upstream that picks an account from it.
+///
+/// Ordered by how faithfully each source describes the machine actually making
+/// the request, because these upstreams read one identity as one device. A key
+/// seen carrying many identities looks like a key being shared, and that is
+/// what gets an account pool withdrawn — so an identity invented here is the
+/// last resort, not the default.
+fn anthropic_device_id(configured: Option<&str>) -> String {
+    if let Some(value) = configured.map(str::trim).filter(|value| !value.is_empty()) {
+        return value.to_string();
+    }
+
+    claude_code_device_id().unwrap_or_else(derived_device_id)
+}
+
+/// The identity Claude Code sends for this machine, read from its own settings.
+///
+/// Reusing it keeps a machine running both tools looking like the one device it
+/// is. Claude Code stores it as `userID`; it travels as `device_id`.
+fn claude_code_device_id() -> Option<String> {
+    let path = dirs::home_dir()?.join(".claude.json");
+    let settings = std::fs::read_to_string(path).ok()?;
+    let settings = serde_json::from_str::<Value>(&settings).ok()?;
+    settings
+        .get("userID")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+/// A last-resort identity, derived from the machine rather than drawn at
+/// random, so that it is the same on every run. A fresh one each launch would
+/// present this machine as a crowd of devices sharing one key.
+fn derived_device_id() -> String {
     static DEVICE_ID: OnceLock<String> = OnceLock::new();
-    DEVICE_ID.get_or_init(|| format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple()))
+    DEVICE_ID
+        .get_or_init(|| {
+            let machine = std::env::var("COMPUTERNAME")
+                .or_else(|_| std::env::var("HOSTNAME"))
+                .unwrap_or_default();
+            let user = std::env::var("USERNAME")
+                .or_else(|_| std::env::var("USER"))
+                .unwrap_or_default();
+            let mut hasher = Sha256::new();
+            hasher.update(b"codestudio-lite/gateway/device-id\0");
+            hasher.update(machine.as_bytes());
+            hasher.update(b"\0");
+            hasher.update(user.as_bytes());
+            format!("{:x}", hasher.finalize())
+        })
+        .clone()
 }
 
 fn convert_gateway_request(
@@ -1423,7 +1484,7 @@ fn convert_gateway_request(
     let parts = request_parts_from_client(client_protocol, request_body, &model);
     let mut body = request_body_for_protocol(upstream_protocol, &parts, stream);
     if upstream_protocol == GatewayProtocol::AnthropicMessages {
-        ensure_anthropic_request_identity(&mut body);
+        ensure_anthropic_request_identity(&mut body, Some(config.upstream_device_id.as_str()));
     }
     let endpoint = upstream_endpoint(upstream_protocol, profile, &model, stream);
     let headers = upstream_headers_with_passthrough(upstream_protocol, api_key, request_headers);
@@ -3220,6 +3281,13 @@ fn stream_converted_gateway_response(
             &mut stream_usage,
         )?;
     }
+    // Each tool call reaches the client once, after its arguments have finished
+    // arriving: `write_protocol_stream_tool_call` emits a whole call — opening
+    // it, filling in its arguments, and closing it — so calling it per fragment
+    // would spell one call out as a run of truncated ones.
+    for (index, tool_call) in full_tool_calls.iter().enumerate() {
+        write_protocol_stream_tool_call(client_stream, &stream_state, tool_call, index)?;
+    }
     write_protocol_stream_done(
         client_stream,
         &stream_state,
@@ -3253,12 +3321,61 @@ fn write_converted_stream_frame(
         full_text.push_str(&update.text_delta);
         write_protocol_stream_delta(client_stream, stream_state, &update.text_delta)?;
     }
-    for tool_call in update.tool_calls {
-        let index = full_tool_calls.len();
-        write_protocol_stream_tool_call(client_stream, stream_state, &tool_call, index)?;
-        full_tool_calls.push(tool_call);
-    }
+    gather_tool_calls(
+        full_tool_calls,
+        update.tool_calls,
+        update.tool_argument_delta.as_deref(),
+    );
     Ok(())
+}
+
+/// Fold one decoded stream update into the tool calls gathered so far.
+///
+/// An upstream streams a tool call in pieces: it names the call, then spells out
+/// its arguments across later frames. Both halves have to land on one entry, or
+/// the client is handed a call it cannot execute and an argument fragment it
+/// cannot place.
+fn gather_tool_calls(
+    gathered: &mut Vec<GatewayToolCall>,
+    tool_calls: Vec<GatewayToolCall>,
+    argument_delta: Option<&str>,
+) {
+    for tool_call in tool_calls {
+        match gathered
+            .last_mut()
+            .filter(|previous| previous.id == tool_call.id)
+        {
+            // Announcing the same call twice — the Responses API sends it on
+            // both `output_item.added` and `output_item.done` — restates it
+            // rather than adding one.
+            Some(previous) => *previous = tool_call,
+            None => gathered.push(tool_call),
+        }
+    }
+    if let Some(fragment) = argument_delta {
+        if let Some(tool_call) = gathered.last_mut() {
+            append_tool_arguments(tool_call, fragment);
+        }
+    }
+}
+
+/// Append a streamed fragment to the arguments gathered for a tool call.
+///
+/// Arguments arrive as a JSON document spelled out a piece at a time, so the
+/// fragments concatenate. The placeholder an upstream sends when it first names
+/// the call — an empty object, or nothing at all — is not part of that document
+/// and must not be prepended to it.
+fn append_tool_arguments(tool_call: &mut GatewayToolCall, fragment: &str) {
+    let gathered = match &tool_call.arguments {
+        Value::String(text) => text.as_str(),
+        Value::Object(fields) if fields.is_empty() => "",
+        Value::Null => "",
+        // Already decoded into a structure, so the arguments are complete: a
+        // text fragment cannot extend them, and treating them as a prefix would
+        // discard what we have.
+        _ => return,
+    };
+    tool_call.arguments = Value::String(format!("{gathered}{fragment}"));
 }
 
 #[allow(dead_code)]
@@ -3370,6 +3487,7 @@ mod tests {
             auth_enabled,
             model_override: true,
             privacy_filter_mode: PrivacyFilterMode::Off,
+            upstream_device_id: String::new(),
         }
     }
 
@@ -3628,7 +3746,7 @@ mod tests {
     #[test]
     fn anthropic_upstream_requests_carry_reseller_identity_metadata() {
         let mut body = json!({ "model": "claude", "messages": [] });
-        ensure_anthropic_request_identity(&mut body);
+        ensure_anthropic_request_identity(&mut body, None);
 
         let identity = identity_object(&body);
         assert!(identity.get("device_id").is_some());
@@ -3640,13 +3758,53 @@ mod tests {
         );
     }
 
+    /// Inventing an identity is the last resort: an upstream that reads one
+    /// identity as one device treats a key carrying many as a shared key.
+    #[test]
+    fn a_configured_device_id_outranks_anything_worked_out_locally() {
+        let mut body = json!({ "model": "claude", "messages": [] });
+        ensure_anthropic_request_identity(&mut body, Some("  device-from-settings  "));
+
+        assert_eq!(
+            identity_object(&body)["device_id"].as_str(),
+            Some("device-from-settings"),
+            "the configured value should be used, trimmed"
+        );
+    }
+
+    #[test]
+    fn a_blank_configured_device_id_falls_through_to_detection() {
+        let mut body = json!({ "model": "claude", "messages": [] });
+        ensure_anthropic_request_identity(&mut body, Some("   "));
+
+        let device_id = identity_object(&body)["device_id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(!device_id.is_empty());
+        assert_eq!(device_id, anthropic_device_id(None));
+    }
+
+    /// A fresh identity per launch would present one machine as a crowd of
+    /// devices sharing a key, which is what gets a key withdrawn.
+    #[test]
+    fn the_derived_device_id_is_the_same_every_time() {
+        assert_eq!(derived_device_id(), derived_device_id());
+        assert_eq!(
+            derived_device_id().len(),
+            64,
+            "should match the shape upstreams expect"
+        );
+        assert!(derived_device_id().chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
     #[test]
     fn anthropic_identity_keeps_a_client_supplied_user_id() {
         let mut body = json!({
             "model": "claude",
             "metadata": { "user_id": "caller-owned-identity" }
         });
-        ensure_anthropic_request_identity(&mut body);
+        ensure_anthropic_request_identity(&mut body, None);
 
         assert_eq!(
             body["metadata"]["user_id"].as_str(),
@@ -3657,7 +3815,7 @@ mod tests {
     #[test]
     fn anthropic_identity_fills_a_metadata_object_without_a_user_id() {
         let mut body = json!({ "model": "claude", "metadata": { "trace": "keep" } });
-        ensure_anthropic_request_identity(&mut body);
+        ensure_anthropic_request_identity(&mut body, None);
 
         assert_eq!(body["metadata"]["trace"].as_str(), Some("keep"));
         assert!(identity_object(&body).get("session_id").is_some());
@@ -3674,7 +3832,7 @@ mod tests {
 
         let mut anthropic =
             request_body_for_protocol(GatewayProtocol::AnthropicMessages, &parts, false);
-        ensure_anthropic_request_identity(&mut anthropic);
+        ensure_anthropic_request_identity(&mut anthropic, None);
         assert!(identity_object(&anthropic).get("device_id").is_some());
 
         let openai = request_body_for_protocol(GatewayProtocol::OpenAiResponses, &parts, false);
@@ -4639,6 +4797,116 @@ mod tests {
             stream_delta_from_event(GatewayProtocol::GoogleGemini, &chat_frame, &gemini),
             "world"
         );
+    }
+
+    /// Replay a stream the way the gateway does: decode each event, then fold
+    /// it into the tool calls gathered so far.
+    fn gather_stream(protocol: GatewayProtocol, events: &[Value]) -> Vec<GatewayToolCall> {
+        let mut gathered = Vec::new();
+        for value in events {
+            let frame = SseFrame {
+                event: None,
+                data: String::new(),
+            };
+            let update = stream_update_from_event(protocol, &frame, value);
+            gather_tool_calls(
+                &mut gathered,
+                update.tool_calls,
+                update.tool_argument_delta.as_deref(),
+            );
+        }
+        gathered
+    }
+
+    /// Anthropic names a tool call once, then streams its arguments as JSON
+    /// fragments. Both halves belong to one call.
+    #[test]
+    fn anthropic_tool_argument_fragments_join_the_call_that_opened_them() {
+        let gathered = gather_stream(
+            GatewayProtocol::AnthropicMessages,
+            &[
+                json!({ "type": "content_block_start", "index": 0, "content_block": {
+                    "type": "tool_use", "id": "toolu_real", "name": "view_image", "input": {} } }),
+                json!({ "type": "content_block_delta", "index": 0, "delta": {
+                    "type": "input_json_delta", "partial_json": "{\"path\":" } }),
+                json!({ "type": "content_block_delta", "index": 0, "delta": {
+                    "type": "input_json_delta", "partial_json": "\"a.png\"}" } }),
+                json!({ "type": "content_block_stop", "index": 0 }),
+            ],
+        );
+
+        assert_eq!(
+            gathered.len(),
+            1,
+            "fragments must not become their own calls"
+        );
+        assert_eq!(gathered[0].id, "toolu_real");
+        assert_eq!(gathered[0].name, "view_image");
+        assert_eq!(
+            gathered[0].arguments.as_str(),
+            Some("{\"path\":\"a.png\"}"),
+            "the client cannot run a call whose arguments were dropped"
+        );
+    }
+
+    /// Ids are echoed back by the client on the next turn, so repeats leave the
+    /// upstream unable to pair a result with the call it answers.
+    #[test]
+    fn every_streamed_tool_call_gets_its_own_id() {
+        let gathered = gather_stream(
+            GatewayProtocol::AnthropicMessages,
+            &[
+                json!({ "type": "content_block_start", "index": 0, "content_block": {
+                    "type": "tool_use", "id": "toolu_one", "name": "read", "input": {} } }),
+                json!({ "type": "content_block_delta", "index": 0, "delta": { "partial_json": "{}" } }),
+                json!({ "type": "content_block_start", "index": 1, "content_block": {
+                    "type": "tool_use", "id": "toolu_two", "name": "write", "input": {} } }),
+                json!({ "type": "content_block_delta", "index": 1, "delta": { "partial_json": "{}" } }),
+            ],
+        );
+
+        let ids = gathered.iter().map(|call| &call.id).collect::<Vec<_>>();
+        assert_eq!(ids, vec!["toolu_one", "toolu_two"]);
+        assert!(
+            !gathered.iter().any(|call| call.name == "tool"),
+            "a placeholder name means a fragment was mistaken for a call: {gathered:?}"
+        );
+    }
+
+    /// The Responses API sends the same call on `added` and again on `done`.
+    #[test]
+    fn responses_restating_a_tool_call_does_not_duplicate_it() {
+        let gathered = gather_stream(
+            GatewayProtocol::OpenAiResponses,
+            &[
+                json!({ "type": "response.output_item.added", "item": {
+                    "type": "function_call", "call_id": "call_abc", "name": "shell", "arguments": "" } }),
+                json!({ "type": "response.function_call_arguments.delta",
+                    "item_id": "call_abc", "delta": "{\"cmd\":\"ls\"}" }),
+                json!({ "type": "response.output_item.done", "item": {
+                    "type": "function_call", "call_id": "call_abc", "name": "shell",
+                    "arguments": "{\"cmd\":\"ls\"}" } }),
+            ],
+        );
+
+        assert_eq!(gathered.len(), 1);
+        assert_eq!(gathered[0].id, "call_abc");
+        assert_eq!(
+            arguments_as_string(&gathered[0].arguments),
+            "{\"cmd\":\"ls\"}"
+        );
+    }
+
+    #[test]
+    fn argument_fragments_never_extend_already_complete_arguments() {
+        let mut call = GatewayToolCall {
+            id: "call_1".to_string(),
+            name: "shell".to_string(),
+            arguments: json!({ "cmd": "ls" }),
+        };
+        append_tool_arguments(&mut call, "{\"cmd\":");
+
+        assert_eq!(call.arguments, json!({ "cmd": "ls" }));
     }
 
     #[test]

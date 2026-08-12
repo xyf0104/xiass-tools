@@ -506,6 +506,11 @@
     applyGatewayStatus(result.status);
   }
 
+  async function updateGatewayUpstreamDeviceId(deviceId: string) {
+    const result = await updateGatewaySettings({ upstreamDeviceId: deviceId });
+    applyGatewayStatus(result.status);
+  }
+
   async function initializeDashboardOnMount() {
     await restorePendingClaudeDesktopLaunch();
     await loadDashboardWithCache({ showRefreshIndicator: route === "dashboard" });
@@ -604,6 +609,7 @@
             {gatewayBusy}
             onGatewayAction={runGatewayAction}
             onPrivacyFilterChange={updateGatewayPrivacyFilter}
+            onUpstreamDeviceIdChange={updateGatewayUpstreamDeviceId}
             onCopyGatewayUrl={copyGatewayUrl}
           />
         {:else if route === "terminal"}

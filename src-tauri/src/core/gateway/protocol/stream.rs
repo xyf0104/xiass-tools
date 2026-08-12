@@ -70,6 +70,11 @@ fn parse_frame(raw: &str) -> Option<SseFrame> {
 pub(in crate::core::gateway) struct GatewayStreamUpdate {
     pub(in crate::core::gateway) text_delta: String,
     pub(in crate::core::gateway) tool_calls: Vec<GatewayToolCall>,
+    /// A fragment of the arguments belonging to the call a previous frame
+    /// already announced. Upstreams name a tool call first and spell its
+    /// arguments out afterwards, so a fragment continues that call instead of
+    /// starting another one.
+    pub(in crate::core::gateway) tool_argument_delta: Option<String>,
     pub(in crate::core::gateway) usage: Option<GatewayUsage>,
 }
 
@@ -146,8 +151,39 @@ pub(in crate::core::gateway) fn decode_update(
     GatewayStreamUpdate {
         text_delta: text_delta(protocol, frame, value),
         tool_calls: tool_calls(protocol, frame, value),
+        tool_argument_delta: tool_argument_delta(protocol, frame, value),
         usage: usage(protocol, value),
     }
+}
+
+/// The argument fragment this frame carries for the call already in progress.
+///
+/// These events name no tool and carry no id — Anthropic identifies the call by
+/// content block index, and the Responses API by an item id that only some
+/// upstreams populate. Treating a fragment as a call in its own right invents an
+/// identity for it, which is how a single tool call turned into a run of calls
+/// sharing one placeholder id.
+fn tool_argument_delta(
+    protocol: GatewayProtocol,
+    frame: &SseFrame,
+    value: &Value,
+) -> Option<String> {
+    let event = value
+        .get("type")
+        .and_then(Value::as_str)
+        .or(frame.event.as_deref())
+        .unwrap_or_default();
+    let fragment = match protocol {
+        GatewayProtocol::OpenAiResponses if event == "response.function_call_arguments.delta" => {
+            value.get("delta").and_then(Value::as_str)
+        }
+        GatewayProtocol::AnthropicMessages if event == "content_block_delta" => value
+            .get("delta")
+            .and_then(|delta| delta.get("partial_json"))
+            .and_then(Value::as_str),
+        _ => None,
+    }?;
+    (!fragment.is_empty()).then(|| fragment.to_string())
 }
 
 pub(in crate::core::gateway) fn text_delta(
@@ -213,8 +249,7 @@ fn tool_calls(protocol: GatewayProtocol, frame: &SseFrame, value: &Value) -> Vec
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .enumerate()
-            .filter_map(|(index, item)| openai_tool_call(index, item))
+            .filter_map(openai_tool_call)
             .collect(),
         GatewayProtocol::OpenAiResponses => {
             let event = value
@@ -234,30 +269,9 @@ fn tool_calls(protocol: GatewayProtocol, frame: &SseFrame, value: &Value) -> Vec
                     .and_then(responses_tool_call)
                     .into_iter()
                     .collect()
-            } else if event == "response.function_call_arguments.delta" {
-                let delta = value
-                    .get("delta")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                if delta.is_empty() {
-                    Vec::new()
-                } else {
-                    vec![GatewayToolCall {
-                        id: value
-                            .get("item_id")
-                            .or_else(|| value.get("call_id"))
-                            .and_then(Value::as_str)
-                            .unwrap_or("call_codestudio_stream")
-                            .to_string(),
-                        name: value
-                            .get("name")
-                            .and_then(Value::as_str)
-                            .unwrap_or("tool")
-                            .to_string(),
-                        arguments: Value::String(delta.to_string()),
-                    }]
-                }
             } else {
+                // Argument fragments continue the call named above; see
+                // `tool_argument_delta`.
                 Vec::new()
             }
         }
@@ -274,20 +288,9 @@ fn tool_calls(protocol: GatewayProtocol, frame: &SseFrame, value: &Value) -> Vec
                     .and_then(anthropic_tool_call_from_value)
                     .into_iter()
                     .collect()
-            } else if event == "content_block_delta" {
-                let delta = value.get("delta").unwrap_or(&Value::Null);
-                delta
-                    .get("partial_json")
-                    .and_then(Value::as_str)
-                    .filter(|text| !text.is_empty())
-                    .map(|text| GatewayToolCall {
-                        id: "call_codestudio_stream".to_string(),
-                        name: "tool".to_string(),
-                        arguments: Value::String(text.to_string()),
-                    })
-                    .into_iter()
-                    .collect()
             } else {
+                // `content_block_delta` carries argument fragments for the
+                // block `content_block_start` named; see `tool_argument_delta`.
                 Vec::new()
             }
         }
@@ -297,7 +300,7 @@ fn tool_calls(protocol: GatewayProtocol, frame: &SseFrame, value: &Value) -> Vec
     }
 }
 
-fn openai_tool_call(index: usize, value: &Value) -> Option<GatewayToolCall> {
+fn openai_tool_call(value: &Value) -> Option<GatewayToolCall> {
     let function = value.get("function").unwrap_or(value);
     let name = function
         .get("name")
@@ -316,7 +319,11 @@ fn openai_tool_call(index: usize, value: &Value) -> Option<GatewayToolCall> {
             .and_then(Value::as_str)
             .filter(|value| !value.trim().is_empty())
             .map(ToString::to_string)
-            .unwrap_or_else(|| format!("call_codestudio_stream_{index}")),
+            // The position is only unique within one frame, so it repeats as
+            // soon as a second frame arrives. Tool call ids must stay unique
+            // across the whole conversation: the client echoes them back, and
+            // an upstream that receives repeats has no way to pair results.
+            .unwrap_or_else(|| format!("call_codestudio_{}", Uuid::new_v4().simple())),
         name,
         arguments: argument_value(arguments),
     })

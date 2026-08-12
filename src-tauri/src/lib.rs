@@ -90,6 +90,7 @@ pub fn run() {
             commands::tool_installer::plan_tool_install,
             commands::tool_installer::plan_tool_launch,
             commands::tool_installer::plan_tool_update,
+            commands::tool_installer::plan_tool_uninstall,
             commands::tool_installer::repair_tool_path,
             commands::tool_installer::uninstall_tool,
             commands::tool_installer::update_tool,

@@ -61,6 +61,12 @@ struct InstallDefinition {
 
 #[derive(Debug)]
 struct InstallCommandOutput {
+    /// Engine mismatches npm warned about.
+    ///
+    /// Captured from the complete output rather than the tail: npm prints these
+    /// early and its own summary pushes them past the last twenty lines, so a
+    /// check against `stdout_tail` would miss almost every real case.
+    engine_mismatches: Vec<crate::core::node_engine::EngineMismatch>,
     success: bool,
     exit_code: Option<i32>,
     stdout_tail: String,
@@ -112,6 +118,69 @@ pub fn plan_tool_update_for_status(
     let definition = install_definition(tool_id)
         .ok_or_else(|| format!("Tool '{tool_id}' is not allowed for updates."))?;
     Ok(build_update_plan(&definition, current_status))
+}
+
+/// Describes what uninstalling a tool would remove.
+///
+/// Built from the same preview the uninstall itself uses, so the confirmation
+/// cannot drift from what actually happens.
+pub fn plan_tool_uninstall(tool_id: &str) -> Result<ToolInstallPlan, String> {
+    let definition = install_definition(tool_id)
+        .ok_or_else(|| format!("Tool '{tool_id}' is not allowed for uninstallation."))?;
+    let status = current_status(tool_id).ok();
+    let installed = status
+        .as_ref()
+        .map(|status| status.install_state == InstallState::Installed)
+        .unwrap_or(false);
+    let supported = uninstall_supported_for_tool(tool_id, &definition.action);
+    let blocker = if !installed {
+        Some(format!("{} is not installed.", definition.tool.name))
+    } else if !supported {
+        Some(format!(
+            "{} cannot be uninstalled from here; remove it with the tool that installed it.",
+            definition.tool.name
+        ))
+    } else {
+        None
+    };
+    let path_entries = if supported {
+        let overrides = crate::core::uninstall_cleanup::InstallerOverrides::from_env();
+        app_paths()
+            .ok()
+            .map(|paths| {
+                let local_app_data = paths.home_dir.join("AppData/Local");
+                crate::core::uninstall_cleanup::installer_path_entries(
+                    tool_id,
+                    &paths.home_dir,
+                    &local_app_data,
+                    crate::core::uninstall_cleanup::HostPlatform::current(),
+                    &overrides,
+                )
+                .into_iter()
+                .map(|path| path.display().to_string())
+                .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    Ok(ToolInstallPlan {
+        uninstall_path_entries: path_entries,
+        tool_id: tool_id.to_string(),
+        tool_name: definition.tool.name.to_string(),
+        manager: manager_label(&definition.action).to_string(),
+        command: uninstall_command_preview_for_tool(tool_id, &definition.action),
+        interactive: false,
+        commands: Vec::new(),
+        prerequisites: Vec::new(),
+        requires_prerequisites: false,
+        can_install: blocker.is_none(),
+        already_installed: installed,
+        requires_admin: false,
+        steps: Vec::new(),
+        warnings: Vec::new(),
+        blocker,
+    })
 }
 
 pub fn plan_claude_desktop_update() -> Result<ClaudeDesktopPlan, String> {
@@ -402,9 +471,12 @@ pub fn install_tool_with_progress(
         .map(|status| status.install_state == InstallState::Installed)
         .unwrap_or(false);
     let process_success = output.success;
-    let success = process_success && verified;
+    let engine_mismatch = blocking_engine_mismatch(&definition.action, &output);
+    let success = process_success && verified && engine_mismatch.is_none();
     let exit_code = output.exit_code;
-    let message = if success {
+    let message = if let Some(mismatch) = &engine_mismatch {
+        engine_mismatch_message(&definition.tool.name, mismatch)
+    } else if success {
         format!("{} installed and verified.", definition.tool.name)
     } else if process_success {
         format!(
@@ -592,9 +664,12 @@ pub fn update_tool_with_progress(
         .as_ref()
         .map(|status| status.install_state == InstallState::Installed)
         .unwrap_or(false);
-    let success = output.success && verified;
+    let engine_mismatch = blocking_engine_mismatch(&definition.action, &output);
+    let success = output.success && verified && engine_mismatch.is_none();
     let exit_code = output.exit_code;
-    let message = if success {
+    let message = if let Some(mismatch) = &engine_mismatch {
+        engine_mismatch_message(&definition.tool.name, mismatch)
+    } else if success {
         format!(
             "{} update command completed and verified.",
             definition.tool.name
@@ -769,6 +844,12 @@ pub fn uninstall_tool_with_progress(
             .unwrap_or(true)
     };
     let success = output.success && uninstalled;
+    // The opt-in cleanups only run once the tool is confirmed gone. Stripping a
+    // still-working CLI from PATH, or deleting the configuration of something
+    // still installed, are both worse than leaving the cleanup undone.
+    if success {
+        run_uninstall_cleanups(&tool_id, &definition, &request, &mut notes);
+    }
     let message = if success && tool_id == "claude-desktop" && cfg!(target_os = "windows") {
         let install_kinds = detector::claude_desktop_install_kinds();
         claude_desktop_windows_uninstall_success_message(
@@ -1347,6 +1428,8 @@ fn build_plan(
             .any(|definition| action_interactive(&definition.action));
 
     ToolInstallPlan {
+
+        uninstall_path_entries: Vec::new(),
         tool_id: definition.tool.id.to_string(),
         tool_name: definition.tool.name.to_string(),
         manager,
@@ -1437,6 +1520,8 @@ fn build_update_plan(
     append_path_repair_steps(&mut steps, &definition.action);
 
     ToolInstallPlan {
+
+        uninstall_path_entries: Vec::new(),
         tool_id: definition.tool.id.to_string(),
         tool_name: definition.tool.name.to_string(),
         manager,
@@ -1939,7 +2024,7 @@ fn run_update_action_for_tool(
 }
 
 fn run_uninstall_action_for_tool(
-    _tool_id: &str,
+    tool_id: &str,
     action: &InstallAction,
     progress: Option<&InstallProgressContext>,
 ) -> Result<InstallCommandOutput, String> {
@@ -1960,6 +2045,13 @@ fn run_uninstall_action_for_tool(
         }
         InstallAction::NpmGlobalIgnoreScripts(package) => {
             run_npm_global_command(&["uninstall", "-g", package], progress)
+        }
+        InstallAction::PowerShellScript(_, _)
+        | InstallAction::ShellScript(_, _)
+        | InstallAction::InteractiveShellScript(_, _)
+            if removable_paths_for_tool(tool_id).is_some() =>
+        {
+            run_directory_uninstall(tool_id, progress)
         }
         InstallAction::PowerShellScript(_, _)
         | InstallAction::ClaudeDesktopWindowsMsix
@@ -2352,6 +2444,7 @@ fn run_claude_desktop_msix_uninstall(
     let exit_code = if success { 0 } else { 1 };
     emit_install_progress(progress, "status", String::new(), Some(exit_code), true);
     Ok(InstallCommandOutput {
+        engine_mismatches: Vec::new(),
         success,
         exit_code: Some(exit_code),
         stdout_tail: message,
@@ -2376,6 +2469,7 @@ fn stop_claude_desktop_windows_background_services(
 ) -> Result<InstallCommandOutput, String> {
     if !cfg!(target_os = "windows") {
         return Ok(InstallCommandOutput {
+            engine_mismatches: Vec::new(),
             success: true,
             exit_code: Some(0),
             stdout_tail: String::new(),
@@ -2439,6 +2533,7 @@ fn remove_claude_desktop_windows_background_services(
 ) -> Result<InstallCommandOutput, String> {
     if !cfg!(target_os = "windows") {
         return Ok(InstallCommandOutput {
+            engine_mismatches: Vec::new(),
             success: true,
             exit_code: Some(0),
             stdout_tail: String::new(),
@@ -2581,6 +2676,7 @@ fn run_claude_desktop_windows_service_script(
         true,
     );
     Ok(InstallCommandOutput {
+        engine_mismatches: Vec::new(),
         success,
         exit_code: Some(if success { 0 } else { 1 }),
         stdout_tail,
@@ -2757,6 +2853,7 @@ fn run_macos_dmg_app_install(
         true,
     );
     Ok(InstallCommandOutput {
+        engine_mismatches: Vec::new(),
         success: installed,
         exit_code: Some(if installed { 0 } else { 1 }),
         stdout_tail,
@@ -2814,6 +2911,7 @@ fn run_macos_managed_app_uninstall(
         Ok(()) => {
             emit_install_progress(progress, "status", String::new(), Some(0), true);
             Ok(InstallCommandOutput {
+                engine_mismatches: Vec::new(),
                 success: true,
                 exit_code: Some(0),
                 stdout_tail: format!(
@@ -2912,6 +3010,7 @@ fn macos_dmg_dependencies_available() -> bool {
 
 fn failed_output(message: impl Into<String>) -> InstallCommandOutput {
     InstallCommandOutput {
+        engine_mismatches: Vec::new(),
         success: false,
         exit_code: Some(1),
         stdout_tail: String::new(),
@@ -3447,6 +3546,10 @@ fn run_streaming_command(
     let exit_code = status.code();
     emit_install_progress(progress, "status", String::new(), exit_code, true);
     Ok(InstallCommandOutput {
+        // Parsed here, where the untruncated output is still in hand.
+        engine_mismatches: crate::core::node_engine::parse_engine_mismatches(&format!(
+            "{stdout}{stderr}"
+        )),
         success: status.success(),
         exit_code,
         stdout_tail: tail(&stdout),
@@ -3527,6 +3630,7 @@ fn emit_install_progress(
 
 fn missing_command_output(command: &str) -> InstallCommandOutput {
     InstallCommandOutput {
+        engine_mismatches: Vec::new(),
         success: false,
         exit_code: None,
         stdout_tail: String::new(),
@@ -3539,6 +3643,7 @@ fn missing_command_output(command: &str) -> InstallCommandOutput {
 
 fn start_failed_output(command: &str, err: std::io::Error) -> InstallCommandOutput {
     InstallCommandOutput {
+        engine_mismatches: Vec::new(),
         success: false,
         exit_code: None,
         stdout_tail: String::new(),
@@ -3733,6 +3838,11 @@ fn uninstall_supported_for_tool(tool_id: &str, action: &InstallAction) -> bool {
     if tool_id == "claude-desktop" && cfg!(target_os = "windows") {
         return true;
     }
+    // Grok and Hermes are installed by vendor scripts that ship no uninstall
+    // command, so their own directories are removed directly instead.
+    if removable_paths_for_tool(tool_id).is_some() {
+        return true;
+    }
     matches!(
         action,
         InstallAction::NpmGlobal(_)
@@ -3760,6 +3870,16 @@ fn update_command_preview_for_tool(tool_id: &str, action: &InstallAction) -> Str
 fn uninstall_command_preview_for_tool(tool_id: &str, action: &InstallAction) -> String {
     if tool_id == "claude-desktop" && cfg!(target_os = "windows") {
         return CLAUDE_DESKTOP_WINDOWS_UNINSTALL_COMMAND.to_string();
+    }
+    // Vendor-script installs have no command to show, so the preview lists the
+    // directories that will actually be deleted.
+    if let Some(paths) = removable_paths_for_tool(tool_id) {
+        return paths
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join("
+");
     }
     match action {
         InstallAction::NpmGlobal(package) => npm_global_command_preview("uninstall", package),
@@ -3909,6 +4029,256 @@ fn update_process_targets(tool_id: &str) -> UpdateProcessTargets {
 
 fn decode(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
+}
+
+/// The engine mismatch that stops the requested package from running.
+///
+/// npm only warns about `EBADENGINE` and still exits 0, so without this an
+/// install reports success and leaves a CLI that cannot start. Mismatches on
+/// transitive dependencies are ignored: they do not stop the requested tool.
+fn blocking_engine_mismatch(
+    action: &InstallAction,
+    output: &InstallCommandOutput,
+) -> Option<crate::core::node_engine::EngineMismatch> {
+    let package = match action {
+        InstallAction::NpmGlobal(package) | InstallAction::NpmGlobalIgnoreScripts(package) => {
+            *package
+        }
+        _ => return None,
+    };
+    output
+        .engine_mismatches
+        .iter()
+        .find(|mismatch| mismatch.is_package(package))
+        .cloned()
+}
+
+fn engine_mismatch_message(
+    tool_name: &str,
+    mismatch: &crate::core::node_engine::EngineMismatch,
+) -> String {
+    format!(
+        "{tool_name} requires Node.js {}, but {} is installed. The package was installed but will not run until Node.js is updated.",
+        mismatch.required, mismatch.current
+    )
+}
+
+/// Applies the cleanups the user opted into after a successful uninstall.
+///
+/// Failures are reported as notes rather than failing the uninstall: the tool
+/// is already gone, and telling the user a completed removal failed would be
+/// worse than telling them one leftover needs attention.
+fn run_uninstall_cleanups(
+    tool_id: &str,
+    definition: &InstallDefinition,
+    request: &ToolUninstallRequest,
+    notes: &mut Vec<String>,
+) {
+    use crate::core::uninstall_cleanup as cleanup;
+
+    if request.remove_path {
+        let Ok(paths) = app_paths() else {
+            notes.push("PATH cleanup was skipped because the home directory could not be resolved.".to_string());
+            return;
+        };
+        let overrides = cleanup::InstallerOverrides::from_env();
+        let local_app_data = paths.home_dir.join("AppData/Local");
+        let entries = cleanup::installer_path_entries(
+            tool_id,
+            &paths.home_dir,
+            &local_app_data,
+            cleanup::HostPlatform::current(),
+            &overrides,
+        );
+        match cleanup::remove_from_user_path(&entries, &paths.home_dir) {
+            Ok(removed) => notes.extend(
+                removed
+                    .into_iter()
+                    .map(|entry| format!("Removed {entry} from PATH.")),
+            ),
+            Err(error) => notes.push(error),
+        }
+        if cleanup::HostPlatform::current() != cleanup::HostPlatform::Windows {
+            match tool_id {
+                "grok" => {
+                    let result = cleanup::remove_profile_block(
+                        &paths.home_dir,
+                        cleanup::GROK_BLOCK_OPEN,
+                        cleanup::GROK_BLOCK_CLOSE,
+                    );
+                    notes.extend(result.removed);
+                    notes.extend(result.warnings);
+                }
+                // Hermes only ever adds the shared `~/.local/bin`, which pipx,
+                // uv and Claude Code's installer rely on too.
+                "hermes" => notes.extend(cleanup::report_shared_profile_lines(
+                    &paths.home_dir,
+                    ".local/bin",
+                )),
+                _ => {}
+            }
+        }
+    }
+
+    if request.remove_config {
+        match remove_tool_config(definition) {
+            Ok(Some(removed)) => notes.push(removed),
+            Ok(None) => {}
+            Err(error) => notes.push(error),
+        }
+    }
+}
+
+/// Backs up a tool's configuration, then deletes it.
+///
+/// The backup goes through the normal backup store, so the existing restore
+/// action can undo this — deleting a configuration is otherwise unrecoverable,
+/// and the user opted in from a checkbox rather than an explicit decision to
+/// discard it.
+fn remove_tool_config(definition: &InstallDefinition) -> Result<Option<String>, String> {
+    let Some(relative) = definition.tool.config_relative_path else {
+        return Ok(None);
+    };
+    let paths = app_paths().map_err(|err| err.to_string())?;
+    let config = paths.home_dir.join(relative);
+    if !config.is_file() {
+        return Ok(None);
+    }
+    crate::core::backup::backup_files("uninstall", None, std::slice::from_ref(&config))
+        .map_err(|err| format!("The configuration backup failed: {err}"))?;
+    std::fs::remove_file(&config)
+        .map_err(|err| format!("{} could not be removed: {err}", config.display()))?;
+    Ok(Some(format!(
+        "Removed {} after backing it up.",
+        config.display()
+    )))
+}
+
+/// The directories a vendor installer owns for this tool, if any.
+///
+/// Only Grok and Hermes are installed by scripts that copy files into a
+/// directory of their own; everything else goes through a package manager that
+/// has its own uninstall.
+fn removable_paths_for_tool(tool_id: &str) -> Option<Vec<PathBuf>> {
+    use crate::core::uninstall_cleanup as cleanup;
+    let paths = app_paths().ok()?;
+    let overrides = cleanup::InstallerOverrides::from_env();
+    let local_app_data = paths.home_dir.join("AppData/Local");
+    match tool_id {
+        "grok" => Some(cleanup::grok_removable_paths(&paths.home_dir, &overrides)),
+        "hermes" => Some(cleanup::hermes_removable_paths(
+            &paths.home_dir,
+            &local_app_data,
+            cleanup::HostPlatform::current(),
+            &overrides,
+        )),
+        _ => None,
+    }
+}
+
+/// Removes a vendor-script installation by deleting the directories it owns.
+///
+/// Configuration is not touched here: `~/.grok/config.toml` and Hermes' data
+/// root hold the user's own settings and sessions, and removing those is a
+/// separate opt-in. Launchers living in a shared bin directory are removed only
+/// after proving they point back at this tool.
+fn run_directory_uninstall(
+    tool_id: &str,
+    progress: Option<&InstallProgressContext>,
+) -> Result<InstallCommandOutput, String> {
+    use crate::core::uninstall_cleanup as cleanup;
+
+    let Some(targets) = removable_paths_for_tool(tool_id) else {
+        return Err("This tool has no executable standalone uninstall action.".to_string());
+    };
+    let paths = app_paths().map_err(|err| err.to_string())?;
+    let (allowed, refused) = cleanup::partition_removable(&targets, &paths.home_dir);
+
+    let mut removed = Vec::new();
+    let mut problems = refused;
+    for path in allowed {
+        let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+            continue;
+        };
+        let outcome = if metadata.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        match outcome {
+            Ok(()) => removed.push(path.display().to_string()),
+            Err(err) => problems.push(format!("{} could not be removed: {err}", path.display())),
+        }
+    }
+    removed.extend(remove_tool_launchers(tool_id, &paths.home_dir, &mut problems));
+
+    for line in &removed {
+        emit_install_progress(progress, "stdout", format!("Removed {line}
+"), None, false);
+    }
+    let success = problems.is_empty() && !removed.is_empty();
+    Ok(InstallCommandOutput {
+        engine_mismatches: Vec::new(),
+        success,
+        exit_code: Some(if success { 0 } else { 1 }),
+        stdout_tail: removed.join("
+"),
+        stderr_tail: problems.join("
+"),
+        missing_command: None,
+    })
+}
+
+/// Removes launcher files the installer placed in a shared bin directory.
+///
+/// Grok names one of its launchers `agent`, which is generic enough that
+/// removing it on name alone would eventually delete an unrelated tool, so each
+/// candidate must prove it belongs here first.
+fn remove_tool_launchers(
+    tool_id: &str,
+    home_dir: &Path,
+    problems: &mut Vec<String>,
+) -> Vec<String> {
+    use crate::core::uninstall_cleanup as cleanup;
+
+    let (candidates, root) = match tool_id {
+        "grok" => (
+            cleanup::grok_launcher_files(home_dir),
+            home_dir.join(".grok"),
+        ),
+        "hermes" => (
+            cleanup::hermes_launcher_files(home_dir),
+            home_dir.join(".hermes"),
+        ),
+        _ => return Vec::new(),
+    };
+    let mut removed = Vec::new();
+    for candidate in candidates {
+        if std::fs::symlink_metadata(&candidate).is_err() {
+            continue;
+        }
+        let link_target = std::fs::read_link(&candidate).ok();
+        let contents = std::fs::read_to_string(&candidate).ok();
+        if !cleanup::launcher_belongs_to_agent(
+            link_target.as_deref(),
+            contents.as_deref(),
+            &root,
+        ) {
+            problems.push(format!(
+                "{} was left in place because it does not belong to this tool.",
+                candidate.display()
+            ));
+            continue;
+        }
+        match std::fs::remove_file(&candidate) {
+            Ok(()) => removed.push(candidate.display().to_string()),
+            Err(err) => problems.push(format!(
+                "{} could not be removed: {err}",
+                candidate.display()
+            )),
+        }
+    }
+    removed
 }
 
 fn tail(value: &str) -> String {

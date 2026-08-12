@@ -319,6 +319,13 @@ export async function planToolInstall(toolId: string): Promise<ToolInstallPlan> 
   return mockToolInstallPlan(toolId);
 }
 
+export async function planToolUninstall(toolId: string): Promise<ToolInstallPlan> {
+  if (isTauri()) {
+    return invoke("plan_tool_uninstall", { toolId });
+  }
+  return { ...mockToolInstallPlan(toolId), uninstallPathEntries: [], alreadyInstalled: true };
+}
+
 export async function planToolUpdate(toolId: string): Promise<ToolInstallPlan> {
   if (isTauri()) {
     return invoke("plan_tool_update", { toolId });
@@ -967,6 +974,7 @@ export async function updateGatewaySettings(
     return invoke("update_gateway_settings", { request });
   }
   mockGatewayPrivacyFilterMode = request.privacyFilterMode ?? mockGatewayPrivacyFilterMode;
+  mockGatewayUpstreamDeviceId = request.upstreamDeviceId ?? mockGatewayUpstreamDeviceId;
   return { status: mockGatewayStatus() };
 }
 
@@ -1365,6 +1373,7 @@ let mockGatewayRunning = false;
 let mockGatewayStartedAt: string | null = null;
 
 let mockGatewayPrivacyFilterMode: GatewayStatus["privacyFilterMode"] = "off";
+let mockGatewayUpstreamDeviceId = "";
 
 let mockChatGPTDesktopSettings: ChatGPTDesktopSettings = {
   source: "mirror",
@@ -2522,6 +2531,8 @@ function mockGatewayStatus(): GatewayStatus {
     authEnabled: true,
     tokenPreview: "codestudio-local-****7f3a2c",
     privacyFilterMode: mockGatewayPrivacyFilterMode,
+    upstreamDeviceId: mockGatewayUpstreamDeviceId,
+    effectiveUpstreamDeviceId: mockGatewayUpstreamDeviceId || "auto-detected-device-id",
     activeProfileId: activeProfile?.id ?? null,
     activeProfileName: activeProfile?.name ?? null,
     activeModel: activeProfile?.model ?? null,

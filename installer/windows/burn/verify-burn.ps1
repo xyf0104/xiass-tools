@@ -181,15 +181,13 @@ if ($unsupportedLanguageLogContent -notmatch [Regex]::Escape("Variable: Selected
     throw "Burn did not fall back an unsupported installer language to en-US."
 }
 
-$sameVersionRelatedBundles = [Regex]::Matches(
-    $planLogContent,
-    'Detected related bundle: (?<id>\{[^}]+\}), type: Upgrade,.*operation: None'
-) | ForEach-Object { $_.Groups['id'].Value }
-foreach ($bundleId in $sameVersionRelatedBundles) {
-    $plannedAbsent = 'Planned related bundle: ' + [Regex]::Escape($bundleId) + '.*ba requested: Absent'
-    if ($planLogContent -notmatch $plannedAbsent) {
-        throw "Same-version related bundle was not planned absent: $bundleId"
-    }
+# An install is one process. Asking the engine to remove a same-version sibling
+# makes it run that sibling's own cached installer as a separate process, and a
+# machine carrying several stale registrations gets one such process each — none
+# of them running this build's code. Whatever the plan does about duplicates, it
+# must not do it that way.
+if ($planLogContent -match 'ba requested: Absent') {
+    throw "Plan asked for a related bundle to be removed, which spawns a second installer process."
 }
 if ($planLogContent -match 'Apply begin') {
     throw "Plan-only verification unexpectedly started installation."

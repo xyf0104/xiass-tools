@@ -49,11 +49,12 @@ namespace CodeStudioLite.Installer
         private string selectedLanguage = "en-US";
         private string installFolder;
         private bool applying;
+        private bool cancelRequested;
         private bool hasFolderOverride;
         private bool verifyPlanOnly;
         private bool launchAfterInstall;
         private bool removeUserData;
-        private readonly HashSet<string> sameVersionRelatedBundles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> staleBundleRegistrations = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         protected override void Run()
         {
@@ -107,20 +108,50 @@ namespace CodeStudioLite.Installer
             installFolder = ResolveInitialInstallFolder(configuredFolder);
             Engine.StringVariables["SelectedLanguage"] = selectedLanguage;
             Engine.StringVariables["InstallFolder"] = installFolder;
+            // The bundle is named for the installer so that the running process
+            // is identifiable as one. What gets left in the installed programs
+            // list is the product, so it is named for the product.
+            Engine.StringVariables["WixBundleName"] = "CodeStudio Lite";
 
-            var application = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
-            form = new InstallerWindow(this, selectedLanguage, installFolder, Command.Action, Command.Display == Display.Full);
+            bool interactive = Command.Display == Display.Full;
+            var application = new Application
+            {
+                ShutdownMode = interactive
+                    ? ShutdownMode.OnMainWindowClose
+                    : ShutdownMode.OnExplicitShutdown,
+            };
+            form = new InstallerWindow(this, selectedLanguage, installFolder, Command.Action, interactive);
+            // Note that PlanRelatedBundle is deliberately not handled. Asking
+            // the engine to remove a same-version sibling makes it run that
+            // sibling's own cached installer, as a separate process with its own
+            // window, running whatever code it shipped with — so a leftover from
+            // a broken build stays broken and hangs the install that spawned it.
+            // The leftovers are cleared here instead, in this process, once the
+            // real work has succeeded. One install is one process.
             DetectRelatedBundle += OnDetectRelatedBundle;
             DetectRelatedMsiPackage += OnDetectRelatedMsiPackage;
             DetectComplete += OnDetectComplete;
             PlanPackageBegin += OnPlanPackageBegin;
-            PlanRelatedBundle += OnPlanRelatedBundle;
             PlanComplete += OnPlanComplete;
             Progress += OnProgress;
             ApplyComplete += OnApplyComplete;
 
-            form.Loaded += (_, __) => Engine.Detect();
-            application.Run(form);
+            if (interactive)
+            {
+                form.Loaded += (_, __) => Engine.Detect();
+                application.Run(form);
+                return form.ExitCode;
+            }
+
+            // A silent run puts nothing on screen. It still needs the window,
+            // because Apply is handed its handle, but showing it was what left
+            // an unpainted frame sitting on the desktop for every child bundle
+            // the engine spawned. EnsureHandle builds the handle without a
+            // showing, and detection starts from the dispatcher because Loaded
+            // only fires for a window that appears.
+            form.EnsureHandleWithoutShowing();
+            application.Dispatcher.BeginInvoke(new Action(() => Engine.Detect()));
+            application.Run();
             return form.ExitCode;
         }
 
@@ -137,6 +168,9 @@ namespace CodeStudioLite.Installer
                 return;
             }
 
+            // Retry comes back through here, and it must not inherit the
+            // cancellation that ended the previous attempt.
+            cancelRequested = false;
             selectedLanguage = IsSupportedLanguage(languageCode) ? languageCode : "en-US";
             removeUserData = form.RemoveUserDataRequested;
             this.installFolder = normalizedFolder;
@@ -153,14 +187,33 @@ namespace CodeStudioLite.Installer
             {
                 form.ExitCode = 1602;
                 form.Close();
+                return;
             }
+
+            // Mid-apply the engine owns the work, so cancelling is a request
+            // rather than an act: the next progress callback passes it on, and
+            // the engine unwinds what it has already done. Until then the run
+            // continues, which is why the window reports that it is stopping
+            // instead of pretending it has stopped.
+            if (cancelRequested)
+            {
+                return;
+            }
+
+            cancelRequested = true;
+            Engine.Log(LogLevel.Standard, "Cancellation requested; asking the engine to stop and roll back.");
+            form.ShowCancelling();
         }
 
         private void OnDetectRelatedBundle(object sender, DetectRelatedBundleEventArgs e)
         {
+            // An upgrade relation the engine plans to do nothing about is a
+            // registration for this same version, left by an earlier install of
+            // it. Note it now — once this install registers itself, its own
+            // entry would be indistinguishable from these.
             if (e.RelationType == RelationType.Upgrade && e.Operation == RelatedOperation.None)
             {
-                sameVersionRelatedBundles.Add(e.ProductCode);
+                staleBundleRegistrations.Add(e.ProductCode);
             }
         }
 
@@ -224,14 +277,6 @@ namespace CodeStudioLite.Installer
             e.State = plannedAction == LaunchAction.Repair ? RequestState.Repair : RequestState.Present;
         }
 
-        private void OnPlanRelatedBundle(object sender, PlanRelatedBundleEventArgs e)
-        {
-            if (plannedAction == LaunchAction.Install && sameVersionRelatedBundles.Contains(e.BundleId))
-            {
-                e.State = RequestState.Absent;
-            }
-        }
-
         private void OnPlanComplete(object sender, PlanCompleteEventArgs e)
         {
             if (e.Status < 0)
@@ -261,7 +306,14 @@ namespace CodeStudioLite.Installer
             Engine.Apply(applyWindowHandle);
         }
 
-        private void OnProgress(object sender, ProgressEventArgs e) => form.SetProgress(e.OverallPercentage);
+        private void OnProgress(object sender, ProgressEventArgs e)
+        {
+            form.SetProgress(e.OverallPercentage);
+            if (cancelRequested)
+            {
+                e.Result = Result.Cancel;
+            }
+        }
 
         private void OnApplyComplete(object sender, ApplyCompleteEventArgs e)
         {
@@ -269,6 +321,14 @@ namespace CodeStudioLite.Installer
             if (e.Status >= 0 && plannedAction == LaunchAction.Uninstall && removeUserData)
             {
                 RemoveUserDataFolder();
+            }
+
+            // Only once the new install is registered and working: until then
+            // the older registration is the one thing that can still uninstall
+            // the product.
+            if (e.Status >= 0 && (plannedAction == LaunchAction.Install || plannedAction == LaunchAction.Repair))
+            {
+                RemoveStaleBundleRegistrations();
             }
             form.ExitCode = e.Status;
             form.ShowComplete(e.Status, e.Restart);
@@ -339,6 +399,91 @@ namespace CodeStudioLite.Installer
             throw new FileNotFoundException(
                 "The installed application executable was not found. " + attempted,
                 attemptedLocations.Count > 0 ? attemptedLocations[0] : null);
+        }
+
+        /// <summary>
+        /// Clears registrations left by earlier installs of this same version,
+        /// so installing over one replaces it instead of listing beside it.
+        ///
+        /// Every build of the installer is stamped with a fresh bundle id, so
+        /// two builds of one version look like unrelated siblings to Windows
+        /// and both stay listed. The engine can be asked to remove a sibling,
+        /// but it does that by launching that sibling's own cached installer:
+        /// another process, another window, running the code it shipped with
+        /// rather than this one. Deleting the registration directly keeps the
+        /// install to a single process, and reaches leftovers whose cached
+        /// installer no longer works.
+        ///
+        /// Only the registration goes. The installed files belong to the MSI,
+        /// which this install has already upgraded in place.
+        ///
+        /// Runs after the install has succeeded, and never fails it: a leftover
+        /// listing is untidy, not broken.
+        /// </summary>
+        private void RemoveStaleBundleRegistrations()
+        {
+            const string uninstallPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+            RegistryView[] views = { RegistryView.Registry64, RegistryView.Registry32 };
+
+            foreach (string bundleId in staleBundleRegistrations)
+            {
+                foreach (RegistryView view in views)
+                {
+                    try
+                    {
+                        using (RegistryKey baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view))
+                        using (RegistryKey uninstall = baseKey.OpenSubKey(uninstallPath, true))
+                        {
+                            if (uninstall == null)
+                            {
+                                continue;
+                            }
+
+                            string cachePath;
+                            using (RegistryKey entry = uninstall.OpenSubKey(bundleId))
+                            {
+                                if (entry == null)
+                                {
+                                    continue;
+                                }
+
+                                cachePath = entry.GetValue("BundleCachePath") as string;
+                            }
+
+                            uninstall.DeleteSubKeyTree(bundleId, false);
+                            Engine.Log(LogLevel.Standard, "Removed the registration left by an earlier install of this version: " + bundleId);
+                            RemoveCachedBundle(cachePath);
+                        }
+                    }
+                    catch (Exception error)
+                    {
+                        Engine.Log(LogLevel.Error, "Could not remove the registration for " + bundleId + ": " + error.Message);
+                    }
+                }
+            }
+        }
+
+        /// The cached copy of a bundle exists to service its own uninstall, so
+        /// it has no purpose once the registration pointing at it is gone.
+        private void RemoveCachedBundle(string cachePath)
+        {
+            if (string.IsNullOrWhiteSpace(cachePath))
+            {
+                return;
+            }
+
+            try
+            {
+                string folder = Path.GetDirectoryName(cachePath);
+                if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+                {
+                    Directory.Delete(folder, true);
+                }
+            }
+            catch (Exception error)
+            {
+                Engine.Log(LogLevel.Error, "Could not remove a cached installer: " + error.Message);
+            }
         }
 
         /// <summary>
@@ -439,22 +584,20 @@ namespace CodeStudioLite.Installer
             }
         }
 
-        private static bool IsProcessInFolder(Process process, string folder)
+        private bool IsProcessInFolder(Process process, string folder)
         {
             if (string.IsNullOrEmpty(folder))
             {
                 return false;
             }
 
-            string executablePath;
-            try
+            string executablePath = ProcessImagePath(process);
+            if (string.IsNullOrEmpty(executablePath))
             {
-                executablePath = process.MainModule.FileName;
-            }
-            catch
-            {
-                // Reading the module of a process owned by another user or a
-                // different bitness throws. Skip it rather than guess.
+                // Say so rather than skip in silence. A process whose location
+                // cannot be read is the one case where this method reports a
+                // stranger and a live copy of the application the same way.
+                Engine.Log(LogLevel.Error, "Could not read the location of process " + process.Id + "; leaving it running.");
                 return false;
             }
 
@@ -464,6 +607,40 @@ namespace CodeStudioLite.Installer
                     processFolder.TrimEnd(Path.DirectorySeparatorChar),
                     folder.TrimEnd(Path.DirectorySeparatorChar),
                     StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// The full path of a running process, read in a way that survives the
+        /// bitness gap between this bootstrapper and the application.
+        ///
+        /// Burn hosts its application as a 32-bit process while the product
+        /// ships 64-bit, and <c>Process.MainModule</c> throws across that
+        /// boundary. It used to be the only way this class located a process,
+        /// so every running copy looked like somebody else's and the installer
+        /// left it open — then stalled part-way through, waiting on files the
+        /// live process still held. <c>QueryFullProcessImageName</c> has no such
+        /// limit and needs only the limited-information right.
+        /// </summary>
+        private static string ProcessImagePath(Process process)
+        {
+            IntPtr handle = OpenProcess(ProcessQueryLimitedInformation, false, process.Id);
+            if (handle == IntPtr.Zero)
+            {
+                return null;
+            }
+
+            try
+            {
+                var buffer = new StringBuilder(1024);
+                int capacity = buffer.Capacity;
+                return QueryFullProcessImageName(handle, 0, buffer, ref capacity)
+                    ? buffer.ToString()
+                    : null;
+            }
+            finally
+            {
+                CloseHandle(handle);
+            }
         }
 
         private void CloseIfUnattended()
@@ -622,6 +799,19 @@ namespace CodeStudioLite.Installer
 
         [DllImport("msi.dll", CharSet = CharSet.Unicode)]
         private static extern uint MsiGetProductInfo(string product, string property, StringBuilder valueBuffer, ref uint valueBufferLength);
+
+        /// Enough to ask a process where it lives, and the only right a 32-bit
+        /// caller reliably gets against a 64-bit process.
+        private const int ProcessQueryLimitedInformation = 0x1000;
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(int desiredAccess, bool inheritHandle, int processId);
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder imageName, ref int size);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
 
         [DllImport("kernel32.dll")]
         private static extern ushort GetUserDefaultUILanguage();

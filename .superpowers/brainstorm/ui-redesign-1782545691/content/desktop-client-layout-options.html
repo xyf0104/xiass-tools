@@ -1,0 +1,59 @@
+<h2>Codex / Claude Desktop 操作页布局方向</h2>
+<p class="subtitle">重点比较页边距、section 间距、控件尺寸统一和长期操作效率。点击你更想继续细化的一版。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#f6f7f8;border:1px solid #d9dee5;border-radius:10px;min-height:360px;font-family:Inter,system-ui,sans-serif;color:#20242a">
+        <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:18px 20px;background:white;border:1px solid #dfe3e8;border-radius:8px;margin-bottom:18px">
+          <div style="min-width:0"><div style="font-size:10px;font-weight:800;color:#6d7680;letter-spacing:.08em">DESKTOP CLIENT</div><div style="font-size:22px;font-weight:760;margin-top:6px">Codex Desktop</div><div style="font-size:13px;color:#68717b;margin-top:5px">安装、更新、启动与本地配置状态</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><span style="padding:8px 13px;background:#111;color:white;border-radius:7px;font-size:12px">启动</span><span style="padding:8px 13px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">刷新</span></div>
+        </div>
+        <div style="display:grid;gap:18px">
+          <div style="background:white;border:1px solid #dfe3e8;border-radius:8px;overflow:hidden"><div style="padding:14px 18px;border-bottom:1px solid #e4e7eb;font-weight:700">启动选项</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:18px"><div style="padding:14px;border:1px solid #dfe3e8;border-radius:8px;background:#f9fafb">写入全局配置</div><div style="padding:14px;border:1px solid #dfe3e8;border-radius:8px;background:#f9fafb">启用界面汉化</div></div></div>
+          <div style="background:white;border:1px solid #dfe3e8;border-radius:8px;overflow:hidden"><div style="padding:14px 18px;border-bottom:1px solid #e4e7eb;font-weight:700">状态</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:18px"><div style="padding:14px;background:#f9fafb;border-radius:8px">当前版本<br><b>1.2.3</b></div><div style="padding:14px;background:#f9fafb;border-radius:8px">最新版本<br><b>1.2.4</b></div><div style="padding:14px;background:#f9fafb;border-radius:8px">安装位置<br><b>Windows App</b></div><div style="padding:14px;background:#f9fafb;border-radius:8px">状态<br><b>可更新</b></div></div><div style="display:flex;gap:10px;padding:0 18px 18px"><span style="padding:9px 13px;background:#111;color:white;border-radius:7px;font-size:12px">安装/更新</span><span style="padding:9px 13px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">打开目录</span><span style="padding:9px 13px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">卸载</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>A. 统一容器流</h3><p>所有内容同宽、同节奏，先解决贴边和 section 间距漂移。实现风险最低，适合当前 Panda recipes 继续演进。</p></div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#f6f7f8;border:1px solid #d9dee5;border-radius:10px;min-height:360px;font-family:Inter,system-ui,sans-serif;color:#20242a">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px">
+          <div style="display:grid;gap:16px">
+            <div style="padding:20px;background:white;border:1px solid #dfe3e8;border-radius:8px"><div style="font-size:10px;font-weight:800;color:#6d7680;letter-spacing:.08em">CODEX CLIENT</div><div style="font-size:22px;font-weight:760;margin-top:6px">操作中心</div><div style="display:flex;gap:8px;margin-top:14px"><span style="padding:9px 14px;background:#111;color:white;border-radius:7px;font-size:12px">启动</span><span style="padding:9px 14px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">刷新</span></div></div>
+            <div style="background:white;border:1px solid #dfe3e8;border-radius:8px;overflow:hidden"><div style="padding:14px 18px;border-bottom:1px solid #e4e7eb;font-weight:700">计划与安装</div><div style="padding:18px;display:grid;gap:12px"><div style="height:54px;background:#f9fafb;border:1px solid #e6e9ed;border-radius:8px"></div><div style="height:54px;background:#f9fafb;border:1px solid #e6e9ed;border-radius:8px"></div><div style="display:flex;gap:10px"><span style="padding:9px 13px;background:#111;color:white;border-radius:7px;font-size:12px">更新</span><span style="padding:9px 13px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">下载包</span></div></div></div>
+            <div style="background:white;border:1px solid #dfe3e8;border-radius:8px;overflow:hidden"><div style="padding:14px 18px;border-bottom:1px solid #e4e7eb;font-weight:700">日志</div><div style="margin:18px;padding:14px;background:#111827;color:#d7dde6;border-radius:8px;font-size:12px;height:74px">stage / Codex Desktop<br>Downloading package...</div></div>
+          </div>
+          <div style="display:grid;gap:16px;align-content:start">
+            <div style="padding:16px;background:white;border:1px solid #dfe3e8;border-radius:8px"><b>状态摘要</b><div style="display:grid;gap:10px;margin-top:14px"><div style="padding:12px;background:#f9fafb;border-radius:8px">已安装</div><div style="padding:12px;background:#f9fafb;border-radius:8px">1.2.3 -> 1.2.4</div><div style="padding:12px;background:#f9fafb;border-radius:8px">Windows App</div></div></div>
+            <div style="padding:16px;background:white;border:1px solid #dfe3e8;border-radius:8px"><b>设置</b><div style="margin-top:14px;padding:12px;background:#f9fafb;border-radius:8px">自动写入配置</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>B. 双栏工作台</h3><p>主操作在左，状态和设置固定在右。信息层级最清楚，但移动端与小窗口需要更认真设计响应式。</p></div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="padding:16px;background:#f6f7f8;border:1px solid #d9dee5;border-radius:10px;min-height:360px;font-family:Inter,system-ui,sans-serif;color:#20242a">
+        <div style="padding:18px 20px;background:white;border:1px solid #dfe3e8;border-radius:8px;margin-bottom:18px"><div style="font-size:22px;font-weight:760">Claude Desktop</div><div style="font-size:13px;color:#68717b;margin-top:5px">按流程组织：检查状态 -> 选择安装方式 -> 操作 -> 查看结果</div></div>
+        <div style="display:grid;gap:14px">
+          <div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px 18px;background:white;border:1px solid #dfe3e8;border-radius:8px"><div style="height:34px;width:34px;border-radius:50%;background:#111;color:white;display:grid;place-items:center;font-weight:800">1</div><div><b>状态检查</b><div style="font-size:12px;color:#68717b;margin-top:4px">已安装，存在可用更新</div></div><span style="padding:7px 11px;background:#eef7ee;color:#216b2d;border-radius:999px;font-size:12px">完成</span></div>
+          <div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px 18px;background:white;border:1px solid #dfe3e8;border-radius:8px"><div style="height:34px;width:34px;border-radius:50%;background:#111;color:white;display:grid;place-items:center;font-weight:800">2</div><div><b>选择安装方式</b><div style="font-size:12px;color:#68717b;margin-top:4px">Windows App / EXE 标签统一尺寸</div></div><span style="padding:8px 12px;background:#f2f4f6;border:1px solid #dce1e6;border-radius:7px;font-size:12px">切换</span></div>
+          <div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:14px;align-items:center;padding:16px 18px;background:white;border:1px solid #dfe3e8;border-radius:8px"><div style="height:34px;width:34px;border-radius:50%;background:#111;color:white;display:grid;place-items:center;font-weight:800">3</div><div><b>执行操作</b><div style="font-size:12px;color:#68717b;margin-top:4px">启动、更新、卸载和打开目录集中在同一动作区</div></div><span style="padding:9px 13px;background:#111;color:white;border-radius:7px;font-size:12px">更新</span></div>
+          <div style="display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;align-items:center;padding:16px 18px;background:white;border:1px solid #dfe3e8;border-radius:8px"><div style="height:34px;width:34px;border-radius:50%;background:#cbd3dd;color:#34404d;display:grid;place-items:center;font-weight:800">4</div><div><b>结果与日志</b><div style="font-size:12px;color:#68717b;margin-top:4px">只有执行中或失败时展开，平时收起减少拥挤</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body"><h3>C. 分区向导式</h3><p>按流程拆解复杂操作，降低认知负担。适合安装/修复流程，但日常启动更新会多一些滚动和层级。</p></div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我的初步建议</h3>
+  <p>如果目标是先解决“贴边和间距不统一”，A 最稳；如果你愿意重塑 Codex/Claude 操作页的结构，B 更像长期形态。C 适合作为安装/修复弹窗或空状态流程，不一定适合作为常驻页面。</p>
+</div>

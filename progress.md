@@ -1,0 +1,188 @@
+# Panda CSS Migration Progress
+
+## 2026-07-14 - Burn WPF Theme
+
+- Started Phase 8 after the user approved replacing the plain Burn UI.
+- Loaded the implementation and file-planning workflows, restored the existing Panda migration plan, and kept this work as a separate phase.
+- Selected a compact WPF wizard using the existing application theme tokens and icon, with no new third-party runtime.
+- Added the WPF XAML surface, code-behind, icon payload, and project configuration; the first compile exposed and fixed an XAML/code-behind accessibility mismatch.
+- Rebuilt and visually inspected Welcome, Options, and Confirm pages; replaced the blurry large ICO frame with the bundled 128px PNG and themed the language ComboBox.
+- Final review bound the native folder dialog to the WPF owner window and extended bundle verification to require both branded image payloads.
+- Phase 8 complete: 174 full unit tests passed, Svelte check reported 0 errors and 0 warnings, repeated Burn builds and plan-only checks passed, and the final bundle remained below 25 MB.
+- Removed the user-facing "compact multilingual installer" footer copy from the branded sidebar at the user's request.
+- Started Phase 9 after confirming the duplicate registry entries are two same-version Burn registrations, not the hidden chained MSI.
+- Completed Phase 9: the BA records equal-version related BundleIds during detection and requests them `Absent` during Install planning; plan-only verification confirmed both current duplicates are covered without applying changes.
+- Full verification passed with 174 unit tests and Svelte check at 0 errors/0 warnings. Existing registry entries intentionally remain until the fixed installer is actually applied.
+- Started Phase 10 after reproducing that persisted language state and normalized MSI ProductLanguage can override the Windows UI language.
+- Completed Phase 10: `SelectedLanguage` is no longer persisted, the BA reads Windows user/system UI language through kernel32, and normalized MSI ProductLanguage no longer overrides the selector.
+- The rebuilt bundle's no-override plan log reports `Variable: SelectedLanguage = zh-CN` on this machine; 174 unit tests and Svelte check passed.
+- Started Phase 11 after a real install stalled after PlanComplete; the log proves Apply never began, pointing to cross-thread WPF handle access.
+- Completed Phase 11: the WPF HWND is cached during `SourceInitialized`, Burn reads only the cached `IntPtr`, and a zero-handle guard now fails visibly instead of hanging.
+- Rebuilt the Burn installer, passed plan-only verification, 174 unit tests, Svelte check, and whitespace checks. Real Apply was not automated because WiX 3 cannot safely cancel at `ApplyBegin` before system changes.
+- Started Phase 12 after confirming the installed executable is `codestudio-lite.exe`; the successful completion page currently exposes two Close actions.
+- Completed Phase 12: successful Install/Repair completion now offers a localized Open CodeStudio Lite primary action, while failure/uninstall and the secondary button remain Close actions.
+- The launcher validates the executable, starts it with the installation directory as working directory, reports launch errors, and closes the installer only after a successful start. Burn build, 174 tests, and Svelte check passed.
+- Tightened completion actions so failure, uninstall, layout, and other non-launchable completions hide the primary button entirely; no completion state can render two Close buttons.
+- Started Phase 13 to provide a Retry plus Close completion state specifically for failed Apply operations.
+- Completed Phase 13: failed Apply completion now offers a localized Retry primary action plus one Close action; retry preserves the selected language, install directory, and original Burn action while resetting completion and exit state before replanning.
+- Detection, planning, and window initialization failures remain close-only. The focused installer tests, Burn compilation and plan-only verification, 174 full unit tests, Svelte check, and whitespace checks passed; no real installation was applied automatically.
+
+## 2026-06-26
+
+- User requested a full Panda CSS migration without a small POC.
+- Confirmed there were no existing planning files.
+- Inspected project shape: Svelte + Vite, global `src/styles.css`, shared components under `src/components`, route pages under `src/routes`.
+- Created the initial full-migration plan, findings log, and progress log.
+- Installed `@pandacss/dev` and `postcss`, then added Panda infrastructure: `panda.config.ts`, `postcss.config.cjs`, `src/panda.css`, package scripts, `.gitignore`, and `src/main.ts` import.
+- Added `src/lib/pandaMigration.test.mjs` as a static migration guard and verified the first red tests before implementation.
+- Migrated `DismissibleNotice`, `StatusPill`, `SecretInput`, `ProblemList`, and `ToolStatusCard` to Panda recipes/utilities.
+- Removed owned legacy global selectors for migrated pieces: `.notice*`, `.secret-input`, and `.problem-*`.
+- Ran `npx panda codegen` successfully after each recipe batch.
+- Verification passed: `node --test src/lib/pandaMigration.test.mjs`, `npm run check`, `npm run test:unit` (71 passed), and `npm run build`.
+- `git diff --check` exited 0 with only existing CRLF conversion warnings reported by Git.
+- Continued the next migration step after the user said "下一步".
+- Added shared Panda recipes for `panelRecipe`, `sectionHeadingRecipe`, `actionButtonRecipe`, `iconButtonRecipe`, `emptyRowRecipe`, `activityListRecipe`, and `activityRowRecipe`.
+- Migrated `ActivityLog` to Panda recipes and moved `ProblemList` from legacy `panel-band`, `section-heading`, `primary-button`, `icon-button`, and `empty-row` classes to shared recipes.
+- Deduplicated component-level button styling by making `SecretInput` use `iconButtonRecipe()` and `ToolStatusCard` use `actionButtonRecipe({ compact: true })`.
+- Removed owned legacy `.activity-*` selectors from `src/styles.css`.
+- Verification passed after the second batch: `node --test src/lib/pandaMigration.test.mjs`, `npm run check`, `npm run test:unit` (72 passed), `npm run build`, and `git diff --check`.
+- Continued the Dashboard route migration after the user said "下一步".
+- Added Dashboard recipes for grids, cards, card main copy, status placement, action rows, and overflow actions, then moved the Dashboard main connected-client/system sections to Panda classes.
+- Added `compact` support to `iconButtonRecipe` for the Dashboard overflow summary button and kept Dashboard action buttons at the old compact row dimensions inside `dashboardCardActionsRecipe`.
+- Migrated `src/lib/dashboardLayout.test.mjs` away from old global CSS selectors so it now asserts the Panda recipe replacement and the new Dashboard section markers.
+- Removed the now-unused Dashboard main-card legacy selectors from `src/styles.css`, including `.system-grid`, `.system-card`, `.system-main`, `.system-copy`, `.system-card-state`, `.client-card-actions`, `.clickable-card`, and `.card-action-*`.
+- Verification passed after the Dashboard main slice: `npx panda codegen`, `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `node --test src/lib/pandaMigration.test.mjs` (7 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (73 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Confirmed the Vite dev server is already listening on `http://127.0.0.1:1420/`.
+- Continued the next Dashboard route slice after the user said "下一步".
+- Added a failing migration guard for Dashboard install/launch modals in `src/lib/pandaMigration.test.mjs`; it failed as expected because the modal markup still used legacy global classes.
+- Added Dashboard modal recipes in `panda.config.ts` for modal shell/body/actions, progress panels, command boxes, info grids, preview lists, logs, terminal frames, launch sections, launch grids/options, and working-directory fields.
+- Replaced Dashboard install and launch modal legacy classes with Panda recipe calls and small page-local `css(...)` helpers while keeping install/launch behavior unchanged.
+- Removed now-unused Dashboard-specific modal CSS selectors from `src/styles.css`; kept shared modal/progress/log/list selectors still used by other pages.
+- Fixed a dangling CSS selector left during cleanup (`.install-log strong, {`) and revalidated with the production build.
+- Verification passed after the Dashboard modal slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (8 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (74 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the Codex Client route migration after the user said "下一步".
+- Added a failing static guard for Codex Client main route surfaces in `src/lib/pandaMigration.test.mjs`; it failed as expected because `CodexClient.svelte` still used legacy global classes.
+- Added reusable desktop-client Panda recipes for install-kind tabs, metrics, action rows, progress panels, preview lists, settings lists, native checkbox toggles, doctor lists, and doctor rows.
+- Migrated Codex Client's main route surfaces to Panda recipes and local `css(...)` helpers, including top actions, launch options, status metrics/actions, progress, update plan list, capability list, and settings.
+- Left the Codex Client uninstall modal and shared global CSS compatibility selectors in place because Claude Desktop and other pages still consume them.
+- Verification passed after the Codex Client main route slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (9 passed), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (75 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the Claude Desktop route migration after the user said "下一步".
+- Updated stale desktop-client test coverage so the Claude Desktop progress assertions now look for `desktopClientProgressRecipe()` and `data-desktop-client-progress-*` markers instead of `class="install-progress"`.
+- Verified the stale assertion fix with `node --test src/lib/desktopClientPages.test.mjs` (26 passed).
+- Added a red migration guard that required migrated desktop-client global selectors to be removed from `src/styles.css`; it failed as expected on `.install-kind-tabs`.
+- Removed unused legacy desktop-client CSS selectors from `src/styles.css`: `.install-kind-tabs`, `.install-progress`, `.progress-*`, `.doctor-list`, `.doctor-row`, `.install-log`, `.live-install-log`, `.install-log-viewport`, and `.install-log-stage`.
+- Kept shared modal, preview-list, native-write-toggle, and `progress-pulse` compatibility styles because current production consumers still require them.
+- A PowerShell `rg` command with nested quotes failed as an array/index parse error; re-ran the selector evidence search with simpler commands before editing CSS.
+- Verification passed after the Claude Desktop route slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (11 passed), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (77 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Confirmed the dev server is listening on `http://127.0.0.1:1420/`.
+- Continued the Profiles/modal cleanup after the task resumed.
+- Added a red static guard for Profiles modal/diff surfaces, then migrated the pending usage, edit, delete, and apply modals to Panda recipes for modal shells, preview lists, native toggles, diff rows, inline notices, and action buttons.
+- Removed Profiles-specific migrated CSS selectors from `src/styles.css`, including wide/usage modal variants, native diff list/row rules, usage toggle/result panels, compact conflict list styling, and obsolete conflict-panel guards.
+- Verification passed after the Profiles modal/diff slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (12 passed), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (78 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued with the small shared-cleanup slice after the user said "下一步".
+- Added a red migration guard for the Codex Client uninstall modal; it failed as expected because `CodexClient.svelte` still lacked the desktop-client modal recipes.
+- Migrated the Codex Client uninstall confirmation modal to `desktopClientModalBackdropRecipe`, `desktopClientModalPanelRecipe`, `desktopClientModalBodyRecipe`, `desktopClientModalActionsRecipe`, `desktopClientPreviewListRecipe`, and `actionButtonRecipe`.
+- Removed now-unused shared modal CSS selectors from `src/styles.css`: `.modal-backdrop`, `.modal-panel`, `.modal-body`, `.modal-actions`, and their grouped heading/action/media-query references.
+- Added a red cleanup guard for now-unowned native diff/toggle globals; it failed as expected on `.native-diff`.
+- Removed now-unused native diff/toggle CSS selectors from `src/styles.css`: `.native-diff`, `.native-diff-heading`, `.native-write-toggle`, and their grouped/media-query references.
+- Confirmed with `rg` that `modal-*`, `native-write-toggle`, and `native-diff*` no longer appear in production Svelte/CSS files. Remaining compatibility selectors with production consumers were `preview-list`, `inline-error`, and `inline-success`.
+- Verification passed after the Codex Client uninstall modal and shared CSS cleanup slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (13 passed), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (79 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Confirmed the dev server is still listening on `http://127.0.0.1:1420/` (PID 27724).
+- Continued the Profiles usage modal cleanup after finding `usage-official-panel` still had exactly one production consumer.
+- Added a red Profiles guard for `profileUsageOfficialPanelRecipe`; it failed as expected while the usage modal still used the legacy `usage-official-panel` class.
+- Added `profileUsageOfficialPanelRecipe`, migrated the official OAuth usage notice to it, and removed the legacy `.usage-official-panel` selectors from `src/styles.css`.
+- Verification passed after the Profiles usage official notice cleanup: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (13 passed), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `powershell -NoProfile -Command "node --test src/lib/dashboardLayout.test.mjs"` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (79 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Confirmed the dev server is still listening on `http://127.0.0.1:1420/` (PID 27724).
+- Continued the Profiles main-surface migration after the user said "下一步".
+- Completed the in-progress Profiles tool switcher slice: the existing guard for `profileModeLayoutRecipe`, `profileToolSwitcherRecipe`, and `profileToolTabsRecipe` passed after removing the old `.profile-mode-layout`, `.profile-tool-switcher`, and `.profile-tool-tabs` CSS selectors.
+- Added a red migration guard for the Profiles main card list; it first failed on the missing `profileToolSectionRecipe` after one test-regex syntax correction.
+- Added Profiles main-list Panda recipes for the selected tool panel, sortable grid, sortable row, compact profile card, card main row, drag handle, avatar, identity text, status placement, and card actions.
+- Migrated the Profiles main card list to those recipes, moved card state from legacy class bindings to `data-active`, `data-builtin`, `data-drag-active`, and `data-sortable-active`, and changed the drag helper to query `[data-profile-card]`.
+- Reused the new `profileAvatarRecipe({ size: "large" })` for the edit modal avatar so the old `.profile-avatar.large` selector could be removed cleanly.
+- Removed the migrated Profiles main list selectors from `src/styles.css`, including route-transition references to `.profile-card` and `.profile-grid > .profile-sortable-row`, the old `.profile-card*`, `.compact-profile-card`, `.profile-avatar`, `.profile-identity`, `.profile-drag-handle`, and sortable-active selectors.
+- Verification passed after the Profiles main card/list slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (15 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (81 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the Setup Wizard route migration after the user said "下一步" and restored context from the planning files plus session catchup.
+- Added a red static guard for Setup Wizard route surfaces requiring `wizard*Recipe` usage, `data-step-state`, and `data-selected` state attributes; it failed as expected before the migration.
+- Added Setup Wizard Panda recipes for the route stack, actions, stepper, panels, choices, mode groups, forms, inline notices, OAuth card, security note, preview box/headings, write-preview list/rows/meta/content, and warning list.
+- Migrated `src/routes/SetupWizard.svelte` from legacy global classes to those recipes and replaced `class:active`, `class:done`, and `class:selected` state styling with data attributes.
+- Removed the now-unused Setup Wizard global selectors from `src/styles.css`, including stepper/panel/choice/OAuth/preview/write-preview/security/button-row selectors plus the unowned `.choices`, `.compact-choices`, and `.field-grid` compatibility styles.
+- Kept `.form-grid`, `.field-error`, and `.write-content-preview` because Profiles still consumes them.
+- Verification passed after the Setup Wizard slice: `node --test src/lib/pandaMigration.test.mjs` (16 passed), no legacy Setup Wizard selector hits from `rg`, `npx panda codegen`, `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (82 passed), and `npm run build`.
+- Continued the Gateway route migration after the user said "下一步" and restored context from the planning files plus session catchup.
+- Added a red static guard for Gateway route surfaces; it failed as expected while `Gateway.svelte` still used global `gateway-*`, `primary-button`, `secondary-button`, `panel-band`, `class:selected`, and request-log classes.
+- Added Gateway Panda recipes for the route width, online hero accent, action row, status panel, metrics grid/code cards, privacy setting row, segmented privacy control, inline error banner, request panel, request list, and privacy-action request rows.
+- Migrated `src/routes/Gateway.svelte` to those recipes, reused shared `panelRecipe`, `sectionHeadingRecipe`, `actionButtonRecipe`, and `emptyRowRecipe`, and moved privacy state from classes to `data-selected` and `data-privacy-action`.
+- Removed the migrated Gateway selectors from `src/styles.css`, including `.gateway-*`, `.sidebar-gateway-error`, `.compact-heading`, and the stale `.wizard-actions` grouped reference.
+- Fixed a Panda recipe type check by narrowing `gatewayTone` to the explicit `"online" | "offline"` union before calling `gatewayHeroRecipe`.
+- Verification passed after the Gateway slice: `npx panda codegen`, `npm run check` (0 errors/0 warnings), `node --test src/lib/pandaMigration.test.mjs` (17 passed), no legacy Gateway selector hits except the intended `data-gateway-request-time`, `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (83 passed), and `npm run build`.
+- Continued the Settings route migration after the user said "下一步" and restored context from the planning files plus session catchup.
+- Confirmed the existing red guard for Settings failed as expected because `Settings.svelte` still lacked the Panda `cx` import and recipe usage.
+- Added Settings Panda recipes for the settings list, rows, row values, about panel/content/summary/mark/title/update row, and update status pill.
+- Migrated `src/routes/Settings.svelte` to those recipes, reused `panelRecipe`, `sectionHeadingRecipe`, `actionButtonRecipe`, and `profileInlineNoticeRecipe`, and narrowed `updateStatusTone` to the generated Panda tone union.
+- Removed the migrated Settings legacy CSS selectors from `src/styles.css`, including `.settings-list`, `.settings-row`, `.settings-row-value`, `.settings-toggle-row`, `.about-*`, and `.pill*`; kept `.brand-mark` and `.inline-error` for remaining non-Settings consumers.
+- Fixed a Panda recipe type check by declaring `updateStatusTone: UpdateStatusTone` before passing it to `settingsUpdatePillRecipe`.
+- Verification passed after the Settings slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (18 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (84 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the Terminal Panel route migration after the user said "下一步" and restored context from the planning files plus session catchup.
+- Added a red static guard for Terminal Panel route surfaces; it failed as expected while `TerminalPanel.svelte` still used `terminal-*` classes, `secondary-button`, and a component-local `<style>` block.
+- Added Terminal Panel Panda recipes for the route shell, header, title, status tone, action row, and xterm frame/viewport adjustments.
+- Migrated `src/routes/TerminalPanel.svelte` to those recipes, reused `actionButtonRecipe`, added an explicit `TerminalStatusTone` union, and replaced status-specific classes with one typed recipe variant.
+- Removed the component-local `<style>` block from `TerminalPanel.svelte`; kept `@xterm/xterm/css/xterm.css` as third-party terminal rendering CSS.
+- Verification passed after the Terminal Panel slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (19 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (85 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the App shell/navigation migration after the user said "下一步" and restored context from the planning files plus session catchup.
+- Confirmed the App shell guard was red after implementation only because `.brand-logo` still existed in `src/styles.css`; the App markup already used the new recipes.
+- Removed the leftover global `.brand-logo` selector because `appBrandMarkRecipe` and `settingsAboutMarkRecipe` now own logo sizing through nested `.brand-logo` rules.
+- Verified no legacy App shell/sidebar/navigation/workspace/route-transition classes remained in `App.svelte` or `src/styles.css`; one complex PowerShell selector check failed due to quoting, then the literal `-SimpleMatch` check returned no matches.
+- Verification passed after the App shell/navigation slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (20 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (86 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the route shell primitives migration after the user said "下一步" and restored context from the planning files plus session catchup.
+- Added a red static guard for shared route shell primitives; it failed as expected while Dashboard still lacked `routeStackRecipe`.
+- Added shared Panda recipes for route stacks, top strips, top actions, status strips, and section action rows, then migrated Dashboard, Codex Client, Claude Desktop, Settings, Profiles, Setup Wizard, and Gateway to those recipes.
+- Removed obsolete `wizardRouteRecipe`, `gatewayRouteRecipe`, and `gatewayActionsRecipe`; Gateway keeps only `gatewayHeroRecipe` for the online/offline top strip accent.
+- Updated `appRouteTransitionRecipe` to animate nested `.cs-top-strip` and `.cs-panel` generated classes now that the legacy `.top-strip` and `.panel-band` selectors are gone.
+- Replaced the remaining Profiles legacy buttons and empty-state panels with `actionButtonRecipe`, `panelRecipe`, and `emptyRowRecipe`.
+- Removed migrated global selectors from `src/styles.css`: `route-stack`, `top-strip`, `compact-top-strip`, `panel-band`, `top-actions`, `status-strip`, `primary-button`, `secondary-button`, `icon-button`, `section-heading`, `section-actions`, `empty-row`, and the unused `embedded-profile-actions` helper.
+- Verification passed after the route shell primitives slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (21 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (87 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the Profiles form cleanup after the user said "下一步" and restored context from the planning files plus session catchup.
+- Added a red static guard for Profiles edit and usage forms; it failed as expected while `Profiles.svelte` still used legacy embedded stack, form grid, field error, icon editor, usage template/result/code, and write-content preview classes.
+- Added Profiles Panda recipes for the embedded stack, edit/usage form grid, field errors, icon editor/actions, usage template selector, usage code field, usage result grid/cards, and write-content preview.
+- Migrated `src/routes/Profiles.svelte` to those recipes and moved usage template and invalid-result state from Svelte class bindings to `data-selected` and `data-invalid` attributes.
+- Removed the migrated Profiles form/usage global selectors from `src/styles.css`, including `.embedded-profile-stack`, `.form-grid`, `.field-error`, `.edit-profile-form`, `.profile-icon-editor`, `.profile-icon-actions`, `.edit-mode-field`, `.edit-mode-toggle`, `.usage-template-row`, `.usage-form`, `.usage-code-field`, `.usage-result-grid`, `.usage-result-card`, `.usage-balance-value`, and `.write-content-preview`.
+- Confirmed the removed selectors no longer have production Svelte/CSS consumers; `preview-list` now has no production Svelte consumers, while `inline-error` still has the Dashboard environment-conflict banner consumer.
+- Verification passed after the Profiles form cleanup slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (22 passed), `npm run check` (0 errors/0 warnings), removed-selector `rg` check (no production hits), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (88 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the next global CSS cleanup after the user said "下一步".
+- Added a red static guard requiring the unused `preview-list` global compatibility styles to be removed; it failed as expected while `.preview-list` remained in `src/styles.css`.
+- Removed `.preview-list` selectors from `src/styles.css` and removed `.preview-list div` from the shared border/background grouped rule.
+- Confirmed `preview-list` no longer appears in production Svelte routes/components or `src/styles.css`; remaining occurrences are migration-test guards and Panda recipe class names.
+- Verification passed after the `preview-list` cleanup slice: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (23 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (89 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the Dashboard environment-conflict cleanup after the task resumed.
+- Added a red static guard requiring `dashboardEnvConflictRecipe`, `data-dashboard-env-conflict-chips`, and removal of `.inline-error`, `.inline-success`, `.error-banner`, `.env-conflict-banner`, and `.conflict-chip-list`; it failed as expected before the migration.
+- Added `dashboardEnvConflictRecipe`, migrated the Dashboard environment conflict banner and chip list to Panda-owned markup, and removed the old inline/error/conflict global selectors from `src/styles.css`.
+- Verification passed after the Dashboard inline notice cleanup: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (24 passed), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (90 passed), `npm run build`, selector `rg` checks (no old production hits), and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the shared utility cleanup after identifying `.eyebrow` and `.spin` as low-risk cross-page globals.
+- Added a red static guard requiring shared `eyebrowRecipe` and `spinRecipe`, and requiring no production `class="eyebrow"`, `class="spin"`, or `? "spin" : ""` consumers; it failed as expected while the recipes did not exist.
+- Added `eyebrowRecipe` and `spinRecipe`, migrated ToolStatusCard plus Dashboard, Codex Client, Claude Desktop, Profiles, Setup Wizard, Gateway, and Settings to recipe calls, removed the Dashboard-local `dashboardEyebrowClass`, and deleted `.eyebrow` / `.spin` from `src/styles.css` while keeping `@keyframes spin`.
+- Updated `dashboardLayout.test.mjs` to expect the refresh icon to use `spinRecipe()` instead of the old `spin` class.
+- Verification passed after the shared utility cleanup: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (25 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (91 passed), `npm run build`, selector `rg` checks (no old utility class production hits), and `git diff --check` (exit 0 with CRLF warnings only).
+- Continued the shared `ToolIcon` cleanup after identifying `.tool-icon*` as the next single-owner global CSS block.
+- Added a red static guard requiring `ToolIcon.svelte` to use `toolIconRecipe`, data attributes for variant/tone/fallback text, and no `.tool-icon*` selectors in `src/styles.css` or `panda.config.ts`; it failed as expected on the missing recipe and later on stale recipe-local `.tool-icon` selectors.
+- Added `toolIconRecipe` with tone variants (`light`, `codex`, `claude`, `gemini`, `openclaw`, `codex-app`, `hermes`) and size variants (`card`, `choice`, `heading`), migrated `ToolIcon.svelte` to recipe output plus `data-tool-icon-*` attributes, and deleted the global `.tool-icon*` CSS block.
+- Replaced stale nested `.tool-icon`/`.tool-icon-choice` selectors inside `profileAvatarRecipe` and `wizardChoiceButtonRecipe` with `data-tool-icon-*` selectors.
+- Verification passed after the ToolIcon cleanup: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (26 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (92 passed), `npm run build`, selector `rg` checks (no old `.tool-icon*` production/config selectors), and `git diff --check` (exit 0 with CRLF warnings only).
+
+## 2026-06-27
+
+- Continued the final global CSS cleanup after the user said "下一步" and restored context from `task_plan.md`, `progress.md`, `findings.md`, memory, and the planning catchup script.
+- Confirmed the remaining old tool/provider/backup/test/OAuth/profile-choice selector blocks in `src/styles.css` had no production Svelte consumers, while `App.svelte` still had a bare `class="error-banner"` and `SetupWizard.svelte` still had a bare `class="wide-field"`.
+- Added a red static guard in `src/lib/pandaMigration.test.mjs` requiring `appErrorBannerRecipe`, `wizardWideFieldRecipe`, no legacy unowned selectors in `src/styles.css`, and no bare `error-banner`/`wide-field` production classes; it failed as expected before implementation.
+- Added `appErrorBannerRecipe` and `wizardWideFieldRecipe`, migrated the App top-level error banner and Setup Wizard wide remark field to those recipes, and updated App route transition selectors from legacy `.tool-card`/`.tool-grid` references to Panda-owned `.cs-tool-card`/`.cs-dashboard-grid` selectors.
+- Removed the dead legacy CSS blocks from `src/styles.css`: `.tool-grid`, `.tool-copy`, `.tool-card`, `.tool-main`, `.tool-path`, `.tool-state`, `.tool-action`, `.provider-summary`, `.provider-mode-grid`, `.backup-row`, `.test-panel`, `.tool-check-list`, `.check-summary`, `.check-row`, `.launch-options-grid`, `.codex-oauth-panel`, `.oauth-*`, `.profile-choice-*`, `.oauth-confirm-panel`, `.oauth-diff`, `.quiet`, plus now-empty media blocks.
+- Verification passed after the final global CSS cleanup: `npx panda codegen`, `node --test src/lib/pandaMigration.test.mjs` (27 passed), `npm run check` (0 errors/0 warnings), `node --test src/lib/desktopClientPages.test.mjs` (26 passed), `node --test src/lib/dashboardLayout.test.mjs` (5 passed), `npm run test:unit` (93 passed), `npm run build`, selector checks for `.tool-card`, `class="error-banner"`, and `class="wide-field"` (no hits), and `git diff --check` (exit 0 with CRLF warnings only).
+- Started a bugfix for Codex Client and Claude Desktop update-plan cache UX after the user reported that both pages still show "正在更新计划" on every entry.
+- Restored context from the planning files, memory, and `session-catchup.py`; the catchup script reported unsynced context and recommended checking `git diff --stat`.
+- Confirmed the worktree is intentionally dirty from the Panda migration plus prior desktop-client changes, so this fix stayed scoped to update-plan UX and tests.
+- Root-cause evidence: both stores hydrate cached plan data before background refresh, but `CodexClient.svelte` and `ClaudeDesktop.svelte` still rendered `planRefreshing` as visible plan-section text, status pills, and loading rows whenever cached plan details existed.
+- Added red regression tests to `src/lib/desktopClientPages.test.mjs` requiring cached Codex Client and Claude Desktop update plans to keep showing plan details without foreground refresh placeholders.
+- Verified RED with `node --test src/lib/desktopClientPages.test.mjs`: 26 passed, 2 failed, both on the new cached-plan foreground-refresh assertions.
+- Updated `CodexClient.svelte` so cached release/plan details no longer display `planRefreshText`, refresh status pills, plan loading rows, or capability loading rows during background refresh; stale/unavailable plans still keep their warning/loading icon path.
+- Updated `ClaudeDesktop.svelte` so cached plan details always show `activePlanStatus` plus download URL, SHA-256, and install location, without a foreground refresh pill or loading row.
+- Updated existing static tests in `src/lib/codexClientLaunch.test.mjs` and `src/lib/pandaMigration.test.mjs` so they assert the new cached-plan behavior instead of the old foreground refresh UI.
+- Verification passed after the cache UX fix: `node --test src/lib/desktopClientPages.test.mjs src/lib/codexClientLaunch.test.mjs src/lib/pandaMigration.test.mjs` (63 passed), `npm run check` (0 errors/0 warnings), `npm run test:unit` (95 passed), `npm run build`, and `git diff --check` (exit 0 with CRLF warnings only).

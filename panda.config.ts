@@ -1833,6 +1833,41 @@ export default defineConfig({
             }
           }
         },
+        gatewayDeviceIdFieldRecipe: {
+          className: "cs-gateway-device-id-field",
+          description: "Gateway upstream device identity input and its save action.",
+          base: {
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            minWidth: 0,
+            "& input": {
+              flex: "1 1 auto",
+              minWidth: 0,
+              padding: "7px 10px",
+              borderRadius: "8px",
+              border: "1px solid var(--border)",
+              background: "var(--surface-2)",
+              color: "var(--text)",
+              fontFamily: "var(--font-mono)",
+              fontSize: "12px"
+            }
+          }
+        },
+        gatewayDeviceIdHintRecipe: {
+          className: "cs-gateway-device-id-hint",
+          description: "Explains which device identity upstreams will see.",
+          base: {
+            margin: "0 0 2px",
+            color: "var(--text-muted)",
+            fontSize: "11px",
+            lineHeight: "1.6",
+            "& code": {
+              fontFamily: "var(--font-mono)",
+              wordBreak: "break-all"
+            }
+          }
+        },
         gatewaySettingRowRecipe: {
           className: "cs-gateway-setting-row",
           description: "Gateway privacy filter setting row.",

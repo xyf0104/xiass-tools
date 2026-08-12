@@ -1,0 +1,46 @@
+# Progress
+
+## 2026-07-11
+
+- Restored prior planning context and confirmed the previous xterm/desktop integration plan is complete.
+- Confirmed the tracked worktree is clean before starting this change.
+- Created an isolated plan for Codex `requires_openai_auth` and `auth.json` consistency.
+- Located current backend and frontend `requires_openai_auth` branches plus existing `auth.json` profile-detection tests.
+- Identified gateway preview assertions and copy that must change together with the backend invariant.
+- Confirmed an existing typed `CodexAuthJson` write-plan and verification path can enforce the requested invariant.
+- Confirmed the existing auth write plan and verifier currently cover only custom official OAuth profiles, not API-key profiles.
+- Defined the credential source per Codex mode: upstream profile key for direct mode, local gateway token for gateway mode, stored OAuth JSON for official mode.
+- Confirmed the Gateway exposes a persisted tool-scoped token suitable for Codex `auth.json`, and selected a merge-in-place JSON strategy to preserve OAuth metadata.
+- Traced the regression to removal of `experimental_bearer_token` without a replacement API-key `auth.json` plan; retained the security boundary that keys must not return to `config.toml`.
+- Found and scoped a false-positive direct-profile matcher that accepted missing `auth.json`; logged and corrected the Windows search-command issue encountered during inspection.
+- Confirmed the existing tokenless Codex Gateway route can remain as legacy compatibility while new configs receive the local token through `auth.json`.
+- Verified from the official Codex config reference that managed auth.json usage also requires selecting the `file` credential store; incorporated that into the implementation scope.
+- Confirmed the installed Codex API-key cache uses the root uppercase `OPENAI_API_KEY` field without `auth_mode`; completed the tracing phase and started implementation.
+- Started an isolated `codex login --with-api-key` format probe; the first temporary path was sandbox-denied and did not touch the real Codex home.
+- Completed the isolated probe: Codex itself writes `auth_mode: apikey` plus root `OPENAI_API_KEY`; updated the implementation design accordingly.
+- Began adding red tests; the first atomic patch was rejected on context mismatch, so no partial test edits landed.
+- Added focused Rust and frontend regression tests for auth format, write ordering, direct/gateway plans, file credential storage, and preview parity.
+- Confirmed RED: Rust failed only on the two intentionally missing auth-content helpers; the frontend static test failed because the current mock preview lacks file-backed auth.json handling.
+- Implemented Codex auth.json generation/restoration, file credential-store selection, auth-first write ordering, strict content verification, unified gateway auth, preview parity, and localized copy.
+- Targeted verification passed: 45 Codex-related Rust tests and all 6 profile static tests.
+- Removed the unused legacy translation/mapping that described disabling Codex OpenAI auth.
+- Completed implementation and began full Rust/frontend regression verification.
+- Full verification passed: Rust library tests 315/315, frontend unit tests 149/149, Svelte check 0 errors/0 warnings, and production build completed without chunk-size warnings.
+- Final targeted rerun passed: 45 Codex-related Rust tests and 6 profile preview tests.
+- `cargo fmt --check`, `git diff --check`, and production residual scans passed; only expected Git CRLF conversion notices were printed.
+- Added security assertions proving direct Provider keys and local Gateway tokens do not appear in generated `config.toml` content.
+- Restored the completed auth.json implementation after the requirement update and added new phases for the managed-provider contract override.
+- Confirmed the new work retains auth-first Key/Token writes while changing all managed provider flags to `false` and adding the fixed actor-authorization header.
+- Updated Rust generation to emit the unified managed-provider contract in field order, added strict post-write verification, and retained legacy `true` recognition for already-applied older configs.
+- Updated backend native previews to show `requires_openai_auth = false` followed immediately by the actor-authorization header.
+- Synchronized TypeScript mock previews, frontend static expectations, preview-detail mapping, and en-US/zh-CN/zh-TW copy with the new contract while retaining auth.json credential warnings.
+- The first combined Rust test patch was rejected on a legacy fixture context mismatch; no partial changes landed, so the update was split into smaller function-scoped patches.
+- Added Rust contract helpers and coverage for official/direct/gateway generation, exact adjacent TOML lines, backend preview ordering, auth-first write plans, and rejection of a tampered actor header.
+- Retained intentional legacy `requires_openai_auth = true` fixtures for import/active-profile compatibility while current managed fixtures use `false` plus the header.
+- Targeted Rust tests showed empty configs collapsed provider fields into one inline dotted table; fixed table initialization so the requested auth and header settings render as adjacent lines.
+- The remaining direct verification failure came from treating `apikey` inside a URL hostname as a secret; write verification now compares the parsed URL directly while preview redaction remains unchanged.
+- Focused verification passed: 46 Codex-related Rust tests, all 149 frontend unit tests, and Rust formatting checks.
+- Completed the updated provider-contract implementation and started full regression verification.
+- Full verification passed: Rust library tests 316/316, frontend unit tests 149/149, Svelte check 0 errors/0 warnings, and the production build completed with a 426.28 kB main chunk and no chunk-size warning.
+- Final focused frontend preview tests passed 6/6; `cargo fmt --check`, `git diff --check`, credential-leak scans, and stale product `requires_openai_auth = true` scans passed.
+- All updated-contract phases are complete; unrelated untracked planning and workflow artifacts remain untouched and unstaged.

@@ -15,6 +15,8 @@
     gatewayRequestPanelRecipe,
     gatewayRequestRowRecipe,
     gatewaySegmentedRecipe,
+    gatewayDeviceIdFieldRecipe,
+    gatewayDeviceIdHintRecipe,
     gatewaySettingRowRecipe,
     panelRecipe,
     routeStackRecipe,
@@ -35,6 +37,7 @@
   export let gatewayBusy = false;
   export let onGatewayAction: (action: "start" | "stop" | "restart") => void | Promise<void> = () => {};
   export let onPrivacyFilterChange: (mode: PrivacyFilterMode) => void | Promise<void> = () => {};
+  export let onUpstreamDeviceIdChange: (deviceId: string) => void | Promise<void> = () => {};
   export let onCopyGatewayUrl: () => void | Promise<void> = () => {};
 
   const privacyModes: Array<{ value: PrivacyFilterMode; labelKey: Parameters<typeof $t>[0] }> = [
@@ -45,6 +48,9 @@
   ];
 
   let privacyBusy = false;
+  let deviceIdInput = "";
+  let deviceIdDirty = false;
+  let deviceIdBusy = false;
   let requestLog: GatewayRequestLogEntry[] = [];
   let requestLogLoading = false;
   let requestLogError: string | null = null;
@@ -67,6 +73,24 @@
   $: activeModel = gatewayStatus?.activeModel ?? $t("common.none");
   $: baseUrl = gatewayStatus?.baseUrl ?? "http://127.0.0.1:43112/v1";
   $: privacyFilterMode = gatewayStatus?.privacyFilterMode ?? "off";
+  $: effectiveDeviceId = gatewayStatus?.effectiveUpstreamDeviceId ?? "";
+  $: deviceIdIsPinned = (gatewayStatus?.upstreamDeviceId ?? "").trim().length > 0;
+  $: if (gatewayStatus && !deviceIdDirty) {
+    deviceIdInput = gatewayStatus.upstreamDeviceId ?? "";
+  }
+
+  async function saveUpstreamDeviceId() {
+    if (deviceIdBusy) {
+      return;
+    }
+    deviceIdBusy = true;
+    try {
+      await onUpstreamDeviceIdChange(deviceIdInput.trim());
+      deviceIdDirty = false;
+    } finally {
+      deviceIdBusy = false;
+    }
+  }
 
   async function setPrivacyMode(mode: PrivacyFilterMode) {
     if (privacyBusy || mode === privacyFilterMode) {
@@ -179,6 +203,32 @@
         {/each}
       </div>
     </div>
+    <div class={gatewaySettingRowRecipe()}>
+      <span>{$t("gateway.upstreamDeviceId")}</span>
+      <div class={gatewayDeviceIdFieldRecipe()}>
+        <input
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder={$t("gateway.upstreamDeviceIdPlaceholder")}
+          bind:value={deviceIdInput}
+          on:input={() => (deviceIdDirty = true)}
+          data-gateway-device-id-input
+        />
+        <button
+          type="button"
+          class={actionButtonRecipe({ compact: true })}
+          disabled={deviceIdBusy || !deviceIdDirty}
+          on:click={saveUpstreamDeviceId}
+        >
+          {$t("common.save")}
+        </button>
+      </div>
+    </div>
+    <p class={gatewayDeviceIdHintRecipe()} data-gateway-device-id-source={deviceIdIsPinned ? "pinned" : "detected"}>
+      {deviceIdIsPinned ? $t("gateway.upstreamDeviceIdPinned") : $t("gateway.upstreamDeviceIdDetected")}
+      <code>{effectiveDeviceId}</code>
+    </p>
     {#if gatewayStatus?.lastError}
       <div class={gatewayInlineErrorRecipe()}>{gatewayStatus.lastError}</div>
     {/if}

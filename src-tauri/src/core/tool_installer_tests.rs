@@ -648,3 +648,113 @@ fn install_progress_payload_keeps_root_tool_scope() {
     assert!(captured[1].done);
     assert_eq!(captured[1].exit_code, Some(0));
 }
+
+fn npm_output_with(engine_mismatches: Vec<crate::core::node_engine::EngineMismatch>) -> InstallCommandOutput {
+    InstallCommandOutput {
+        engine_mismatches,
+        success: true,
+        exit_code: Some(0),
+        stdout_tail: "added 1 package in 3s".to_string(),
+        stderr_tail: String::new(),
+        missing_command: None,
+    }
+}
+
+const OPENCLAW_ENGINE_WARNING: &str = "npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'openclaw@2026.7.1-2',
+npm warn EBADENGINE   required: { node: '>=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0' },
+npm warn EBADENGINE   current: { node: 'v24.13.0', npm: '11.19.0' }
+npm warn EBADENGINE }";
+
+/// npm exits 0 after an engine warning, so without this the install reports
+/// success and leaves a CLI that cannot start.
+#[test]
+fn an_engine_warning_for_the_requested_package_blocks_success() {
+    let mismatches = crate::core::node_engine::parse_engine_mismatches(OPENCLAW_ENGINE_WARNING);
+    let output = npm_output_with(mismatches);
+
+    let blocking = blocking_engine_mismatch(&InstallAction::NpmGlobal("openclaw"), &output)
+        .expect("the requested package is blocked");
+    assert_eq!(blocking.current, "v24.13.0");
+    let message = engine_mismatch_message("OpenClaw", &blocking);
+    assert!(message.contains(">=22.22.3 <23 || >=24.15.0 <25 || >=25.9.0"));
+    assert!(message.contains("v24.13.0"));
+}
+
+/// npm warns about dependencies as well; those do not stop the requested tool.
+#[test]
+fn an_engine_warning_for_a_dependency_does_not_block() {
+    let mismatches = crate::core::node_engine::parse_engine_mismatches(
+        &OPENCLAW_ENGINE_WARNING.replace("openclaw@2026.7.1-2", "some-transitive-dep@1.0.0"),
+    );
+    let output = npm_output_with(mismatches);
+
+    assert!(blocking_engine_mismatch(&InstallAction::NpmGlobal("openclaw"), &output).is_none());
+}
+
+/// Only npm installs carry engine metadata; nothing else should be inspected.
+#[test]
+fn non_npm_actions_are_not_engine_checked() {
+    let mismatches = crate::core::node_engine::parse_engine_mismatches(OPENCLAW_ENGINE_WARNING);
+    let output = npm_output_with(mismatches);
+
+    assert!(blocking_engine_mismatch(&InstallAction::Winget("Some.Package"), &output).is_none());
+}
+
+/// The warning is parsed from the complete output, not from `stdout_tail`:
+/// `tail` keeps only the last twenty non-empty lines, and npm's own summary
+/// pushes the five-line block out of that window on a normal install.
+#[test]
+fn the_engine_warning_survives_output_truncation() {
+    let noise = (0..40)
+        .map(|index| format!("npm http fetch GET 200 https://registry.npmjs.org/pkg-{index}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let full = format!("{noise}\n{OPENCLAW_ENGINE_WARNING}\n{noise}\nadded 1 package in 3s");
+
+    assert!(
+        !tail(&full).contains("EBADENGINE"),
+        "the block must be outside the tail for this test to mean anything"
+    );
+    let mismatches = crate::core::node_engine::parse_engine_mismatches(&full);
+    assert_eq!(mismatches.len(), 1);
+    assert!(mismatches[0].is_package("openclaw"));
+}
+
+/// Grok and Hermes are installed by vendor scripts that ship no uninstall
+/// command; without the directory removal they could be installed but never
+/// removed.
+#[test]
+fn vendor_script_agents_are_uninstallable() {
+    for tool_id in ["grok", "hermes"] {
+        let definition = install_definition(tool_id).expect("definition");
+        assert!(
+            uninstall_supported_for_tool(tool_id, &definition.action),
+            "{tool_id} should be uninstallable"
+        );
+        assert!(removable_paths_for_tool(tool_id).is_some(), "{tool_id}");
+    }
+}
+
+/// Everything else keeps going through its package manager, so a directory
+/// removal must not be offered for it.
+#[test]
+fn package_manager_installs_are_not_removed_by_directory() {
+    for tool_id in ["claude", "codex", "openclaw", "node", "pnpm"] {
+        assert!(
+            removable_paths_for_tool(tool_id).is_none(),
+            "{tool_id} must be removed by its package manager"
+        );
+    }
+}
+
+/// The preview is what the confirmation shows, so it has to name the
+/// directories rather than an empty command string.
+#[test]
+fn the_vendor_script_uninstall_preview_lists_directories() {
+    let definition = install_definition("grok").expect("definition");
+    let preview = uninstall_command_preview_for_tool("grok", &definition.action);
+
+    assert!(preview.contains(".grok"), "{preview}");
+    assert!(!preview.trim().is_empty());
+}

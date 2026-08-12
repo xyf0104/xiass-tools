@@ -99,6 +99,8 @@ export interface ToolInstallPrerequisite {
 }
 
 export interface ToolInstallPlan {
+  /** PATH entries the tool's own installer added; empty means it never touched PATH. */
+  uninstallPathEntries?: string[];
   toolId: string;
   toolName: string;
   manager: string;
@@ -126,6 +128,10 @@ export interface ToolUninstallRequest {
   toolId: string;
   confirm: boolean;
   installKind?: "msix" | "exe" | null;
+  /// Also back up and delete the tool's configuration file.
+  removeConfig?: boolean;
+  /// Also remove the PATH entries the tool's own installer added.
+  removePath?: boolean;
 }
 
 export interface ToolInstallProgress {
@@ -755,6 +761,10 @@ export interface GatewayStatus {
   authEnabled: boolean;
   tokenPreview: string;
   privacyFilterMode: PrivacyFilterMode;
+  /** What the user pinned, if anything. Blank lets the gateway work it out. */
+  upstreamDeviceId: string;
+  /** The identity upstreams will actually see, whatever its source. */
+  effectiveUpstreamDeviceId: string;
   activeProfileId: string | null;
   activeProfileName: string | null;
   activeModel: string | null;
@@ -768,6 +778,7 @@ export interface GatewayControlResult {
 
 export interface UpdateGatewaySettingsRequest {
   privacyFilterMode?: PrivacyFilterMode | null;
+  upstreamDeviceId?: string | null;
 }
 
 export interface ChatGPTDesktopSettings {

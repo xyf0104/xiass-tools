@@ -21,6 +21,13 @@ pub async fn plan_tool_update(tool_id: String) -> Result<ToolInstallPlan, String
 }
 
 #[tauri::command]
+pub async fn plan_tool_uninstall(tool_id: String) -> Result<ToolInstallPlan, String> {
+    tauri::async_runtime::spawn_blocking(move || tool_installer::plan_tool_uninstall(&tool_id))
+        .await
+        .map_err(|err| err.to_string())?
+}
+
+#[tauri::command]
 pub async fn plan_tool_launch(tool_id: String) -> Result<ToolLaunchPlan, String> {
     tauri::async_runtime::spawn_blocking(move || tool_launch::plan_tool_launch(&tool_id))
         .await

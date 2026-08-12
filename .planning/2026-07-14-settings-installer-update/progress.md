@@ -1,0 +1,23 @@
+# Progress
+
+- Created an isolated plan for the Settings installer-driven updater without overwriting the Panda or Burn plans.
+- Mapped the current UI and updater store: an install button exists, but the updater plugin installs stock artifacts and cannot execute Burn or mount a DMG.
+- Completed the updater contract: stock check/version selection plus custom signed installer download and platform handoff.
+- Added the Rust installer updater with R2 URL restrictions, resumable download progress, Tauri signer Base64 decoding, streaming minisign verification, Burn launch, and rollback-capable DMG helper.
+- Routed Windows/macOS through the signed installer backend while retaining Tauri `downloadAndInstall` on Linux.
+- Moved the immediate-update action beside the version label and added all three locale strings.
+- Updated manifest generation, R2 publishing, Burn signing, macOS DMG signing, and release documentation.
+- Targeted updater/installer tests pass 19/19; Svelte check passes; Rust updater unit tests pass 2/2 after the added public-key contract test.
+- Full frontend suite passes 185/185 and full Rust library suite passes 359/359.
+- Production Vite build succeeds with the main application chunk at 450.72 kB (119.10 kB gzip).
+- `npm run updater:build:windows` succeeds end to end; Burn verification passes and produces a 19,513,578-byte signed EXE plus a 440-byte `.sig`.
+- macOS updater and normalization scripts pass static shell syntax checks on Windows; a real DMG build still requires macOS as designed.
+- Follow-up: automatic Windows installation currently exits after Burn apply without relaunching; Phase 5 tracks the explicit post-success relaunch contract.
+- Added a RED regression for updater-triggered Burn relaunch, then implemented an explicit `LaunchAfterInstall` flag and shared launch function; targeted installer tests pass 10/10 and the managed Burn project compiles with zero warnings.
+- Rebuilt the complete Windows updater after the relaunch change; release compilation, Burn verification, and Tauri signing all succeeded.
+- Follow-up Phase 6: bump the global release to 1.5.0 and flatten R2 artifact object paths so OS and architecture are expressed only in filenames.
+- Updated package, npm lock root, Tauri config, Cargo manifest, and Cargo lock application versions to 1.5.0, with a consistency regression test.
+- Flattened manifest URLs and R2 object keys to `releases/1.5.0/<filename>` while retaining Tauri platform-selection keys.
+- Built and signed `CodeStudio-Lite-1.5.0-Windows-x64-setup.exe`; Burn verification and C# compilation succeeded.
+- Generated `C:\Users\dreamyloong\Desktop\latest.json` from the real signed Burn artifact and confirmed the flattened upload path with an R2 publisher dry run.
+- Final frontend suite passes 188/188; Svelte diagnostics, Cargo format/check, and diff checks pass.

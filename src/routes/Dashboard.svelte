@@ -73,6 +73,8 @@
     planToolLaunch,
     planToolInstall,
     planToolUpdate,
+    planToolUninstall,
+    uninstallTool,
     repairToolPath,
     resizeInstallTerminal,
     startInstallTerminal,
@@ -110,7 +112,10 @@
   let installPlan: ToolInstallPlan | null = null;
   let installResult: ToolInstallResult | null = null;
   let pendingInstallTool: ToolStatus | null = null;
-  let installMode: "install" | "update" = "install";
+  let installMode: "install" | "update" | "uninstall" = "install";
+  // Both cleanups destroy something, so neither is ever on by default.
+  let uninstallRemoveConfig = false;
+  let uninstallRemovePath = false;
   let installError: string | null = null;
   let toolActionMessage: string | null = null;
   let toolActionError: string | null = null;
@@ -745,8 +750,10 @@
     }
   }
 
-  async function openToolActionPlan(tool: ToolStatus, mode: "install" | "update") {
-    if (isManagedDesktopClient(tool)) {
+  async function openToolActionPlan(tool: ToolStatus, mode: "install" | "update" | "uninstall") {
+    // Managed desktop clients have their own install and update pages; their
+    // uninstall stays on those pages and is not routed through this dialog.
+    if (isManagedDesktopClient(tool) && mode !== "uninstall") {
       await triggerDesktopClientAction(tool, mode);
       return;
     }
@@ -754,6 +761,9 @@
     const planTool = mode === "install" ? installPlanToolFor(tool) : tool;
     pendingInstallTool = planTool;
     installMode = mode;
+    // A destructive opt-in must never carry over from a previous dialog.
+    uninstallRemoveConfig = false;
+    uninstallRemovePath = false;
     installPlan = null;
     installResult = null;
     installError = null;
@@ -764,7 +774,12 @@
     toolActionError = null;
     planningToolId = planTool.id;
     try {
-      const plan = installMode === "update" ? planToolUpdate(planTool.id) : planToolInstall(planTool.id);
+      const plan =
+        installMode === "uninstall"
+          ? planToolUninstall(planTool.id)
+          : installMode === "update"
+            ? planToolUpdate(planTool.id)
+            : planToolInstall(planTool.id);
       installPlan = await plan;
     } catch (err) {
       installError = err instanceof Error ? err.message : String(err);
@@ -777,6 +792,10 @@
     await openToolActionPlan(tool, "install");
   }
 
+  async function openUninstallPlan(tool: ToolStatus) {
+    await openToolActionPlan(tool, "uninstall");
+  }
+
   async function closeInstallPlan() {
     if (installingToolId) {
       return;
@@ -784,6 +803,8 @@
     await disposeInstallTerminal(false);
     pendingInstallTool = null;
     installMode = "install";
+    uninstallRemoveConfig = false;
+    uninstallRemovePath = false;
     installPlan = null;
     installResult = null;
     installError = null;
@@ -802,12 +823,19 @@
     installResult = null;
     clearInstallProgressLogs();
     try {
-      const action = installMode === "update" ? updateTool : installTool;
-      const result = await action({
-        toolId: installPlan.toolId,
-        confirm: true,
-        installPrerequisites: installPlan.requiresPrerequisites
-      });
+      const result =
+        installMode === "uninstall"
+          ? await uninstallTool({
+              toolId: installPlan.toolId,
+              confirm: true,
+              removeConfig: uninstallRemoveConfig,
+              removePath: uninstallRemovePath
+            })
+          : await (installMode === "update" ? updateTool : installTool)({
+              toolId: installPlan.toolId,
+              confirm: true,
+              installPrerequisites: installPlan.requiresPrerequisites
+            });
       installResult = result;
       if (installResult.currentStatus) {
         onToolStatusUpdated(installResult.currentStatus);
@@ -1566,6 +1594,17 @@
                   {isLaunchingTool(tool, launchingToolId, directLaunchToolIds) ? $t("toolLaunch.starting") : $t("toolLaunch.action")}
                 </button>
               {/if}
+              {#if !isManagedDesktopClient(tool)}
+                <button
+                  class={actionButtonRecipe({ compact: true })}
+                  title={$t("toolInstall.uninstallTitle", { name: tool.name })}
+                  disabled={isToolActionBusy(tool, launchingToolId, directLaunchToolIds)}
+                  on:click={() => openUninstallPlan(tool)}
+                >
+                  <AppIcon name="delete" size={16} />
+                  {$t("common.uninstall")}
+                </button>
+              {/if}
             {:else}
               {#if tool.pathRepair}
                 <button
@@ -1614,9 +1653,16 @@
       <div class={dashboardModalBodyRecipe()}>
         <div>
         <h2 id="tool-install-title">
-          {$t(installMode === "update" ? "toolInstall.updateTitle" : "toolInstall.title", { name: pendingInstallTool.name })}
+          {$t(
+            installMode === "uninstall"
+              ? "toolInstall.uninstallTitle"
+              : installMode === "update"
+                ? "toolInstall.updateTitle"
+                : "toolInstall.title",
+            { name: pendingInstallTool.name }
+          )}
         </h2>
-        <p>{$t("toolInstall.description")}</p>
+        <p>{$t(installMode === "uninstall" ? "toolInstall.uninstallDescription" : "toolInstall.description")}</p>
       </div>
 
       {#if planningToolId}
@@ -1668,6 +1714,33 @@
 
         {#if installPlan.blocker}
           <div class={noticeRecipe({ tone: "error" })}>{installPlan.blocker}</div>
+        {/if}
+
+        {#if installMode === "uninstall"}
+          <div data-uninstall-options>
+            <label>
+              <input type="checkbox" bind:checked={uninstallRemoveConfig} disabled={Boolean(installingToolId)} />
+              <span>
+                {$t("toolInstall.removeConfig")}
+                <small>{$t("toolInstall.removeConfigHint")}</small>
+              </span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                bind:checked={uninstallRemovePath}
+                disabled={Boolean(installingToolId) || !(installPlan.uninstallPathEntries?.length)}
+              />
+              <span>
+                {$t("toolInstall.removePath")}
+                <small>
+                  {installPlan.uninstallPathEntries?.length
+                    ? installPlan.uninstallPathEntries.join(" · ")
+                    : $t("toolInstall.removePathUnsupported")}
+                </small>
+              </span>
+            </label>
+          </div>
         {/if}
 
         {#if installMode !== "update" && installPlan.steps.length > 0}
@@ -1813,11 +1886,22 @@
           >
             {#if installingToolId}
               <AppIcon name="loading" size={16} class={spinRecipe()} />
-              {$t(installMode === "update" ? "tool.updating" : "tool.installing")}
-            {:else}
-              <AppIcon name={installMode === "update" ? "update" : "install"} size={16} />
               {$t(
-                installPlan.interactive
+                installMode === "uninstall"
+                  ? "toolInstall.uninstalling"
+                  : installMode === "update"
+                    ? "tool.updating"
+                    : "tool.installing"
+              )}
+            {:else}
+              <AppIcon
+                name={installMode === "uninstall" ? "delete" : installMode === "update" ? "update" : "install"}
+                size={16}
+              />
+              {$t(
+                installMode === "uninstall"
+                  ? "toolInstall.confirmUninstall"
+                  : installPlan.interactive
                   ? "toolInstall.openTerminal"
                   : installMode === "update"
                     ? "toolInstall.confirmUpdate"

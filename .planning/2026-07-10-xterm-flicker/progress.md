@@ -1,0 +1,253 @@
+# Progress
+
+## 2026-07-11: API Login GPT-5.6 Entry Follow-up
+
+- Added Phases 24-26 for auth/model-path mapping, implementation, and full verification.
+- Located the existing launch-option field path and generic model-whitelist injector.
+- Confirmed the generic whitelist creates custom/provider-described entries and cannot provide the requested official GPT-5.6 presentation.
+- Searched the retained Codex++ checkout: GPT-5.6 exists in catalog tests/relay copy, but no dedicated API-login official-entry option was found in the initial scan.
+- Traced the complete persisted launch-option field pattern through frontend state/types and backend settings/injection serialization.
+- Confirmed the renderer currently receives no auth-mode flag and that the existing response/app-server/React patch layers can host a separate official-descriptor injection.
+
+## 2026-07-10: macOS Mirror TLS Follow-up
+
+- Added Phases 21-23 to trace, fix, and verify the reported LibreSSL/curl mirror download failure.
+- Restored the current plan and worktree context; all prior xterm, desktop, bundle, and version changes remain intentional.
+- Searched tracked sources and confirmed the visible mirror URLs in `api.ts` are mock metadata, while the real renamed backend must be inspected outside `git grep` because it is untracked.
+- Located the real mirror and transfer implementation in `src-tauri/src/core/chatgpt_desktop.rs`.
+- Traced the reported text to the metadata `fetch_text` curl command and found the same retry weakness in the package downloader.
+- Selected a shared curl policy: retry all transfer errors with bounded delay/time, force HTTP/1.1 on macOS, and resume package output during retries.
+- Confirmed the private helper can receive focused regression coverage from the existing Windows-only ChatGPT Desktop test module.
+- Completed the failure trace and selected Rustls-backed reqwest for both metadata and package transfers, with macOS HTTP/1.1 and Range resume.
+- Added focused regression tests for bounded transient-status retries, safe resume response modes, and removal of system curl from both transfer paths.
+- Ran the new tests against the old transport and confirmed the expected red baseline: 22 missing symbols, all belonging to the planned retry/resume implementation.
+- Replaced metadata and package system-curl transfers with the Rustls reqwest client, macOS HTTP/1.1, four bounded attempts, transient-status retry policy, Range resume, short-transfer detection, and unchanged temp-file promotion.
+- Re-ran the mirror-filtered tests after implementation: retry policy and Rustls/no-system-curl assertions pass 2/2.
+- Added local HTTP regressions that deliberately truncate metadata and package responses; the package server requires a `Range: bytes=5-` resume on the second request.
+- Ran the complete ChatGPT Desktop Rust test group: 22/22 passed, including both interrupted-transfer integration tests.
+- Completed Phase 22 and began full regression verification.
+- Frontend verification passes: `npm run check` reports zero diagnostics and `npm run test:unit` passes 143/143.
+- The first Rust format check found only one mechanical line-wrap difference in the new local HTTP test; queued `cargo fmt` before final checks.
+- Applied `cargo fmt`; `cargo check` passes.
+- Ran the complete Rust library suite: 309/309 tests passed.
+- Re-ran Rust formatting and repository whitespace checks successfully.
+- Audited both ChatGPT Desktop transfer functions: no system curl remains; macOS HTTP/1.1, Range resume, and SHA-256 verification are present.
+- Completed Phases 21-23.
+
+## 2026-07-10: Version 1.3.0 Follow-up
+
+- Added Phases 18-20 to inventory, update, and verify the global CodeStudio Lite version.
+- Located all previous-version occurrences and isolated six application-owned metadata fields from dependency and test-fixture values.
+- Confirmed the frontend version constant is injected from `package.json`.
+- Recorded the initial Windows process-creation error and completed the inventory with smaller read batches.
+- Updated the six application-owned version fields across npm, Tauri, Cargo, and both lockfiles from 1.2.3 to 1.3.0.
+- Deliberately left third-party dependency versions and the generic macOS plist parser fixture unchanged.
+- Verified the new and old version occurrence sets and confirmed no application-owned 1.2.3 metadata remains.
+- Parsed the npm and Cargo metadata successfully; both report CodeStudio Lite 1.3.0.
+- Ran the focused `appInfo` test: 1/1 passed.
+- Ran `npm run check`: zero errors and zero warnings.
+- Ran `npm run build`: successful under package version 1.3.0 with no bundle-size warning.
+- Ran `cargo check`; the full local package compiled successfully as version 1.3.0.
+- Ran the complete frontend unit suite: 143/143 passed.
+- Ran `git diff --check`: no whitespace errors; only existing Windows line-ending notices were emitted.
+- The first consolidated version script failed only because PowerShell's default JSON object cannot represent `package-lock.json`'s empty-string package key; queued the hashtable-based retry.
+- Re-ran the consolidated version check with hashtable JSON parsing; all six metadata sources equal 1.3.0 and the production entry contains the injected version.
+- Completed Phases 18-20.
+- The retained 4174 preview was no longer running during the final smoke check; queued a clean restart of the already verified 1.3.0 production output.
+- Restarted `codestudio-lite@1.3.0` production preview on `http://127.0.0.1:4174/`; page and entry both return HTTP 200 and the served entry contains 1.3.0.
+
+## 2026-07-10: Production Bundle Follow-up
+
+- Resumed the completed xterm/ChatGPT Desktop task after a production build reported a 1,000.05 kB entry chunk.
+- Added Phases 15-17 for bundle composition analysis, code splitting, and full frontend verification.
+- Preserved all existing uncommitted feature work; no application source or build configuration has been changed yet in this follow-up.
+- Inspected `package.json`, `vite.config.ts`, Git status/statistics, and the session catch-up report.
+- Confirmed the current configuration already hides Vite's default warning up to 1000 kB, so the follow-up will replace that single-bundle policy with measured chunk grouping.
+- Ran a write-free Vite/Rollup analysis build and captured per-module rendered sizes for the entry and existing Tauri dynamic chunks.
+- Chose dependency-family chunking as the first candidate because it separates the measured runtime libraries without changing route/component lifecycle behavior.
+- Simulated three manual-chunk strategies without writing production output.
+- Rejected the over-split Svelte/Iconify layout due to a mutual import and selected terminal/vendor/locales boundaries that can satisfy Vite's default 500 kB limit.
+- Replaced the raised warning threshold in `vite.config.ts` with scoped `locales`, `terminal`, and general `vendor` manual chunks.
+- Left all application imports synchronous and made no route, terminal, desktop-domain, or backend changes.
+- Ran `npm run build`; 363 modules transformed and the build completed without warnings.
+- Confirmed every generated JavaScript chunk is below Vite's default 500 kB threshold, with the entry reduced to 424.20 kB.
+- Ran `npm run check`: zero Svelte/type errors and zero warnings.
+- Ran `npm run test:unit`: all 143 tests passed.
+- Ran `git diff --check`: no whitespace errors; only existing line-ending notices were emitted.
+- Confirmed ports 4173, 4174, and 5175 are currently free; the previously retained preview is no longer running.
+- The first inline asset-closure verifier hit PowerShell quoting syntax before Node executed; recorded the error and changed the regex strategy rather than repeating the same command.
+- Re-ran the production asset-closure verifier with shell-safe quoting; all referenced HTML/JS assets exist.
+- Started the production preview on `http://127.0.0.1:4174/` and received HTTP 200 for every emitted asset referenced by the page.
+- Inspected the final scoped Git diff and confirmed only `vite.config.ts` contains tracked changes from this bundle follow-up.
+- Completed Phases 15-17.
+
+## 2026-07-10
+
+- Restored the existing repository planning context and confirmed it belongs to an older Panda CSS migration.
+- Confirmed the current terminal repair is uncommitted and scoped to four tracked files.
+- Started an isolated plan for the xterm flicker/input regression.
+- Reviewed the uncommitted terminal diff and full panel/store source.
+- Narrowed the leading hypothesis to a feedback loop between manual xterm resizing, viewport geometry, `ResizeObserver`, and backend PTY repainting.
+- Confirmed the frame CSS and backend PTY path make every unstable grid calculation visible as a real terminal repaint.
+- A combined parallel source read was rejected by the managed shell ACL helper; continuing with smaller targeted reads.
+- Confirmed the invalid xterm private-field path against the installed xterm 5.5 source.
+- Added a regression test that requires FitAddon, public xterm resize events, content-box observer deduplication, and removal of private cell-size reads.
+- Verified the new test fails before implementation: 7 passed, 1 failed on the missing FitAddon dependency.
+- Installed `@xterm/addon-fit` 0.10.0, compatible with the existing xterm 5.5 peer range.
+- Replaced manual private-field fitting with FitAddon, content-box observer deduplication, xterm `onResize` backend sync, and focus after the initial fit.
+- Updated the terminal session store so a fit that occurs before PTY creation remains queued and is deduplicated against the PTY's initial 100x24 size.
+- Targeted terminal tests pass: 8 passed, 0 failed.
+- `npm run check` passes with 0 errors and 0 warnings.
+- Full unit suite passes: 135 passed, 0 failed.
+- Production Vite build passes.
+- `git diff --check` passes; output contains only the repository's existing LF-to-CRLF warnings.
+- Confirmed the installed dependency pair is FitAddon 0.10.0 plus xterm 5.5.0.
+- Browser verification preparation hit Windows `EACCES` on ports 1420 and 1421; investigating the local port reservation before retrying.
+- Confirmed ports 1420-1421 are inside a Windows excluded range and started Vite successfully at `http://127.0.0.1:5173/`.
+- Exercised the browser launch flow through Codex CLI -> embedded mode -> terminal route; xterm mounted and retained active input focus.
+- Geometry sampling found the terminal frame at about 29,747 px high, confirming an active container-growth feedback loop rather than a mere debounce problem.
+- Extended the regression test to require a definite route height, a shrinkable terminal grid track, and terminal overflow containment.
+- Verified the layout regression test fails before the constraint fix, then tightened its regex so it cannot accidentally match height declarations from later recipes.
+- Added a definite route-wrapper height plus `minmax(0, 1fr)` and overflow containment to the terminal grid.
+- Panda code generation completed; its update-check warning is unrelated and did not affect generation.
+- Targeted terminal tests pass again (8/8), and `npm run check` remains clean after the layout constraint fix.
+- Re-ran the full embedded-launch browser flow after reload.
+- Verified stable terminal geometry across a one-second interval: 1280x368 frame, 368 px xterm screen/viewport, no growth.
+- Verified the active terminal input accepts typed text and retains focus; no browser warnings or errors were emitted.
+- Final full unit suite passes: 135 passed, 0 failed.
+- Final production build passes and `git diff --check` reports no whitespace errors.
+- Stopped the Vite verification server and closed the temporary browser tab.
+- All phases complete.
+- Restored planning context for the follow-up naming request and confirmed the current tracked diff still contains only the xterm/FitAddon work.
+- Added Phases 4-6 for the ChatGPT Desktop domain migration.
+- Recorded the hard boundary that Codex CLI and `~/.codex` concepts must retain their current names.
+- Inventoried the dedicated desktop tool ID `codex-app`, frontend `codexClient` domain, Rust `codex_client` domain, Tauri command/event names, and storage schema.
+- Defined target identifiers for the ChatGPT Desktop domain and documented compatibility-only exceptions for historical desktop aliases and upstream asset URLs.
+- Inspected shared TypeScript types and API wrappers, separating desktop state/install APIs from adjacent Codex CLI auth/OAuth APIs.
+- Added external package/binary names to the compatibility exclusion list so internal protocol renaming does not break real upstream artifact detection.
+- Inspected Rust desktop-domain types/commands and SQLite storage. Identified required compatibility migrations for settings keys, managed-marker keys, and cached state rows.
+- Inspected settings/marker persistence and frontend route wiring. Confirmed which internal symbols should be renamed and which external Codex package/process constants must remain.
+- Identified shared Claude/ChatGPT desktop concepts that should become generic rather than ChatGPT-specific, plus profile/gateway alias locations that must retain legacy Codex desktop values for compatibility.
+- Completed Phase 4 domain mapping and began Phase 5 implementation.
+- Renamed the frontend component/store/tests, Rust command/core/tests, and desktop icon asset to ChatGPT Desktop filenames.
+- Applied the first mechanical identifier pass: TypeScript `ChatGPTDesktop*`, Rust `ChatGptDesktop*`, generic `DesktopClientCapability`, `chatgptDesktop` route/locale/API identifiers, `chatgpt_desktop` commands/modules, and `chatgpt-desktop` event/tool IDs.
+- First Svelte check found only stale generated Panda typing for the renamed tool-icon tone; source identifier cleanup continues before codegen.
+- Residual scan found missed frontend snake-case Tauri command strings and Rust locale-key strings, queued for a targeted second pass.
+- Applied the targeted second pass for frontend Tauri command strings/constants and Rust `chatgptDesktop.*` locale keys.
+- Regenerated Panda output; `npm run check` now passes with 0 errors and warnings.
+- Rust compiles successfully; only four unreachable-pattern warnings remain from duplicated aliases created by the mechanical replacement.
+- Residual scan shows obsolete technical names have been removed except approved upstream/compatibility cases; began semantic compatibility cleanup.
+- Inspected post-rename storage and locale state. Prepared explicit patches for legacy table/state-key migration, generic shared locale keys, and remaining ChatGPT product copy.
+- Resumed the interrupted Phase 5 migration from the persisted plan and handoff. Confirmed the required boundary remains: rename the desktop technical domain and protocol to ChatGPT Desktop while preserving Codex CLI, `.codex`, OAuth, Codex++ features, and external upstream artifact identifiers.
+- Ran the planning session catch-up. It found only two unsynchronized read operations and no hidden code edits; the current diff stat shows old desktop-domain files as deletions because their renamed replacements are still untracked and must be included in final status/diff auditing.
+- Audited the remaining frontend/backend protocol surface and found a frontend-only stale detection command wrapper that would call a nonexistent Tauri command after the backend rename.
+- Renamed the frontend install-kind detector wrapper and command string to the ChatGPT Desktop protocol, updated the store caller, restored legacy desktop aliases, and added canonical-first active-profile fallback in frontend and Rust.
+- Added one-time migration from the legacy `codexClient` refresh timestamp key to `chatgptDesktop`, renamed desktop support predicates in the detector, and updated the Linux adaptation regression assertions.
+- Moved Claude Desktop's shared plan/status labels to generic `desktopClient.*` locale keys across all three locales and corrected the English ChatGPT Desktop product copy plus backend activity/error messages while retaining upstream artifact and CLI identifiers.
+- Fixed the Claude/ChatGPT static test section boundaries after a same-text patch matched the wrong occurrence, then added regression coverage for the canonical ChatGPT Desktop command/event/settings/table/tool IDs, legacy alias/migration inputs, generic Claude Desktop copy, and preserved Codex CLI/upstream artifact boundaries.
+- First targeted validation: `npm run check` passed with no diagnostics. Rust check exposed one duplicate serde attribute from the latest cache alias patch; three static tests exposed stale Rust type/copy expectations rather than implementation failures.
+- After merging the serde attributes and correcting Rust/Claude test expectations, `cargo check` passes. The targeted suite is down to one formatting-sensitive regex that did not allow `cargo fmt` to wrap a function parameter.
+- Relaxed the formatting-sensitive assertion; the targeted desktop and Linux suite now passes 57/57. Residual identifier audit found no stale canonical protocol strings and isolated two remaining display-fixture copy updates.
+- Updated the remaining browser/Rust display fixtures to `ChatGPT Desktop`, corrected the shared profile-scope label to list ChatGPT Desktop alongside Codex CLI, and added a Rust behavior test for canonical and legacy active-profile key precedence.
+- Panda code generation completed (only its known update-check permission warning). Full frontend unit tests pass 137/137, including the FitAddon regression, and `npm run check` passes with 0 errors/warnings. The first full Rust test run hit a transient Windows archive file lock before tests started.
+- Running Rust tests from an isolated target directory bypassed the locked default archive and executed all 295 tests: 294 passed and one gateway test exposed a concurrent legacy-table migration race.
+- Made the legacy SQLite migration concurrent-safe and verified the originally failing gateway test in isolation.
+- Final Rust suite passes 295/295 from the isolated target directory. Legacy settings and marker keys now migrate forward and are removed only after successful writes to their new ChatGPT Desktop keys.
+- Production build, Rust formatting check, and `git diff --check` pass. Final residual searches contain old desktop identifiers only in compatibility aliases, migration tests/keys, and upstream artifact URLs; Codex CLI, OAuth, `.codex`, and Codex++ enhancement terminology remain intact.
+- Final completion gate reports all 6/6 phases complete. The only forbidden-pattern search hit is the regression assertion that explicitly rejects the old detector names.
+- Added Phases 7-8 for the reported ChatGPT Desktop API-key launch exit and recorded the exact exit code and remote-plugin warning without assuming the warning is the fatal cause.
+- Restored the plan session and traced the launcher: CodeStudio only spawns the desktop process, while the default-enabled remote plugin cache is registered before launch without checking the current auth method.
+- Safely inspected local auth/config structure and confirmed API-key-only authentication plus the CodeStudio-managed `openai-curated-remote` marketplace registration.
+- Inspected the embedded snapshot metadata and confirmed remote IDs/install markers trigger remote bundle synchronization even though the marketplace source paths are local.
+- Added failing regression coverage for ChatGPT-only auth gating, targeted marketplace config removal, and corrected user-facing capability copy.
+- Implemented ChatGPT-auth-only remote cache registration, safe removal of the CodeStudio-managed config entry for unsupported auth or a disabled toggle, and corrected all locale hints.
+- User rejected the auth-gating direction based on working Codex++ behavior. Paused validation and switched to local Codex++ source comparison before finalizing the fix.
+- Resumed Phase 7 after the user confirmed the prior local Codex++ checkout is unavailable and authorized downloading the source from its remote repository.
+- Recovered the historical Codex++ research pointer from memory: archived session `019edf0f-5aca-7021-b252-244ab10c586e` contains the prior checkout details and plugin-unlock implementation paths.
+- Extracted the exact remote repository URL from the archived session: `https://github.com/BigPizzaV3/CodexPlusPlus`.
+- Shallow-cloned the current Codex++ source to `C:\tmp\CodexPlusPlus` for direct implementation comparison.
+- The sandbox Git ownership check rejected the host-created checkout; switched to a per-command safe-directory override for read-only source inspection.
+- Confirmed against current Codex++ source that API Key plugin support is protected by a dedicated injection regression test and implemented by local marketplace result/request patching rather than auth-gating the feature.
+- Compared the bundled remote-plugin ZIPs byte-for-byte: CodeStudio and Codex++ use the identical archive, so retaining remote metadata is compatible with Codex++ and cannot by itself justify disabling the feature.
+- Compared Windows launch primitives and base arguments. They match Codex++; shifted diagnosis to the local log timeline and lifecycle/bridge differences.
+- Confirmed the desktop process remains alive and the reported exit code most likely belongs to the bundled app-server child; began structured log and command-line inspection.
+- Queried the exact warning timeline in `logs_2.sqlite` and proved remote plugin synchronization/authentication warnings are nonfatal; narrowed the root-cause search to the terminating app-server process lifecycle.
+- Correlated old/new app-server lifetimes and found a clean forced-restart boundary with zero app-server ERROR logs, pointing to CodeStudio's process termination order as the source of the visible `-1` report.
+- Located the faulty Windows selector: it targets the bundled `codex.exe` app-server instead of the MSIX `ChatGPT.exe` parent. Prepared a parent-first package-aware shutdown fix while retaining the API Key plugin cache.
+- Replaced the child-only Windows shutdown script with install-aware closure: MSIX uses package-level graceful close; portable installs are scoped to their install root. Consolidated launch/restart into a single termination path.
+- Removed the rejected auth gate and marketplace-removal helpers, restored API-mode capability copy, and kept the official remote snapshot enabled for API Key launches.
+- Ported Codex++'s current local marketplace merge behavior into the injected renderer: local snapshot serialization, `local` plus `vertical` list kinds, official marketplace filter coverage, and local plugin result merging.
+- Updated Node and Rust regression assertions for package-parent shutdown and API Key plugin preservation.
+- Targeted launch/plugin Node suite passes 16/16.
+- Targeted ChatGPT Desktop Rust suite passes 10/10, including a real temporary marketplace expansion test.
+- Reused the same package-aware closer for uninstall and removed the second child-only selector. Updated running-state detection to use the MSIX `ChatGPT.exe` parent and the portable `Codex.exe` main process appropriately.
+- Final frontend checks pass: `npm run check` reports 0 errors and 0 warnings; `npm run test:unit` passes 138/138; `npm run build` succeeds.
+- Final Rust checks pass: `cargo check`, `cargo fmt -- --check`, and the isolated-target full suite pass; Rust tests are 296/296.
+- `git diff --check` reports no whitespace errors. Residual production-source search finds no API Key auth gate, remote marketplace removal helper, or child-only `Get-Process -Name Codex` selector.
+- Live launch verification was intentionally not executed from this task because the corrected package-aware restart would close the ChatGPT Desktop process hosting the active Codex session.
+- User reported that the macOS path still recognizes the old Codex Desktop application and is missing newer Codex++ functionality.
+- Restored the persisted plan and added Phases 9-11 for current Codex++ macOS inventory, implementation, and verification.
+- Reaffirmed the compatibility boundary: ChatGPT Desktop is canonical internally, while Codex CLI, `.codex`, provider/protocol concepts, and real legacy upstream artifact aliases remain unchanged where required.
+- Compared current CodeStudio and Codex++ macOS paths and completed the compatibility inventory.
+- Added regression tests for `ChatGPT.app`-first discovery with legacy fallbacks, `CFBundleExecutable` process identity, candidate-based DMG lookup, app-specific launch commands, and CDP target reinjection monitoring.
+- Verified the new Rust tests fail against the old implementation with six missing helper/function errors, establishing the intended red baseline.
+- Added candidate-based macOS DMG lookup while preserving the original single-app-name wrapper used by Claude Desktop.
+- Added `CFBundleExecutable` parsing plus app-bundle-specific running and quit helpers, using the bundle identifier for graceful AppleScript quit and the real executable/display names for TERM/KILL fallback.
+- Updated ChatGPT Desktop to prefer `ChatGPT.app`, retain three legacy app-name aliases, default new installs to `/Applications/ChatGPT.app`, detect the actual bundle without forcing the legacy bundle ID, and use the selected bundle for update/uninstall shutdown and launch.
+- Added a CDP target watchdog that only reinjects when the selected page WebSocket target changes and stops after the desktop debugging endpoint remains unavailable.
+- Targeted macOS Rust tests pass 17/17; the dedicated reinjection-watchdog regression passes 1/1.
+- Added the Codex++-compatible `Codex` executable fallback for legacy `.app` bundles whose plist omits `CFBundleExecutable`.
+- All ChatGPT Desktop Rust tests pass 13/13 and the focused shared-package Bundle test passes.
+- `cargo check` passes after the macOS implementation changes.
+- Ported Codex++'s current ChatGPT Desktop CDP target recognition: `ChatGPT` pages on `chatgpt.com`, `chat.openai.com`, and local `data:text/html` error pages are accepted, while unrelated pages are rejected instead of receiving the enhancement script.
+- Added and passed a focused CDP target-picker regression test.
+- Final frontend verification passes: `npm run check` reports 0 errors and 0 warnings, `npm run test:unit` passes 138/138, and `npm run build` succeeds.
+- Final Rust verification passes: `cargo check`, `cargo fmt -- --check`, and the complete isolated-target suite; Rust tests are 301/301.
+- `git diff --check` passes. Source-only residual audit found old macOS identifiers only in explicit compatibility constants, current bundle metadata, and regression fixtures.
+- Removed the temporary `.codex-target-macos` verification directory after confirming it was inside the workspace.
+- Live DMG mounting, AppleScript process shutdown, and `open -a` launch were not executed because this task is running on Windows; their pure command/path logic and all compiled branches are covered by tests.
+- Restored the completed 11-phase plan for the dynamic icon/legacy-branding follow-up; session catch-up contained only prior completion messages and the new user request, with no hidden code edits.
+- Added Phases 12-14 for generation detection, dynamic product naming/icon selection, and verification.
+- Inspected the icon assets and confirmed the current desktop PNG is the requested legacy artwork, while the Codex CLI SVG can be reused for the current-generation inverted icon.
+- Confirmed `ToolIcon` currently has no branding variant input and always renders the old desktop PNG for `chatgpt-desktop`.
+- Defined artifact-based generation detection: `ChatGPT.exe`/`CFBundleExecutable=ChatGPT` is current, `Codex.exe`/`CFBundleExecutable=Codex` is legacy, and unknown or missing installs default to current.
+- Mapped dynamic-brand consumers to the app navigation, Dashboard client card, ChatGPT Desktop route/localized messages, and backend raw operation messages; preserved Profiles/Setup Wizard Codex configuration-family labels.
+- Resumed Phase 12 after context handoff. Session catch-up found only prior read operations and the current request, with no hidden product-code edits; the existing uncommitted desktop-domain migration remains the implementation baseline.
+- Added Phase 12 regression coverage for Windows/macOS generation rules, legacy cache defaults, shared frontend branding state, exact i18n phrase replacement, current/legacy icon assets and tones, and App/store/Dashboard consumption. Production implementation is intentionally still absent before the red test run.
+- Confirmed the red baseline: all 4 new Node branding tests fail only on absent implementation, while Rust reports 20 expected missing-field/type/helper errors and no unrelated compilation issue. Phase 12 is complete and Phase 13 has started.
+- Implemented the initial Rust generation model and artifact rules, added default-current cache deserialization, propagated generation into detection snapshots and installed records, and made backend desktop tool naming/command selection generation-aware. Targeted compilation is next to locate remaining constructors.
+- Completed the backend generation pass. The targeted ChatGPT Desktop Rust suite now passes 17/17, including Windows current/legacy precedence, macOS executable-first fallback, and legacy cache default-current behavior.
+- Added the shared frontend branding store and wired App snapshots, detail cache/state/install results, generation-aware i18n, localized Dashboard tool projection, browser mock defaults, and current/legacy ToolIcon resources. Current uses the inverted CLI SVG; legacy keeps the original PNG.
+- Regenerated Panda output for the two desktop icon tones and corrected the frontend boundary test to preserve the existing `Codex` configuration-family label in Profiles/Setup Wizard. Panda codegen succeeded with only its known update-check permission warning.
+- Wrapped raw desktop-domain messages at the ChatGPT Desktop route and Dashboard display boundaries, covering errors, operation notes, plan warnings, capability copy, and action notices without transforming structured paths, URLs, action codes, or persisted state.
+- Browser verification found the first current icon frame inherited the dark theme surface, so an attribute-level white background override was added and Panda output regenerated. The immediate reload screenshot was an unstyled transient and will be rechecked only after network-idle.
+- Clean browser verification on port 5174 confirms the current product name and inverted CLI icon computed styles. Added executable Node coverage proving legacy text conversion preserves ChatGPT account and Codex CLI terminology.
+- Made the Dashboard desktop product name an explicit Svelte reactive dependency so locale or generation changes always recompute the card and action copy, rather than relying on an indirect function reference.
+- Phase 13 is complete. Targeted frontend branding tests pass 5/5, `svelte-check` reports 0 errors/warnings, targeted Rust tests pass 17/17, and clean-browser computed styles confirm the current white-frame inverted CLI icon.
+- First full verification: production build passed; frontend unit tests were 142/143 with only a stale fixed-name protocol assertion; Rust format check requested mechanical layout changes. Updated the assertion to require both generation names before rerunning.
+- Applied `cargo fmt` to the new Rust generation code. No semantic changes were introduced by formatting.
+- Second frontend rerun confirmed Rust format/check and Svelte checking pass; the only failure was a pre-existing migration regex that assumed save and delete shared one `if` block. Updated it to match the actual safe two-step migration.
+- Frontend tests now pass 143/143. The first complete Rust run did not reach tests because the duplicate isolated target exhausted D: during linking; cleanup is limited to the agent-created build cache before retrying with the existing default target.
+- Verified `.codex-target-branding` was inside the workspace and occupied about 4.47 GB, then removed only that agent-created cache with `cargo clean`. The existing 56.6 GB default target remains intact for the full Rust retry.
+- The default target also had stale ACLs and could neither write fingerprints nor clean under normal permissions. After scoped approved cleanup, D: now has about 50.2 GB free; the full Rust suite will rebuild once in the default target.
+- Clean default-target rebuild completed successfully. The complete Rust lib suite passes 304/304 with no failures.
+- Final verification completed: frontend unit tests pass 143/143, `npm run check` reports 0 errors/warnings, production build succeeds, Rust formatting/checks pass, full Rust tests pass 304/304, and `git diff --check` exits 0.
+- Final UI/source audit confirms current ChatGPT Desktop uses the white-frame inverted CLI mark and current naming, legacy uses the untouched original PNG and Codex Desktop naming, and Codex CLI/provider/protocol boundaries remain unchanged. A clean preview is running at `http://127.0.0.1:5175/`.
+- Restored Phase 24 after context handoff and confirmed no production code for the GPT-5.6 launch option had been changed yet.
+- Traced the complete frontend/Rust settings path and the secret-free `CodexAuthMethod::ApiKey` detection boundary.
+- Compared CodeStudio's custom model descriptor with current Codex++ and the OpenAI Codex public model catalog.
+- Confirmed the official GPT-5.6 family IDs and app-server model schema, completed Phase 24, and started test-first Phase 25 implementation.
+- Added frontend contract tests and Rust behavior tests for the default-off setting, API-key-only activation, official descriptor fields, and CLI/config isolation.
+- Confirmed the red baseline: the Node suite fails only on the absent new launch option, while Rust reports only the intentionally missing field, auth helper, and descriptor generator.
+- Added the default-off localized launch toggle across Svelte, TypeScript, the frontend store, the mock API, Rust settings, update persistence, and renderer serialization.
+- Added API-key-only auth metadata using `CodexAuthMethod::ApiKey`; ChatGPT/OAuth, access-token, unknown, and no-auth states leave the new injection disabled.
+- Added official app-server descriptors for GPT-5.6 Sol, Terra, and Luna, plus renderer response/Statsig/React/MCP/app-server patching that deduplicates official entries without using the custom-model descriptor or changing the default model.
+- Bumped the enhancement and model-wrapper patch versions so an already patched page cannot retain stale model closures after the new settings arrive.
+- Targeted verification passes: 18/18 launch/injection Node tests, 4/4 GPT-5.6 Rust tests, and `cargo fmt -- --check`.
+- Full verification passes: `svelte-check` reports 0 errors/warnings, frontend unit tests pass 145/145, production build succeeds without chunk warnings, `cargo check` passes, and the Rust library suite passes 313/313.
+- `git diff --check` exits 0 with only the repository's existing LF-to-CRLF notices.
+- Final source audit finds GPT-5.6 identifiers only in ChatGPT Desktop settings, renderer injection, localized copy, and their tests; no Codex CLI/profile/config implementation contains the new option or official model IDs.
+- Browser verification at `http://127.0.0.1:4174/` confirms the localized GPT-5.6 toggle renders exactly once, defaults unchecked and enabled, and produces no browser console errors.
+- Phase 26 is complete. ChatGPT Desktop itself was not launched or restarted during verification.
+- Added Phases 27-29 for consolidating gateway profile management into Access Profiles with a header-level configuration-file/gateway switch.
+- Preserved the initial ownership boundary: Profiles will own profile CRUD and selection; Gateway will retain runtime status, controls, logs, and request activity.

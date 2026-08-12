@@ -1,0 +1,372 @@
+# Progress
+
+## 2026-07-13
+
+- Located and loaded the installed `codebase-design` skill plus `planning-with-files`.
+- Restored prior Pi integration context and confirmed the architecture task must preserve the existing mixed worktree.
+- Created a dedicated architecture-planning workspace; no product files have been modified.
+- Measured backend and frontend hotspots and enumerated `profile.rs` responsibilities.
+- Identified the repeated per-tool native lifecycle as the leading deep-module candidate; rejected file-only splitting as insufficient.
+- Traced apply and verification dispatch plus canonical-id duplication across backend and frontend files.
+- Identified four distinct module responsibilities: tool catalog, native profile adapters, profile store, and profile orchestration; restart and provider HTTP remain separate.
+- Reviewed the public profile command surface and decided to preserve Tauri command/request compatibility while replacing internal delegation.
+- Classified native config parsing as pure/local-substitutable work and rejected an unnecessary generic storage port until a second adapter exists.
+- Audited gateway and frontend hotspots and separated them into later migration waves rather than one repository-wide rewrite.
+- Confirmed that frontend API access has a real seam with two adapters: Tauri production invokes and the browser-development fake.
+- Completed the modification plan with target backend/frontend structures, primary interfaces, seven migration waves, verification gates, risk controls, and completion criteria.
+- Reviewed the design against depth, leverage, locality, seam placement, and the deletion test.
+- Kept product code unchanged; only the dedicated planning directory and active-plan pointer were modified.
+- Began implementation of the full migration objective and reopened the plan with Phases 5-12.
+- Confirmed the existing 1.4.0/Pi/ChatGPT/gateway work remains uncommitted and must be preserved while structural edits proceed.
+- Baseline passed: Rust 346/346, frontend 157/157, Svelte diagnostics, production build, Rust formatting, and diff checks.
+- Added the backend ToolCatalog interface with canonical aliases, profile display metadata, protocol capabilities, and table-driven tests; migrated profile, launch, environment-health, and gateway canonicalization call sites.
+- Completed Wave 1: all backend tool definition consumers now enter through ToolCatalog, and the frontend uses a shared profile catalog for routes and browser mock validation.
+- Replaced five source-location assertions with catalog ownership/behavior checks and added a guard against reintroducing private canonical-id implementations.
+- Wave 1 verification passed: Rust 348/348, frontend 159/159, Svelte check, production build, cargo fmt, and git diff check.
+- Extracted `NativeConfigWritePlan`, lifecycle plan types, unchanged filtering, atomic write/delete execution, and their focused tests into `profile/native/plan.rs`.
+- Replaced the unavailable `tempfile` test dependency with standard-library process/timestamp-scoped temporary directories.
+- NativePlan focused verification passed: 2 module tests plus the existing unchanged-apply-plan regression test.
+- Inventoried the complete Pi native behavior surface before adapter extraction: apply, official restore, gateway cleanup, detection/import, matching, verification, and direct/official/gateway preview paths.
+- Wave 2 full verification passed: Rust 350/350, frontend 159/159, Svelte diagnostics, production build, cargo formatting, and diff checks.
+- Began the Pi adapter migration by moving Pi protocol mapping, direct/official/gateway rendering, gateway cleanup, native detection, profile matching, and verification into `profile/native/pi.rs`.
+- Moved ownership of the Pi managed-provider id into the Pi module and updated preview callers to use that owner.
+- Pi extraction verification passed: 19 focused tests, then the full 350-test Rust suite, cargo formatting, and diff checks.
+- Pi is not yet accepted as a completed adapter: shared apply/detect/cleanup/verify/preview dispatch still contains Pi branches and must be replaced by the common adapter interface.
+- Added the `NativeProfileAdapter` interface and registry in `profile/native/mod.rs`; its seam accepts document text and returns rendered content or inspection results without exposing Pi JSON structures.
+- Registered Pi and routed target resolution, apply rendering, gateway cleanup, native inspect/match, write verification, and redacted content rendering through the adapter.
+- Removed Pi branches from the corresponding shared path/apply/cleanup/verify/content-preview dispatch and deleted the obsolete keychain-free Pi wrapper.
+- Adapter routing verification passed: 19 Pi-focused tests, the full 350-test Rust suite, cargo formatting, and diff checks.
+- Pi preview change-description branches remain in shared presentation logic, so Pi acceptance is still pending until preview ownership also crosses the adapter seam.
+- Completed the Pi adapter preview ownership: direct, official restore, and gateway warnings/diff descriptions now return as a complete `NativeConfigPreview` from `PiAdapter`.
+- Removed all Pi native-format branches from shared profile path/render/detect/cleanup/verify/content-preview/change-preview dispatch.
+- Pi passes the deletion test: remaining `profile.rs` Pi mentions are official-profile metadata, restart targets, display names, and the icon glyph rather than native document knowledge.
+- Pi adapter acceptance verification passed: 19 focused tests, the full 350-test Rust suite, cargo formatting, and diff checks.
+- Began the Grok adapter migration by moving Grok TOML protocol mapping, managed-model rendering, official restore, gateway cleanup, detection, matching, and verification into `profile/native/grok.rs`.
+- Registered Grok with `NativeProfileAdapter`; target, render, redacted render, cleanup, inspect/match, verify, and complete preview generation are implemented behind the seam.
+- Routed startup Grok native sync through the adapter and removed Grok branches from shared path/apply/cleanup/verify/content-preview dispatch.
+- Grok roundtrip focused verification passes; shared legacy Grok preview-description branches still need deletion before Grok can pass its deletion test.
+- Removed the unreachable Grok warning/direct/official/gateway preview branches from shared presentation code and narrowed Grok implementation imports to tests only.
+- Grok now passes the deletion test: remaining shared `profile.rs` references are restart metadata, display labels, and the icon glyph, with no Grok TOML knowledge or native dispatch.
+- Grok adapter acceptance verification passed: the full 350-test Rust suite, cargo formatting, and diff checks.
+- Began Hermes migration. The first combined multi-region extraction was rejected before writing because repeated marker matches produced invalid array line numbers; the failure is recorded in `task_plan.md`.
+- Switched to independently verified symbol-boundary extraction and moved Hermes direct, official, gateway, and gateway-cleanup YAML rendering into `profile/native/hermes.rs`.
+- Hermes render extraction compiles; the focused native detection test, cargo formatting, and diff checks pass.
+- Hermes remains in progress: detection, matching, verification, adapter registration/routing, and preview ownership still reside in shared profile code.
+- Moved the remaining Hermes detection, profile matching, managed-endpoint classification, and direct/gateway verification into `profile/native/hermes.rs` using independently verified symbol ranges.
+- Implemented and registered `HermesAdapter`, including target/render/redacted-render/cleanup/inspect/match/verify and complete direct/official/gateway preview output.
+- Routed startup Hermes sync and shared path/apply/cleanup/verify/content-preview calls through the adapter; removed the obsolete keychain-free matching wrapper.
+- Hermes focused verification passes without compiler warnings: 3 tests plus cargo formatting and diff checks.
+- Hermes is not yet accepted: five unreachable legacy preview-description branches remain in shared presentation code and must be deleted before the deletion test passes.
+- Removed all unreachable Hermes direct/official/gateway warning and diff branches from shared presentation logic.
+- Hermes now passes the deletion test: shared `profile.rs` retains only restart metadata, display names, and the icon glyph; no Hermes YAML labels, keys, or native dispatch remain.
+- Hermes adapter acceptance verification passed: the full 350-test Rust suite, cargo formatting, and diff checks.
+- Began OpenClaw migration by moving its contiguous direct/official/gateway JSON5 rendering and gateway cleanup implementation into `profile/native/openclaw.rs`.
+- OpenClaw render extraction compiles and preserves the existing JSON-provider characterization test; cargo formatting and diff checks pass.
+- OpenClaw remains in progress: active-provider parsing, detection, matching, verification, adapter registration/routing, and preview ownership still need migration.
+- Moved OpenClaw active-provider resolution, native detection, profile matching, and managed-provider classification into `profile/native/openclaw.rs`.
+- The combined OpenClaw JSON-provider characterization test still passes; cargo formatting and diff checks remain clean.
+- OpenClaw remains in progress: verification, adapter implementation/registration, shared routing, and preview ownership still need migration.
+- Moved OpenClaw direct/gateway verification into its module and implemented/registered `OpenClawAdapter` with target/render/redacted-render/cleanup/inspect/match/verify/full-preview methods.
+- Routed startup OpenClaw native sync through the adapter and removed the obsolete keychain-free matching wrapper.
+- OpenClaw adapter compiles and the JSON-provider characterization test passes.
+- OpenClaw remains in progress: shared path/apply/cleanup/verify/content-preview and unreachable preview-description branches still need deletion before the deletion test.
+- Removed all OpenClaw shared path/apply/cleanup/verify/content-preview fallbacks and the unreachable direct/official/gateway preview warning/diff branches.
+- OpenClaw now passes the deletion test: shared `profile.rs` retains only restart metadata, display labels, and the icon glyph; no OpenClaw JSON keys or native dispatch remain.
+- OpenClaw adapter acceptance verification passed: the full 350-test Rust suite, cargo formatting, and diff checks.
+- Began OpenCode migration by moving its contiguous direct/official/gateway JSONC rendering and gateway cleanup implementation into `profile/native/opencode.rs`.
+- OpenCode render extraction preserves the JSON-provider characterization test; cargo formatting and diff checks pass.
+- OpenCode remains in progress: active-provider/model-ref parsing, detection, matching, verification, adapter registration/routing, and preview ownership still need migration.
+- Moved OpenCode active-provider/model-reference parsing, native detection, profile matching, managed-provider classification, and direct/gateway verification into `profile/native/opencode.rs`.
+- The OpenCode module now contains its complete native-format implementation, but the adapter object, registry routing, shared dispatch deletion, and preview ownership are still pending.
+- JSON-provider characterization, cargo formatting, and diff checks remain green.
+- Implemented and registered `OpenCodeAdapter` with target/render/redacted-render/cleanup/inspect/match/verify/full-preview methods.
+- Routed startup OpenCode native sync through the adapter and removed the obsolete keychain-free matching wrapper.
+- OpenCode adapter compiles and the JSON-provider characterization test passes.
+- OpenCode remains in progress: shared path/apply/cleanup/verify/content-preview and unreachable preview-description branches still need deletion before the deletion test.
+- Removed the remaining OpenCode shared path/apply/cleanup/verify/content-preview fallbacks and unreachable preview-description branches.
+- OpenCode now passes the deletion test: shared `profile.rs` retains only startup orchestration plus restart, display, default-order, and icon metadata; no OpenCode JSON/JSONC format knowledge or native dispatch remains.
+- OpenCode adapter acceptance verification passed: the full 350-test Rust suite, no-run compilation without warnings, cargo formatting, and diff checks.
+- Inventoried the complete Gemini CLI native behavior surface: `.env` path, direct/official/gateway rendering, managed cleanup, detection, matching, verification, and direct/official/gateway preview ownership.
+- Began Gemini CLI migration by moving direct rendering, official restoration, gateway rendering, and managed gateway cleanup into `profile/native/gemini.rs`.
+- Gemini render extraction verification passed: the environment-preservation and non-OpenAI base-URL focused tests, cargo formatting, and diff checks.
+- Gemini CLI remains in progress: detection, matching, verification, adapter registration/routing, startup sync, and preview ownership still need migration before the deletion test.
+- Completed the Gemini CLI adapter by moving `.env` detection, matching, managed-state classification, direct/gateway verification, and complete direct/official/gateway preview ownership into `profile/native/gemini.rs`.
+- Registered `GeminiAdapter` and routed target resolution, startup native sync, rendering, gateway cleanup, inspection/matching, verification, and preview through the common adapter seam.
+- Removed Gemini CLI native-format branches and environment-key knowledge from shared `profile.rs`; remaining Gemini mentions are catalog/restart/display/default-order metadata or the separate Gemini Code Assist implementation.
+- Gemini CLI passes the deletion test and acceptance verification: 5 focused Gemini tests, the full 350-test Rust suite, no-run compilation without warnings, cargo formatting, and diff checks.
+- Added `supports_mode` to the native adapter interface so config-only adapters can own mode support without shared tool-id lists; existing adapters retain the default config/gateway support.
+- Implemented and registered `GeminiCodeAssistAdapter` with config-only capability, VS Code settings path, direct/official rendering, native detection/matching, verification, and full preview ownership.
+- Routed Gemini Code Assist startup sync, path resolution, apply rendering, verification, and preview through the adapter, then removed the shared VS Code setting key and all native-format branches from `profile.rs`.
+- Gemini Code Assist passes the deletion test: remaining shared references are official/restart/display/catalog metadata, startup orchestration, and the write-plan kind.
+- Gemini Code Assist acceptance verification passed: three focused profile tests, no-run compilation without warnings, the full 350-test Rust suite, cargo formatting, and diff checks.
+- Inventoried Claude Code native ownership and separated its primary `settings.json` adapter behavior from the optional secondary VS Code plugin write plan.
+- Began Claude Code migration by moving direct rendering, official restoration, gateway rendering, and managed gateway cleanup for `settings.json` into `profile/native/claude.rs`.
+- Claude render extraction verification passed: direct secret matching, official gateway cleanup, and mapped gateway model focused tests, plus cargo formatting and diff checks.
+- Claude Code remains in progress: detection, matching, verification, adapter registration/routing, startup sync, and complete preview ownership still need migration; the optional VS Code plugin plan remains shared orchestration by design.
+- Completed `ClaudeAdapter` with `settings.json` path, direct/official/gateway rendering, managed cleanup, detection, keychain-aware matching, direct/gateway verification, and full preview ownership.
+- Registered Claude Code and routed startup sync, path resolution, rendering, cleanup, inspection/matching, verification, content preview, and change preview through the common adapter seam.
+- Deleted the now-empty shared non-Codex direct/official/gateway preview dispatch layer rather than preserving an unreachable pass-through compatibility shell.
+- Claude Code passes the deletion test: shared `profile.rs` no longer contains Anthropic settings keys or primary native format functions; the optional VS Code plugin write plan remains explicit orchestration.
+- Claude Code acceptance verification passed: three focused Claude tests, no-run compilation without warnings, the full 350-test Rust suite, cargo formatting, and diff checks.
+- Inventoried Codex's coupled native surface: `config.toml` formatting/matching/verification, `auth.json` lifecycle, OAuth preservation, review-model handling, and multi-file apply ordering.
+- Began Codex migration by extracting the complete `config.toml` render cluster into `profile/native/codex.rs`: direct, official, gateway, provider-table normalization, managed actor-authorization headers, review model, and legacy credential repair.
+- Routed production direct/gateway/content-preview rendering through the new Codex module; the old render cluster is now test-only pending adapter-interface test migration and deletion.
+- Codex render extraction verification passed: two focused render/review-model tests, no-run compilation without warnings, cargo formatting, and diff checks.
+- Codex remains in progress: detection, matching, verification, adapter registration, preview ownership, auth-document coordination, and deletion of the test-only old render implementation are still required.
+- Moved Codex `config.toml` detection, auth-aware profile matching, official compatibility rules, review-model comparison, managed provider auth-contract checks, and direct/gateway verification into `profile/native/codex.rs`.
+- Routed startup reconciliation through the Codex module with explicit `config.toml` plus optional `auth.json` inputs, preserving multi-document orchestration outside the single-document adapter interface.
+- Routed production Codex verification through the new module; old detection/matching/verification helpers are now test-only pending test-interface migration and deletion.
+- Codex detection/verification extraction passed: no-run compilation without warnings, focused auth-backed detection and review-model verification tests, cargo formatting, and diff checks.
+- Codex remains in progress: adapter registration and full preview ownership, auth.json lifecycle extraction/coordination, and deletion of all test-only shared Codex format copies are still required.
+- Extracted Codex `auth.json` document ownership into `profile/native/codex.rs`: path resolution, JSON reading/parsing/rendering, API-key mode writes, official ChatGPT/OAuth restoration, and write verification.
+- Routed startup auth reads, auth write-plan rendering, OAuth capture source path, and write verification through the Codex module while preserving auth-before-config ordering in shared lifecycle orchestration.
+- Kept OAuth snapshot save/copy/delete operations in shared profile orchestration for the upcoming ProfileStore/Manager wave; those are persistence use cases rather than native document format rules.
+- Removed two obsolete shared auth helpers outright and limited remaining old auth render helpers to tests pending test migration.
+- Codex auth extraction verification passed: API-key/OAuth preservation, official restoration, and auth-before-config focused tests; no-run compilation without warnings, cargo formatting, and diff checks.
+- Codex remains in progress: full preview ownership, adapter registration where single-document methods are applicable, and deletion/migration of all test-only Codex format copies remain required.
+- Implemented and registered `CodexAdapter` for the single-document operations it can own: `config.toml` target, direct/official/gateway rendering, verification, and complete direct/official/gateway preview generation.
+- Kept Codex auth-dependent inspection and matching on the explicit dual-document module interface; the single-document trait methods return a clear error instead of silently producing an incorrect result.
+- Routed the public native preview path through the adapter registry before legacy Codex-specific preview code.
+- Codex adapter verification passed: managed actor-authorization preview, review-model preview, redacted content behavior, and the full 350-test Rust suite; cargo formatting and diff checks remain green.
+- Codex remains in progress only for deletion cleanup and test migration: the old shared Codex preview body and test-only format implementations still need removal before the deletion test can pass.
+- Migrated Codex tests for auth paths/content, native detection, auth-aware matching, official matching, provider auth contracts, and direct/gateway verification to test-only compatibility exports from `profile/native/codex.rs`.
+- Deleted the corresponding shared `profile.rs` auth, detection, matching, review-model, provider-auth, active-provider, and verification implementation copies.
+- Focused Codex detection, matching, and verification tests pass through the extracted module; no-run compilation is warning-free and formatting/diff checks remain green.
+- Codex deletion cleanup is now narrowed to the old test-only TOML render cluster and the unreachable legacy preview body.
+- Completed Codex deletion cleanup: removed the legacy preview body and test-only TOML renderer cluster; actor authorization, auth marker/API-key parsing, wire API mapping, provider id, and auth-repair preview ownership now live in `profile/native/codex.rs`.
+- Codex passes the deletion test and acceptance gate: the full 350-test Rust suite, warning-free no-run compilation, cargo formatting, and diff checks.
+- Began the final native migration by introducing `profile/native/claude_desktop.rs` as the specialized multi-file Claude Desktop module rather than forcing its lifecycle into the single-document adapter interface.
+- Moved Windows/macOS Claude Desktop path discovery, normal/3P config targets, config-library profile/metadata targets, developer-settings targets, and path deduplication into the new module.
+- Claude Desktop path ownership passes two focused platform/developer-settings tests and `git diff --check`; obsolete shared path constants were deleted after compiler warnings exposed them.
+- Claude Desktop remains in progress: deployment/developer/profile/metadata rendering, lifecycle planning, detection/matching, verification, and preview ownership still need to move before the deletion test.
+- Moved Claude Desktop inference-model ownership into the specialized module: safe route-id validation, 1M exclusion, default route inventory, gateway label overrides, direct/gateway model selection, and JSON item rendering.
+- Kept the two gateway model selectors as deliberate `profile` facade re-exports because `gateway.rs` is a second production caller; this is a real seam to revisit during the Gateway wave rather than test-only compatibility.
+- Claude Desktop model extraction passes safe-route and 3P profile-shape focused tests, warning-free no-run compilation, formatting, and diff checks.
+- Moved Claude Desktop deployment config, developer settings, and config-library metadata parsing/rendering into the specialized module, including preservation of unrelated JSON values, managed enterprise-key cleanup, developer-mode enablement, managed entry application, and official restore selection.
+- Added private JSON5 parse/render/path helpers inside the Claude Desktop implementation so shared profile JSON utilities are no longer part of these document interfaces.
+- The three pure document formats pass focused preservation/apply/restore tests, warning-free no-run compilation, formatting, and diff checks.
+- Claude Desktop remains in progress for 3P profile rendering, multi-file lifecycle plan ownership, detection/matching, verification, and full preview.
+- Moved Claude Desktop 3P profile rendering into the specialized module: direct credential loading, Anthropic protocol enforcement, runtime base-URL normalization, gateway token/base-URL shaping, inference model serialization, and the complete gateway JSON document.
+- Removed the corresponding direct/gateway/profile-value implementations from shared `profile.rs`; remaining low-level model imports are temporary preview dependencies and will disappear with preview migration.
+- Claude Desktop 3P rendering passes focused profile-shape and gateway-base-URL tests, warning-free no-run compilation, formatting, and diff checks.
+- Moved Claude Desktop multi-file apply/restore planning into the specialized module. The module now owns developer-settings conditional writes, both deployment configs, 3P profile creation/deletion, metadata apply/restore, official-mode cleanup, and write ordering.
+- Shared profile now delegates Claude Desktop lifecycle construction through one `build_apply_plan` interface while retaining generic plan execution and verification scheduling.
+- Lifecycle extraction passes the developer-settings plan test, warning-free no-run compilation, formatting, and diff checks.
+- Claude Desktop remains in progress for native detection/matching, per-kind verification, and full preview ownership.
+- Moved Claude Desktop native detection, official-state inspection, 3P model extraction, direct base-URL/token parsing, and keychain-aware profile matching into the specialized module.
+- Shared profile now retains only exact-keychain and keychain-reference wrapper choices plus draft selection/import orchestration; all Claude Desktop JSON format knowledge for detection and matching was deleted.
+- Detection/matching extraction passes the same-endpoint API-key regression test, warning-free no-run compilation, formatting, and diff checks.
+- Claude Desktop remains in progress for per-kind verification and full preview ownership.
+- Moved all Claude Desktop per-write verification into the specialized module behind one `verify_write(kind, path, profile, mode)` interface covering deployment, developer settings, 3P profile, metadata, and official deletion behavior.
+- Shared write verification now groups all four Claude Desktop write kinds into one module call; duplicate JSON parsing and expected-field logic were deleted from `profile.rs`.
+- Verification extraction passes all 96 Claude Desktop-related Rust tests, warning-free no-run compilation, formatting, and diff checks.
+- Claude Desktop remains in progress only for full preview ownership and final deletion search/interface-test acceptance.
+- Moved complete Claude Desktop direct/official/gateway preview ownership into the specialized module, including multi-file warnings, managed deletion descriptions, redacted credential diffs, gateway model-route summaries, and config-library paths.
+- Deleted the legacy 200-line Claude Desktop preview body and its model-summary helper from shared `profile.rs`.
+- Claude Desktop passes the deletion test: production shared profile retains only lifecycle/use-case delegation, restart/display metadata, and generic preview helpers; search results for native fields and profile ids are limited to `cfg(test)` compatibility aliases.
+- Phase 7 accepted: all native adapters from Pi through Claude Desktop now own their native formats; the full 350-test Rust suite, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Began Phase 8 planning for ProfileStore, Policy, Manager, Provider HTTP, and Restart extraction.
+- Added `profile/policy.rs` as the first Phase 8 deep module and moved provider/token/icon normalization, URL validation, protocol normalization/display, credential requirements, official/custom OAuth policy, mode normalization, capability checks, secret preview, and optional-model rules into it.
+- `profile.rs` imports the policy interface privately so existing manager/native callers retain stable names while the implementation has one owner; the shared file no longer contains the migrated rule bodies.
+- Policy extraction passes protocol rejection, runtime URL policy, and icon normalization focused tests, warning-free no-run compilation, formatting, deletion search, and diff checks.
+- Added `profile/store.rs` and moved the read-side ProfileStore implementation: persisted profile loading/migration, usage flags, built-in official profile synthesis, stored ordering, canonical sorting, built-in id/icon ownership, and ID lookup.
+- Preserved `profile::load_profile_by_id` as an explicit stable facade for `tool_launch` and `usage_query`; the wrapper delegates to the concrete store module and contains no persistence implementation.
+- Store read-side extraction passes built-in protocol and persisted built-in-order tests, warning-free no-run compilation, formatting, and diff checks.
+- ProfileStore remains in progress for active-pointer cleanup, auto-activation, and related ordering mutations.
+- Completed ProfileStore active-state ownership by moving config/gateway pointer cleanup, alias canonicalization, deleted-config fallback to built-in official, gateway pointer removal, first-gateway auto-activation, mode-map selection, and default active-profile resolution into `profile/store.rs`.
+- Deleted the corresponding active-state implementation cluster from shared `profile.rs`; manager use cases continue calling the store interface through the private facade import.
+- Active-state extraction passes first-gateway activation, existing-pointer preservation, deleted-config official replacement, warning-free no-run compilation, formatting, deletion search, and diff checks.
+- ProfileStore core ownership is accepted; remaining Phase 8 work is ProfileManager orchestration, Provider HTTP, and Restart extraction.
+- Added `profile/provider_http.rs` and moved connection testing, API-key resolution, provider requests, model-list URL construction, response-shape parsing, model normalization, context-window extraction, Gemini generation filtering, and provider error summaries into one module.
+- Preserved `profile::test_profile_connection` and `profile::list_profile_models` as public re-exports for Tauri commands; URL/payload helpers are test-only imports.
+- Provider HTTP extraction passes protocol URL and common provider payload tests, warning-free no-run compilation, formatting, and diff checks.
+- The exact extraction range also contained `switch_active_profile`; it remains temporarily re-exported but is explicitly pending relocation to `manager.rs` before Phase 8 acceptance.
+- Added `profile/manager.rs`, moved `switch_active_profile` out of Provider HTTP, and migrated save, update, duplicate, delete, reorder, and active-switch use cases into the manager implementation.
+- `profile.rs` now publicly re-exports the CRUD/switch interface used by Tauri commands while the implementation coordinates policy, store, credentials, storage, OAuth snapshots, activity logging, and active-pointer updates locally in manager.
+- Manager CRUD extraction passes gateway auto-activation and existing-active preservation regressions, warning-free no-run compilation, formatting, source deletion search, and diff checks.
+- ProfileManager remains in progress for write/apply previews and apply orchestration.
+- Moved profile write preview, apply preview, provider-mode preview assembly, native content attachment, and the complete apply use case into `profile/manager.rs`.
+- The manager now owns confirmation checks, installed-tool gating, NativePlan selection/filtering, backups, write verification, active-state updates, OAuth capture, optional restart coordination, activity logging, and apply result assembly.
+- `profile.rs` publicly re-exports preview/apply commands; one preview attachment helper is imported only for legacy tests and remains implemented in manager.
+- Manager preview/apply extraction passes redacted placeholder preview and unchanged-plan filtering regressions, warning-free no-run compilation, formatting, and diff checks.
+- ProfileManager core command ownership is accepted; Phase 8 remains open for Restart extraction and final facade/deletion audit.
+- Added `profile/restart.rs` and moved the complete restart implementation: target inventory, restart context/outcome interface, Windows process inspection and PowerShell scripts, MSIX/package fallback, macOS PID discovery/quit/TERM/KILL handling, process-path relaunch, and platform quoting helpers.
+- Manager now crosses one restart interface; platform strategy tests access only the restart module's profile-visible target/context/script interface.
+- Restart extraction passes Codex target coverage, Claude Desktop packaged fallback, safe-name PowerShell fallback, warning-free no-run compilation, formatting, and diff checks.
+- Phase 8 deletion audit remains open: shared `profile.rs` still performs native auto-import persistence (`save_profile` and `next_profile_sort_order`), so that orchestration must move to manager/store before the facade criterion is satisfied.
+- Removed the shared `reqwest::blocking::Client` import and made Provider HTTP own its dependency directly.
+- Moved native-config startup reconciliation, detected-profile correction/import, persistence, naming, identity matching, and keychain-reference matching into `manager/native_sync.rs`.
+- Shared native detection helpers remain available through a narrow internal manager interface for adapters; legacy synchronization helpers are imported only for tests.
+- Phase 8 deletion audit passes: shared `profile.rs` no longer directly owns public CRUD/apply commands, Provider HTTP client logic, profile load/save/delete/reorder operations, active-pointer rules, or platform restart implementations.
+- Phase 8 accepted with the full 350-test Rust suite, warning-free no-run compilation, cargo formatting, and diff checks.
+- Began Phase 9 frontend interface/domain/UI extraction.
+- Added `src/lib/api/runtime.ts` with a concrete `RuntimeAdapter` interface and two real adapters: lazy Tauri command invocation and an explicit browser adapter that rejects native commands.
+- `api.ts` now selects one runtime adapter once and routes all existing native invocations through it; browser mock behavior remains intact for subsequent domain-by-domain extraction.
+- Updated the profile-management ownership test to inspect the new backend manager implementation owner instead of the stable profile facade.
+- Runtime seam verification passes all 159 frontend unit tests, Svelte check, production build, and diff checks; the production bundle remains split below the previous 1 MB warning threshold.
+- Added `src/lib/profiles/form.ts` as the shared profile-form module. It now owns model-mapping form types, empty/default construction, profile-to-form conversion, request serialization, and validation.
+- Removed the duplicate model-mapping implementations from `Profiles.svelte` and `SetupWizard.svelte`; both routes now cross the same form interface.
+- Shared form extraction passes all 159 frontend unit tests, Svelte check with zero errors/warnings, production build, and diff checks. The largest main chunk is approximately 438 kB.
+- Phase 9 remains in progress. The next deletion-test sequence is: move grouping rules to `profiles/grouping.ts`, move display-only derivation to `profiles/presentation.ts`, extract browser fake profile state/behavior from `api.ts`, add the focused Tauri profile adapter, and only then extract dialogs/list UI whose ownership is cohesive.
+- Added `src/lib/profiles/grouping.ts` and moved installed-tool filtering, canonical grouping, tool/profile ordering, active-profile alias compatibility, active-state lookup, and empty-state derivation behind one profile grouping interface.
+- `Profiles.svelte` now coordinates selection and sortable UI state while consuming grouping results; it no longer owns the tool matrix or active-profile alias fallback.
+- Updated the Pi ownership test to inspect the new grouping implementation owner instead of requiring `PROFILE_TOOL_ORDER` in the route.
+- The first verification run caught one stale route call and one stale source-ownership assertion. Both were migrated to the new interface; the follow-up passes Svelte check with zero errors/warnings, all 159 frontend unit tests, and diff checks.
+- Added `src/lib/profiles/presentation.ts` and moved provider classification, official/tool-icon decisions, display-name normalization, endpoint/remark derivation, icon normalization/validation, and model-option labels into a pure presentation module.
+- Kept locale lookup in `Profiles.svelte` and passed only the resolved official name across the presentation interface, avoiding a Svelte/i18n dependency in the shared module.
+- Presentation extraction passes Svelte check with zero errors/warnings, all 159 frontend unit tests, and diff checks.
+- Phase 9 shared profile-domain ownership is accepted across `catalog.ts`, `form.ts`, `grouping.ts`, and `presentation.ts`. Remaining Phase 9 work is the production/browser adapter split and focused UI modules.
+- Added `src/lib/api/tauri/profiles.ts` as the focused production profile adapter. It owns the complete Tauri command mapping for profile initialization, connection/model operations, CRUD/reorder, OAuth start, usage scripts, previews, and apply.
+- The production adapter accepts the shared `RuntimeAdapter` dependency; `api.ts` no longer embeds profile command names or Tauri argument envelopes.
+- Tauri profile adapter extraction passes Svelte check with zero errors/warnings, all 159 frontend unit tests, and diff checks.
+- The adapter acceptance item remains open until browser profile behavior is moved behind the same `ProfileAdapter` interface.
+- Added `src/lib/api/profiles.ts` with the complete `ProfileAdapter` interface shared by production and browser implementations.
+- The interface covers the behavior callers use rather than exposing command names, runtime details, or browser state. `tauriProfileAdapter` now has an explicit `ProfileAdapter` return type, so missing or drifting operations fail compilation.
+- Shared profile interface verification passes Svelte check with zero errors/warnings, all 159 frontend unit tests, and diff checks.
+- Browser state cannot be moved as an isolated bag without design work because backup restore also consumes active-profile and backup snapshots. The browser adapter will receive an explicit shared browser state module so profile apply and global backup restore retain one source of truth.
+- Added `src/lib/api/browserMock/state.ts` with one `BrowserMockState` owning profile drafts/order, active pointers, usage configuration/results, backups, and backup snapshots.
+- Migrated all existing `api.ts` reads and writes for those seven state clusters to the shared state object, including global backup listing/restore and profile apply backup creation.
+- Removed the former independent module-level state variables, preventing browser profile and backup adapters from diverging when their implementations move into separate files.
+- One source-text regression initially required the old `mockProfileDrafts` variable name. Updated it to assert the same save-then-auto-activate behavior through `browserState.profileDrafts`.
+- Browser state migration passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/profilePolicy.ts` and moved browser-only provider classification, mode/protocol normalization, protocol capability enforcement, Base URL validation, model fixtures, and credential status/detail rules out of `api.ts`.
+- Kept native-preview orchestration in place for the moment because it depends on tool-specific preview construction; the extracted policy module is pure and depends only on shared types/catalog capabilities.
+- Removed the corresponding duplicate policy implementations from `api.ts` and routed existing browser behavior through the new module imports.
+- Browser profile policy extraction passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/profileStore.ts` as the browser profile persistence/domain module over `BrowserMockState`.
+- It now owns built-in official profiles, canonical built-in ids, profile/icon/remark/review-model/model-mapping normalization, persisted order application, comparison, complete profile synthesis, and next sort-order calculation.
+- `api.ts` binds the store interface once and no longer implements those rules. Ownership tests for Codex review models and Pi built-ins now inspect the store implementation owner.
+- Browser profile store extraction passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/usage.ts` and moved browser usage load/save/test/query/delete orchestration, configuration normalization, OAuth-special handling, result generation, and usage state synthesis out of `api.ts`.
+- The usage module accepts only the browser state, profile lookup, and default script generator; callers no longer coordinate usage maps directly.
+- Existing public functions now select the Tauri usage methods or the browser usage module without duplicating implementation.
+- Browser usage extraction passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/profiles.ts` with browser profile CRUD orchestration over the shared state/store/policy modules.
+- The module owns active-pointer cleanup, first-gateway auto-activation, ID allocation, save/update validation, persistence updates, and activity recording through a narrow dependency.
+- Switched browser save and update call paths to the new module and deleted their former implementations from `api.ts`; ownership tests now inspect the browser profile implementation owner.
+- Duplicate/delete/reorder implementations exist in the module but their public browser branches still need to be switched and the old `api.ts` bodies removed before CRUD migration is accepted.
+- Current partial CRUD migration passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Switched duplicate, delete, and reorder browser paths to `browserMock/profiles.ts` and deleted their former implementations from `api.ts`.
+- Browser profile CRUD ownership is now complete: save, update, duplicate, delete, reorder, active-pointer cleanup, built-in fallback, first-gateway activation, ordering, and activity recording all live behind the browser profile module/store interface.
+- Full browser CRUD migration passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Moved browser connection testing and model listing into `browserMock/profiles.ts`, including detection/tool checks, configuration-state presentation, provider URL/credential validation, status aggregation, activity recording, and protocol-specific model fixtures.
+- Public `testProfileConnection` and `listProfileModels` now delegate to the Tauri adapter or browser profile module; their former browser implementations were deleted from `api.ts`.
+- Browser connection/model migration passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/profileWritePreview.ts` and moved draft-write preview validation, ID allocation, SQLite redacted content, active-pointer impact, credential impact, and target config-path presentation out of `api.ts`.
+- Extended the browser store with unique-id allocation and exposed the browser profile module's gateway auto-activation query for preview reuse.
+- Deleted the superseded SQL preview, icon redaction, ID allocation, and gateway auto-activation helpers from `api.ts`; ownership tests now inspect the new preview/store modules.
+- Browser write-preview migration passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/profileApply.ts` and moved browser apply-preview/use-case orchestration: profile lookup, native path resolution, mode preview assembly, apply validation, active-pointer updates, backup snapshots/manifests, restart result fields, environment conflicts, and activity recording.
+- Public `previewProfileApply` and `applyProfile` now delegate to the Tauri adapter or browser apply module; their former orchestration bodies were deleted from `api.ts`.
+- Corrected the extracted result against the live `ApplyProfileResult` contract (`verified`, `nativeVerified`, restart fields, and `gatewayStatus`) using the Svelte type-check feedback loop.
+- Ownership tests for review-model SQL preview and timeout removal now inspect `profileWritePreview.ts` rather than the deleted `api.ts` helper.
+- Browser apply orchestration migration passes all 159 frontend unit tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/lib/api/browserMock/index.ts` as the complete browser `ProfileAdapter` composition module, combining summary, connection/models, CRUD, OAuth, usage, write preview, apply preview, and apply implementations.
+- Tauri and browser implementations now both satisfy `ProfileAdapter`; `api.ts` selects one adapter once from `RuntimeAdapter.kind` and every public profile function delegates through that single interface without its own runtime branch.
+- The frontend production/browser profile-adapter acceptance item is complete. Remaining browser work is moving the tool-specific native diff/mode-preview implementation behind browserMock ownership rather than injecting it from `api.ts`.
+- Full frontend verification passes all 159 unit tests, Svelte check with zero errors/warnings, production build, and diff checks. The main application chunk is approximately 443 kB.
+- Added `src/lib/api/browserMock/nativePreview.ts` containing the complete tool-specific native path, direct/official/gateway diff, Claude Desktop model-route, protocol-support, and mode-preview implementation cluster.
+- Browser apply composition now imports and executes native path/diff/mode preview functions from the new module; Svelte check, all 159 frontend tests, and diff checks pass against the new active path.
+- The first attempt to delete the old 56 KB implementation as one patch exceeded the tool's output/matching window and made no change. The old code remains temporarily dead in `api.ts`; deletion and ownership-test migration are explicitly required before accepting native-preview ownership.
+- Deleted the obsolete native-preview implementation from `api.ts` in bounded clusters and moved its Codex/Pi/timeout ownership assertions to `browserMock/nativePreview.ts`.
+- Fixed a test-scope regression introduced during that ownership migration; the Codex review-model test now reads its native-preview owner locally. All 159 frontend tests, Svelte check, and diff checks pass again.
+- Added `src/components/profiles/ProfileToolTabs.svelte` as the first focused Profiles UI module. It owns active-profile lookup, tab semantics, tool icon rendering, and Panda tool-switcher recipes behind a four-input interface.
+- Removed the corresponding tab markup and recipe ownership from `Profiles.svelte`; updated the Panda migration test to inspect the actual implementation owner instead of retaining a false route-local assertion.
+- The tool-tab deletion test passes: removing the module would force active-profile lookup, accessibility state, and styling ownership back into the route. Verification passes all 159 frontend tests, Svelte check with zero errors/warnings, and diff checks.
+- Added `src/components/profiles/ProfileCard.svelte` and moved profile display derivation, official-name lookup, avatar selection, endpoint/remark rendering, usage availability, built-in status, busy-state rules, and all card actions behind the card interface.
+- `Profiles.svelte` now supplies profile/action state and command callbacks while retaining sortable-list and modal/use-case coordination. Obsolete route-local endpoint, remark, and icon helpers were deleted.
+- Updated the Panda migration ownership test to inspect card recipes and markup in `ProfileCard.svelte`; no compatibility recipe references were retained in the route.
+- ProfileCard extraction passes all 159 frontend tests, Svelte check with zero errors/warnings, and diff checks. Phase 9 remains open for the sortable ProfileList extraction and final route deletion audit.
+- Added `src/components/profiles/ProfileList.svelte` and moved the complete DnD state machine, shadow-item handling, content-key synchronization, drag styling, reorder derivation, optimistic ordering, rollback, and ProfileCard composition behind one list interface.
+- `Profiles.svelte` now owns only the reorder persistence use case and profile workflow dialogs; the five sortable state variables and all DnD implementation functions were deleted from the route.
+- Updated profile-refresh and Panda ownership tests to inspect `ProfileList.svelte`; the route now composes `ProfileToolTabs`, `ProfileList`, and workflow dialogs.
+- Phase 9 accepted: all 159 frontend tests pass, Svelte check reports zero errors/warnings, production build passes with the main application chunk at approximately 446 kB, and deletion searches find no route-local DnD/list/card implementation.
+- Began Phase 10 by adding `gateway/protocol/canonical.rs` and moving the canonical protocol enum, content parts, messages, tool calls/specs, normalized request/assistant response, converted upstream request, and usage model out of the 6,519-line `gateway.rs`.
+- Completed the client text-delta encoder migration into `gateway/protocol/stream.rs`; updated both runtime call sites, deleted the old `write_client_stream_delta` implementation, and proved deletion with an empty symbol search. The focused gateway suite remains 57/57 and `cargo test --no-run` is warning-free.
+- Completed the client tool-call stream encoder migration into `gateway/protocol/stream.rs`; both runtime call sites now use the protocol facade, the old `write_client_stream_tool_call` cluster was deleted, its symbol search is empty, and the 57 focused gateway tests plus warning-free `cargo test --no-run` remain green.
+- Completed client stream completion encoding and SSE output ownership in `gateway/protocol/stream.rs`. Deleted `write_client_stream_done` and all SSE writer helpers from `gateway.rs`; deletion searches are empty, 57 focused gateway tests pass, formatting passes, and `cargo test --no-run` is warning-free.
+- Added `gateway/server.rs` as the HTTP transport boundary. It now owns the request type, bounded socket reads, header termination, Content-Length parsing, and request construction; the complete parser cluster was deleted from `gateway.rs`. The 57 gateway tests, formatting, warning-free full test compilation, and diff check pass.
+- Deepened `gateway/server.rs` to own buffered and streaming response types, response status access, buffered HTTP serialization, and shared CORS headers. Deleted the corresponding response type and writer clusters from `gateway.rs`; the deletion search is empty and the 57 gateway tests plus warning-free full test compilation pass.
+- Moved route-response execution and streaming HTTP header serialization into `gateway/server.rs`. Callers now supply the resolved HTTP reason explicitly, keeping status semantics outside the transport module. Deleted both old writer functions from `gateway.rs`; all 57 gateway tests, full warning-free compilation, formatting, and diff checks pass.
+- Added `gateway/runtime.rs` to own the global shutdown sender, listener thread handle, start timestamp, and last-error state behind `is_running`, `mark_started`, `set_last_error`, `stop`, and `snapshot`. `start_gateway` and status construction no longer lock or mutate runtime internals directly; the old runtime struct, static, lock accessor, and error setter were deleted. The 57 gateway tests and warning-free full compilation pass.
+- Completed Phase 10 by moving the nonblocking listener accept loop and per-connection spawning into `gateway/server.rs`, leaving configuration reload and request handling as injected callbacks. The parent no longer contains accept-loop mechanics. Full Rust verification passes 352/352, including all four protocols, scoped routes, auth, privacy filtering, buffered responses, and streaming conversion.
+- Completed Phase 11 deletion-test reassessment. `tool_installer.rs` and `detector.rs` retain real execution/detection strategy dispatch rather than duplicated identity ownership; ChatGPT Desktop and Claude Desktop patching remain cohesive product-specific cross-platform workflows, consistent with the plan's no immediate binary-patch rewrite boundary. Added a source-level Rust architecture guard that prevents HTTP parsing, stream encoding, runtime state, and accept-loop mechanics from returning to the gateway facade; the guard and warning-free compilation pass.
+- Completed Phase 12 automated verification: `cargo fmt --check`, 353/353 Rust tests, warning-free `cargo test --no-run`, 159/159 frontend unit tests, Svelte check with 0 errors and 0 warnings, production build, and `git diff --check`. The production main chunk is 445.98 kB gzip 117.41 kB, with terminal and locale code split into separate chunks.
+- Completed in-app browser QA against a dedicated local Vite server. Verified the Codex direct-profile surface and direct/gateway mode switch, Claude Desktop management and launch options, the Pi Agent dashboard entry, and Local Gateway status, controls, privacy modes, and request log. Browser console error log was empty; the test tab and dev server were closed afterward.
+- Completion audit: native format ownership resides in `profile/native/*` adapters; `tool_catalog.rs` owns canonical IDs and capabilities; `profile.rs` is the Rust facade over distinct manager/store/policy/provider/restart modules; Setup Wizard and Profiles consume shared frontend profile-domain modules; Tauri and browser mock implementations share the frontend API boundary; gateway runtime, server transport, route/auth/privacy/upstream, and protocol conversion are separate deep modules; all migration waves finish green.
+- The canonical model is visible only inside `crate::core::gateway`, providing an internal seam for protocol adapters without exposing transport details to the rest of the crate.
+- Deleted the original canonical type definitions and now-unused OpenAI protocol string constants from `gateway.rs`; the Anthropic test constant is test-only.
+- Canonical extraction passes `cargo fmt --check`, warning-free `cargo test --no-run`, all 55 Gateway-related tests, and diff checks.
+- Added `gateway/auth.rs` with a transport-independent interface for exact managed bearer-token validation and the strict Codex tool-scope loopback exception.
+- `gateway.rs` now passes only headers, scope metadata, and host into auth; the auth implementation no longer depends on `HttpRequest`, `GatewayRouteTarget`, or `GatewayConfig`.
+- Deleted the former route-local auth and loopback functions. Added focused positive/negative tests for token matching, tool scope, strict routing, IPv4/IPv6 loopback, localhost, and non-loopback binding.
+- Auth extraction passes 57 Gateway-related tests, warning-free `cargo test --no-run`, cargo formatting, and diff checks.
+- Added `gateway/route.rs` to own query stripping, `/tools/{tool}/...` scope parsing, canonical tool aliases, explicit tool headers, User-Agent/client inference, strict-scope metadata, and request-log client labels.
+- `gateway.rs` now resolves a route target from only path and headers. The old `GatewayRouteTarget` implementation plus route-local explicit/inferred tool and client-label functions were deleted.
+- The first compile found an owned/borrowed path construction conflict; converting the scoped route path to an owned string before moving the original path fixed the interface without cloning the whole request.
+- Route extraction passes all 57 Gateway-related tests, warning-free `cargo test --no-run`, cargo formatting, and diff checks.
+- Added `gateway/privacy.rs` with protocol-aware latest-input scope selection for OpenAI Chat, Responses, Anthropic Messages, and Gemini plus filter application and request-log metadata decisions.
+- The privacy interface returns either a filter report or blocked hit count; it does not depend on HTTP status codes, JSON error envelopes, `RouteResponse`, server streams, or gateway configuration structs.
+- `gateway.rs` now converts a blocked privacy decision into the existing 400 response and imports metadata through the privacy interface. The former latest-scope, recursive text detection, metadata, and filtering implementation cluster was deleted.
+- Privacy extraction preserves block-latest-input semantics and full-body redaction after clean latest input. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Extended `gateway/protocol/mod.rs` with the route-to-client-protocol selector and Gemini generate/stream route parser, establishing the entry seam for protocol adapters.
+- `gateway.rs` consumes these functions through private aliases so route, request-log privacy detection, Gemini dispatch, and existing tests keep stable call sites while the implementation owner moves.
+- Deleted both protocol-route parsing implementations from `gateway.rs`. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Added `gateway/upstream.rs` and moved OpenAI Chat/Responses, Anthropic Messages, and Gemini upstream endpoint construction behind one interface.
+- The upstream module now owns Base URL parsing, duplicate endpoint avoidance, provider version-segment detection, query/fragment cleanup, Gemini runtime Base URL resolution, model normalization, and generate/stream endpoint selection.
+- Deleted the endpoint helper cluster, Gemini model normalizer, and obsolete Gemini protocol constant from `gateway.rs`; protocol conversion now asks upstream for the final endpoint.
+- Endpoint extraction passes the full 57-test Gateway matrix, including versioned-provider roots and Gemini routing, plus warning-free no-run compilation, cargo formatting, and diff checks.
+- Extended `gateway/upstream.rs` with protocol-specific authentication headers and deterministic safe request-header passthrough.
+- The module owns generated-header deduplication, allowlisted context families, transport/auth/protocol denylisting, RFC token-name validation, CR/LF/NUL injection rejection, stable sorting, and canonical output casing.
+- Deleted the complete header-generation and passthrough implementation cluster plus the no-longer-needed `HashSet` dependency from `gateway.rs`.
+- Header extraction passes the full 57-test Gateway matrix, including auth/transport rejection, custom-context passthrough, injection rejection, and unknown-header rejection, plus warning-free no-run compilation, formatting, and diff checks.
+- Added `gateway/protocol/openai_chat.rs` and moved the complete OpenAI Chat request-to-canonical decoder out of `gateway.rs`.
+- The adapter owns system-message accumulation, role normalization, multimodal content parsing, tool-result wrapping, tool-call decoding, modern/legacy tool declarations, tool choice, max-token aliases, temperature, and top-p extraction.
+- The adapter temporarily consumes shared content/tool helpers through the private Gateway protocol implementation seam; these helpers remain pending relocation to protocol common as the remaining adapters move.
+- Deleted `chat_request_parts` from `gateway.rs` and retained its call surface through a private protocol re-export. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Added `gateway/protocol/openai_responses.rs` and moved the complete Responses request-to-canonical decoder out of `gateway.rs`.
+- The adapter owns instructions, string/array/generic input, message roles, function-call items, function-call outputs, tool-result correlation, content/text fallbacks, Responses tool declarations, tool choice, max-output-token aliases, temperature, and top-p.
+- Deleted `responses_request_parts` from `gateway.rs` and retained its internal call surface through the protocol module. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Added `gateway/protocol/anthropic.rs` and moved Anthropic system/messages/content/tool-use/tool-result/tool-spec/tool-choice and sampling-field decoding into the Anthropic adapter.
+- Added `gateway/protocol/gemini.rs` and moved Gemini contents/parts/function-call/systemInstruction/tools/toolConfig/generationConfig decoding plus model-role normalization into the Gemini adapter.
+- Deleted both decoder implementations from `gateway.rs`; all four client request protocols now enter canonical form through protocol-owned adapters behind the same internal interface.
+- Anthropic and Gemini extraction passes all 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks.
+- Moved the canonical request encoder from `gateway.rs` into `gateway/protocol/mod.rs` behind one `(protocol, parts, stream)` interface.
+- The protocol module now owns empty-message fallbacks, system/instructions/systemInstruction differences, message/content encoding selection, stream flags, max-token field names/defaults, generation configuration, and per-protocol tool injection.
+- Deleted `request_body_for_protocol` from `gateway.rs`; forwarding orchestration no longer knows protocol payload field layouts. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Moved the upstream response-to-canonical decoder into `gateway/protocol/mod.rs` behind one `(protocol, value)` interface.
+- The protocol implementation now owns OpenAI choice/message/delta parsing, Responses output/function-call/output-text parsing, Anthropic content/tool-use and stop reason, Gemini candidate/parts/function-call and finish reason, plus canonical usage attachment.
+- Deleted `assistant_response_from_protocol` from `gateway.rs`; non-streaming forwarding no longer interprets upstream response layouts. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Moved canonical assistant-response encoding into `gateway/protocol/mod.rs` behind one `(protocol, model, response)` interface.
+- The protocol module now owns generated IDs/timestamps, finish-reason fallbacks, OpenAI Chat message/tool calls, Responses output/function-call/output-text, Anthropic content/tool-use and stop reason, Gemini candidates/parts/finish reason, and per-protocol usage shapes.
+- Deleted `response_body_for_protocol` from `gateway.rs`. Non-streaming conversion now crosses one complete protocol interface for client decode, upstream encode, upstream decode, and client encode. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Added `gateway/protocol/stream.rs` and moved protocol-independent SSE chunk buffering and frame parsing out of `gateway.rs`.
+- The stream module owns UTF-8 lossy chunk accumulation, LF/CRLF frame boundary selection, partial-frame retention, final remainder draining, comment/empty-line filtering, event extraction, and multi-line data joining.
+- Deleted `SseBuffer`, `SseFrame`, separator detection, and frame parsing from `gateway.rs`; existing stream orchestration and tests consume the module through a private re-export.
+- SSE parser extraction passes the full 57-test Gateway matrix, including split-frame and Anthropic delta coverage, plus warning-free no-run compilation, cargo formatting, and diff checks.
+- Moved `GatewayStreamUpdate` and event-to-canonical-update composition into `gateway/protocol/stream.rs`.
+- Stream orchestration now receives one canonical update containing text delta, tool calls, and optional usage; it no longer assembles those protocol results itself.
+- The compiler proved callers do not need the update type name, so only the decoder function and SSE parser types are re-exported, keeping the interface smaller.
+- Canonical stream-update extraction passes all 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks.
+- Moved four-protocol stream text-delta decoding into `gateway/protocol/stream.rs` and normalized the module imports to the top of the file.
+- The stream module now owns OpenAI Chat choice delta/message fallback, Responses JSON/SSE event-type delta selection, Anthropic content-block delta selection, and Gemini assistant-text extraction.
+- Deleted `stream_text_delta_from_event` from `gateway.rs`; the test-only compatibility helper consumes the stream module's private re-export. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Added the active four-protocol streaming tool-call decoder to `gateway/protocol/stream.rs`, including OpenAI Chat indexed calls, Responses output-item and argument deltas, Anthropic tool-use/input-json deltas, Gemini canonical response reuse, and stable fallback call ids.
+- The active stream-update path now uses the new tool-call decoder and all 57 Gateway-related tests plus warning-free no-run compilation pass.
+- Deletion acceptance remains open: the former 149-line tool-call decoder cluster in `gateway.rs` is now dead and temporarily annotated to keep the compiler clean; it must be removed before this migration item can be marked complete.
+- Completed the streaming tool-call deletion test by removing the full former 149-line decoder/helper cluster from `gateway.rs`; searches confirm the three old function names are absent.
+- The remaining `allow(dead_code)` belongs to the pre-existing test compatibility text-delta wrapper, not the deleted tool-call implementation.
+- Streaming tool-call migration now passes all 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, deletion search, and diff checks.
+- Moved four-protocol stream usage event detection, accumulated usage merging, and usage validity checks into `gateway/protocol/stream.rs`.
+- The stream module handles direct/nested Responses and Anthropic usage, Gemini usageMetadata, non-zero token replacement, total-token fallback, cache/reasoning/audio/image detail preservation, and raw detail retention.
+- Deleted `stream_usage_from_event`, `merge_stream_usage`, and `usage_has_values` from `gateway.rs`; only private stream-module aliases remain at orchestration call sites.
+- Streaming usage migration passes all 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, deletion search, and diff checks.
+- Moved `ClientStreamState` into `gateway/protocol/stream.rs`, including protocol, generated stream/item ids, model, and creation timestamp.
+- The constructor now hides UUID and timestamp generation behind a `(protocol, model)` interface; fields remain Gateway-private until the frame encoders finish moving.
+- Deleted the stream state type and constructor from `gateway.rs`. All 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, and diff checks pass.
+- Added the client stream-start encoder to `gateway/protocol/stream.rs` for Responses lifecycle events and Anthropic message/content-block start events; Chat and Gemini intentionally emit no start frame.
+- Both production start-frame call sites now use the protocol stream encoder, and all 57 Gateway-related tests plus warning-free no-run compilation pass.
+- Deletion acceptance remains open: the former 89-line `write_client_stream_start` body in `gateway.rs` is dead and temporarily annotated; it must be removed before this encoder migration item is complete.
+- Completed start-encoder deletion acceptance by removing the former 89-line `write_client_stream_start` implementation from `gateway.rs`; both production call sites use `write_protocol_stream_start`.
+- Deletion search confirms the old function name is absent. The remaining `allow(dead_code)` is the existing text-delta test compatibility wrapper.
+- Client stream-start encoding passes all 57 Gateway-related tests, warning-free no-run compilation, cargo formatting, deletion search, and diff checks.
