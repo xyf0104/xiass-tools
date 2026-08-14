@@ -187,6 +187,7 @@ on run (volumeName)
   tell application "Finder"
     tell disk (volumeName as string)
       open
+      delay 1
 
       set theXOrigin to $DMG_WINDOW_X
       set theYOrigin to $DMG_WINDOW_Y
@@ -206,14 +207,6 @@ on run (volumeName)
         $reposition_hidden_files_clause
       end tell
 
-      set opts to the icon view options of container window
-      tell opts
-        set icon size to 128
-        set text size to 16
-        set arrangement to not arranged
-      end tell
-      $background_clause
-
       set position of item "$escaped_app_name" to {$DMG_APP_X, $DMG_APP_Y}
       set the extension hidden of item "$escaped_app_name" to true
       set position of item "Applications" to {$DMG_APPLICATION_FOLDER_X, $DMG_APPLICATION_FOLDER_Y}
@@ -221,6 +214,24 @@ on run (volumeName)
       close
       open
       delay 1
+
+      tell container window
+        set current view to icon view
+      end tell
+      set opts to the icon view options of container window
+      tell opts
+        set arrangement to not arranged
+        set icon size to 128
+        set text size to 16
+      end tell
+      $background_clause
+      delay 2
+      close
+      open
+      delay 1
+
+      set reopenedOpts to the icon view options of container window
+      set scaleResult to ((icon size of reopenedOpts) as text) & ":" & ((text size of reopenedOpts) as text) & ":" & ((arrangement of reopenedOpts) as text)
 
       tell container window
         set statusbar visible to false
@@ -246,6 +257,7 @@ on run (volumeName)
       set waitTime to waitTime + 1
       if (do shell script "[ -f " & dsStore & " ]; echo $?") = "0" then set ejectMe to true
     end repeat
+    return scaleResult
   end tell
 end run
 OSA
@@ -255,7 +267,7 @@ create_tauri_style_dmg() {
   local image_mb
   local attach_output
   local mount_dir
-  local volume_icon="$APP_PATH/Contents/Resources/icon.icns"
+  local scale_result
   local apple_script="$WORK_DIR/finder-layout.applescript"
 
   rm -f "$DMG_PATH" "$RW_DMG_PATH"
@@ -282,12 +294,6 @@ create_tauri_style_dmg() {
     return 1
   fi
 
-  if [[ -f "$volume_icon" ]]; then
-    /bin/cp "$volume_icon" "$mount_dir/.VolumeIcon.icns"
-    /usr/bin/SetFile -c icnC "$mount_dir/.VolumeIcon.icns"
-    /usr/bin/SetFile -a C "$mount_dir"
-  fi
-
   if [[ -n "$DMG_BACKGROUND" ]]; then
     if [[ ! -f "$DMG_BACKGROUND" ]]; then
       echo "Configured DMG background was not found: $DMG_BACKGROUND" >&2
@@ -299,7 +305,12 @@ create_tauri_style_dmg() {
 
   create_finder_layout_script "$apple_script"
   /bin/sleep 2
-  /usr/bin/osascript "$apple_script" "$(basename "$mount_dir")"
+  scale_result="$(/usr/bin/osascript "$apple_script" "$(basename "$mount_dir")")"
+  if [[ "$scale_result" != "128:16:not arranged" ]]; then
+    echo "Finder DMG scale verification failed: expected 128:16:not arranged, got $scale_result" >&2
+    return 1
+  fi
+  echo "Finder DMG scale verified: $scale_result"
   /bin/sleep 4
 
   /bin/chmod -Rf go-w "$mount_dir" >/dev/null 2>&1 || true

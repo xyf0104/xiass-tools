@@ -964,6 +964,10 @@ test("macOS app bundle is signed as a bundle for stable Accessibility trust", ()
   assert.match(createDmgScript, /\.DS_STORE/);
   assert.match(createDmgScript, /set position of item "\$escaped_app_name"/);
   assert.match(createDmgScript, /set position of item "Applications"/);
+  assert.match(createDmgScript, /Finder DMG scale verification failed/);
+  assert.match(createDmgScript, /128:16:not arranged/);
+  assert.doesNotMatch(createDmgScript, /\.VolumeIcon\.icns/);
+  assert.doesNotMatch(createDmgScript, /SetFile/);
   assert.match(createDmgScript, /DMG_ALLOW_PLAIN_FALLBACK/);
   assert.match(createDmgScript, /does not contain Tauri\/Finder window layout UI/);
   assert.match(createDmgScript, /hdiutil create/);
