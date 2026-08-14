@@ -141,6 +141,25 @@ test("managed Burn UI uses a localized multi-step install wizard", () => {
   assert.doesNotMatch(source, /primaryButton\.Click \+= \(_, __\) => bootstrapper\.BeginAction/);
 });
 
+test("Burn completion copy reflects a successful uninstall", () => {
+  const source = fs.readFileSync(installerWindowSourcePath, "utf8");
+  const localizationMethod = source.match(
+    /private void ApplyLocalization\(\)[\s\S]*?(?=\n        private void SetPageVisibility\()/,
+  )?.[0] ?? "";
+  const completePage = localizationMethod.match(
+    /case InstallerPage\.Complete:[\s\S]*?break;/,
+  )?.[0] ?? "";
+  const showComplete = source.match(
+    /internal void ShowComplete\(int status, ApplyRestart restart\)[\s\S]*?(?=\n        internal void ShowFailure\()/,
+  )?.[0] ?? "";
+
+  assert.match(completePage, /commandAction == LaunchAction\.Uninstall/);
+  assert.match(completePage, /"Uninstall complete", "卸载完成", "解除安裝完成"/);
+  assert.match(showComplete, /commandAction == LaunchAction\.Uninstall/);
+  assert.match(showComplete, /"CodeStudio Lite was uninstalled successfully\.", "CodeStudio Lite 已成功卸载。", "CodeStudio Lite 已成功解除安裝。"/);
+  assert.match(showComplete, /"Restart Windows to finish uninstalling CodeStudio Lite\.", "请重启 Windows 以完成 CodeStudio Lite 卸载。", "請重新啟動 Windows 以完成 CodeStudio Lite 解除安裝。"/);
+});
+
 test("managed Burn project excludes stale local build intermediates", () => {
   const source = fs.readFileSync(bootstrapperProjectPath, "utf8");
 

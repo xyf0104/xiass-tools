@@ -249,9 +249,13 @@ namespace CodeStudioLite.Installer
                 CompleteGlyph.Text = succeeded ? "✓" : "!";
                 CompleteGlyph.Foreground = BrushFrom(succeeded ? "#65D69B" : (cancelled ? "#F4D94E" : "#FF9A93"));
                 CompleteMessage.Text = succeeded
-                    ? (restart == ApplyRestart.RestartRequired
-                        ? T("Restart Windows to finish setup.", "请重启 Windows 以完成安装。", "請重新啟動 Windows 以完成安裝。")
-                        : T("Setup completed successfully.", "安装已成功完成。", "安裝已成功完成。"))
+                    ? (commandAction == LaunchAction.Uninstall
+                        ? (restart == ApplyRestart.RestartRequired
+                            ? T("Restart Windows to finish uninstalling CodeStudio Lite.", "请重启 Windows 以完成 CodeStudio Lite 卸载。", "請重新啟動 Windows 以完成 CodeStudio Lite 解除安裝。")
+                            : T("CodeStudio Lite was uninstalled successfully.", "CodeStudio Lite 已成功卸载。", "CodeStudio Lite 已成功解除安裝。"))
+                        : (restart == ApplyRestart.RestartRequired
+                            ? T("Restart Windows to finish setup.", "请重启 Windows 以完成安装。", "請重新啟動 Windows 以完成安裝。")
+                            : T("Setup completed successfully.", "安装已成功完成。", "安裝已成功完成。")))
                     : cancelled
                         ? T("Setup was cancelled and no changes were kept.", "安装已取消，未保留任何更改。", "安裝已取消，未保留任何變更。")
                         : T("Setup failed", "安装失败", "安裝失敗") + " (0x" + status.ToString("X8") + ").";
@@ -511,8 +515,13 @@ namespace CodeStudioLite.Installer
                     PrimaryButton.Content = ActionLabel();
                     break;
                 case InstallerPage.Complete:
-                    HeadingLabel.Text = T("Setup complete", "安装完成", "安裝完成");
-                    DescriptionLabel.Text = T("CodeStudio Lite setup has finished.", "CodeStudio Lite 安装程序已完成。", "CodeStudio Lite 安裝程式已完成。");
+                    bool uninstallComplete = commandAction == LaunchAction.Uninstall;
+                    HeadingLabel.Text = uninstallComplete
+                        ? T("Uninstall complete", "卸载完成", "解除安裝完成")
+                        : T("Setup complete", "安装完成", "安裝完成");
+                    DescriptionLabel.Text = uninstallComplete
+                        ? T("CodeStudio Lite has been removed from this computer.", "CodeStudio Lite 已从这台电脑卸载。", "CodeStudio Lite 已從這台電腦解除安裝。")
+                        : T("CodeStudio Lite setup has finished.", "CodeStudio Lite 安装程序已完成。", "CodeStudio Lite 安裝程式已完成。");
                     PrimaryButton.Content = canLaunchInstalledApp
                         ? T("Open CodeStudio Lite", "打开 CodeStudio Lite", "開啟 CodeStudio Lite")
                         : (canRetryInstallation
