@@ -289,13 +289,17 @@ test('settings controls retain Cockpit sizing and original responsive behavior',
   assert.match(styles, /\.settings-row\s*\{/);
 });
 
-test('primary pages mount through Cockpit\'s direct page hierarchy', () => {
+test('Antigravity restores its integrated WF workspace while other primary pages keep Cockpit\'s direct hierarchy', () => {
   const app = read('src/App.tsx');
   const layoutStyles = read('src/styles/layout.css');
   const componentStyles = read('src/styles/components.css');
   const mainWrapper = componentStyles.match(/\.main-wrapper\s*\{([\s\S]*?)\n\}/)?.[1] || '';
 
-  assert.doesNotMatch(app, /XiassAgentWorkspace/);
+  assert.equal((app.match(/<XiassAgentWorkspace/g) || []).length, 1);
+  assert.match(app, /<XiassAgentWorkspace\s+module="antigravity"/);
+  for (const panelId of ['official-accounts', 'instances', 'wakeup', 'verification']) {
+    assert.match(app, new RegExp(`id: '${panelId}'`));
+  }
   assert.match(app, /<AccountsPage onNavigate=\{setPage\} \/>/);
   assert.match(app, /<CodexAccountsPage \/>/);
   assert.match(app, /<ClaudeAccountsPage subPlatform="desktop" \/>/);

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.6] - 2026-09-07
+
+### Fixed
+
+- Restored the complete integrated Antigravity WF workspace entry in XIASS Tools, bringing runtime overview, models and image generation, upstream routing, official accounts, instances, wakeup tasks, account verification, and terminal permissions back into one module.
+- Preserved the v1.7.5 direct Cockpit page hierarchy for Codex, Claude, Cursor, and Windsurf instead of wrapping the other Agents in the retired workspace shell again.
+- Added a release regression gate requiring exactly one Antigravity WF workspace with all four account-oriented panels, preventing a future release from silently falling back to the standalone account page.
+
 ## [1.7.5] - 2026-09-01
 
 ### Fixed

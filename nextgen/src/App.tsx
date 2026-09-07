@@ -103,6 +103,11 @@ const DashboardPage = lazy(() =>
 const AccountsPage = lazy(() =>
   import('./pages/AccountsPage').then((module) => ({ default: module.AccountsPage })),
 );
+const XiassAgentWorkspace = lazy(() =>
+  import('./pages/XiassAgentWorkspace').then((module) => ({
+    default: module.XiassAgentWorkspace,
+  })),
+);
 const CodexAccountsPage = lazy(() =>
   import('./pages/CodexAccountsPage').then((module) => ({ default: module.CodexAccountsPage })),
 );
@@ -3512,7 +3517,34 @@ function MainApp() {
             />
           </VisibleBootPage>
           <VisibleBootPage when={page === 'overview'}>
-            <AccountsPage onNavigate={setPage} />
+            <XiassAgentWorkspace
+              module="antigravity"
+              platformId="antigravity"
+              title="Antigravity WF 工作台"
+              description="模型注入、本地代理、补丁、生图、识图、文件、工具调用、官方登录、多开与诊断均在同一工作台中。"
+              panels={[
+                {
+                  id: 'official-accounts',
+                  managedNavigation: true,
+                  content: <AccountsPage onNavigate={setPage} />,
+                },
+                {
+                  id: 'instances',
+                  managedNavigation: true,
+                  content: <InstancesPage onNavigate={setPage} />,
+                },
+                {
+                  id: 'wakeup',
+                  managedNavigation: true,
+                  content: <WakeupTasksPage onNavigate={setPage} />,
+                },
+                {
+                  id: 'verification',
+                  managedNavigation: true,
+                  content: <WakeupVerificationPage onNavigate={setPage} />,
+                },
+              ]}
+            />
           </VisibleBootPage>
           {/* Codex suite: keep both pages mounted after first visit to avoid empty flash when switching. */}
           {shouldMountCodexSuite && (

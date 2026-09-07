@@ -2093,9 +2093,8 @@ async fn refresh_all_quotas_with_options(
 mod tests {
     use super::{
         attach_runtime_snapshot_to_account_ids, build_codex_api_headers, is_cockpit_api_base_url,
-        new_api_token_profile_path,
-        normalize_http_error_body_for_display, normalize_remaining_percentage,
-        parse_account_check_snapshot, parse_reset_credits_snapshot,
+        new_api_token_profile_path, normalize_http_error_body_for_display,
+        normalize_remaining_percentage, parse_account_check_snapshot, parse_reset_credits_snapshot,
         send_codex_api_request_with_agent_auth_base_url, WindowInfo,
         HTTP_ERROR_BODY_DISPLAY_MAX_CHARS,
     };
