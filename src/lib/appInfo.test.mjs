@@ -24,9 +24,10 @@ test("release manifests share the global application version", () => {
   const cargoToml = read("src-tauri/Cargo.toml");
   const cargoLock = read("src-tauri/Cargo.lock");
   const cargoManifestVersion = cargoToml.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-  const cargoLockVersion = cargoLock.match(/\[\[package\]\]\s+name = "codestudio-lite"\s+version = "([^"]+)"/)?.[1];
+  const cargoLockVersion = cargoLock.match(/\[\[package\]\]\s+name = "xiass-tools"\s+version = "([^"]+)"/)?.[1];
 
-  assert.equal(packageJson.version, "1.5.3");
+  assert.equal(packageJson.name, "xiass-tools");
+  assert.equal(packageJson.version, "1.8.0");
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[""].version, packageJson.version);
   assert.equal(tauriConfig.version, packageJson.version);

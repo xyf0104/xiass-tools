@@ -679,6 +679,7 @@ pub(in crate::core::profile) fn codex_gateway_config_content(
     let model = gateway_config_model_for_profile(profile);
     document["cli_auth_credentials_store"] = toml_edit::value("file");
     document["model_provider"] = toml_edit::value(provider_id.clone());
+    document["web_search"] = toml_edit::value(profile.web_search.as_deref().unwrap_or("live"));
     document["model"] = toml_edit::value(model);
     set_review_model(&mut document, profile, model);
     remove_provider_entry(&mut document, &provider_id);
@@ -708,6 +709,7 @@ pub(in crate::core::profile) fn codex_direct_config_content(
     let model = profile.model.trim();
     document["cli_auth_credentials_store"] = toml_edit::value("file");
     document["model_provider"] = toml_edit::value(provider_id.clone());
+    document["web_search"] = toml_edit::value(profile.web_search.as_deref().unwrap_or("live"));
     if model.is_empty() {
         document.as_table_mut().remove("model");
     } else {

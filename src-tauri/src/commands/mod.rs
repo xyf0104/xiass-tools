@@ -13,3 +13,4 @@ pub mod profiles;
 pub mod settings;
 pub mod tool_installer;
 pub mod usage_query;
+pub mod wf_bridge;

@@ -248,7 +248,8 @@
   }
 
   function visibleDashboardActionLimit(_tool: ToolStatus) {
-    return 2;
+    // Keep launch and configuration discoverable even when update/repair are available.
+    return dashboardCardActions.length;
   }
 
   function shouldShowDashboardOverflow(tool: ToolStatus) {

@@ -91,6 +91,15 @@
   } satisfies Record<string, UiIcon>;
 
   export type AppIconName = keyof typeof appIcons;
+  let nextGradientId = 0;
+
+  const actionIcons = new Set(["arrowRight", "play", "power", "rocket", "install", "download", "update", "restart", "apply", "wizard", "add"]);
+  const iconTones: Partial<Record<AppIconName, string>> = {
+    check: "success", warning: "warning", error: "danger", delete: "danger", stop: "danger",
+    key: "warning", folder: "warning", clock: "warning", repair: "warning",
+    profiles: "violet", settings: "violet", edit: "violet", language: "violet",
+    gateway: "cyan", user: "cyan", copy: "cyan", stats: "success", theme: "warning"
+  };
 </script>
 
 <script lang="ts">
@@ -99,18 +108,27 @@
   export let name: AppIconName | string = "info";
   export let size = 18;
   export let title: string | undefined = undefined;
+  export let tone: "auto" | "action" | "success" | "warning" | "danger" | "info" | "violet" | "cyan" = "auto";
 
   let className = "";
   export { className as class };
 
-  $: icon = appIcons[name as AppIconName] ?? appIcons.info;
+  const gradientId = `xiass-action-${++nextGradientId}`;
+  $: resolvedTone = tone !== "auto" ? tone : actionIcons.has(name) ? "action" : iconTones[name as AppIconName] ?? "info";
+  $: sourceIcon = appIcons[name as AppIconName] ?? appIcons.info;
+  // Only bundled icon bodies enter this markup; never interpolate user content.
+  $: icon = resolvedTone === "action" ? {
+    ...sourceIcon,
+    body: `<defs><linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--icon-action-orange)"/><stop offset="38%" stop-color="var(--icon-action-gold)"/><stop offset="72%" stop-color="var(--icon-action-blue)"/><stop offset="100%" stop-color="var(--icon-action-deep)"/></linearGradient></defs>${sourceIcon.body.replaceAll("currentColor", `url(#${gradientId})`)}`
+  } : sourceIcon;
 </script>
 
 <Icon
   {icon}
   width={size}
   height={size}
-  class={className}
+  class={`xiass-icon xiass-icon--${resolvedTone} ${className}`}
+  style={`color: var(--icon-${resolvedTone}, var(--icon-info))`}
   role={title ? "img" : undefined}
   aria-label={title}
   aria-hidden={title ? undefined : "true"}

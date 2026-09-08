@@ -74,6 +74,8 @@ pub fn save_profile_draft(request: SaveProfileDraftRequest) -> Result<ProfileDra
         provider: plan.provider,
         protocol: plan.protocol,
         model: plan.model,
+        web_search: request.web_search.clone(),
+        image_model: request.image_model.clone(),
         review_model,
         model_mappings,
         base_url: plan.base_url,
@@ -125,9 +127,9 @@ pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<Profil
     }
     let name = normalize_required("Profile Name", &request.name)?;
     let provider = normalize_provider_token(&request.provider)?;
-    let mode = normalize_profile_mode(&provider, request.mode.as_ref())?;
-    let protocol = normalize_protocol(request.protocol.as_deref())?;
     let app = canonical_profile_app(&existing.app);
+    let mode = normalize_profile_mode_for_app(&app, &provider, request.mode.as_ref())?;
+    let protocol = normalize_protocol(request.protocol.as_deref())?;
     ensure_custom_official_profile_allowed(&app, &provider, mode)?;
     ensure_profile_protocol_supported_for_mode(&app, mode, &provider, &protocol)?;
     let model = request.model.trim().to_string();
@@ -175,6 +177,8 @@ pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<Profil
         provider,
         protocol,
         model,
+        web_search: request.web_search.clone().or(existing.web_search.clone()),
+        image_model: request.image_model.clone().or(existing.image_model.clone()),
         review_model,
         model_mappings,
         base_url,
@@ -258,6 +262,8 @@ pub fn duplicate_profile_draft(
         provider: source.provider.clone(),
         protocol: source.protocol.clone(),
         model: source.model.clone(),
+        web_search: source.web_search.clone(),
+        image_model: source.image_model.clone(),
         review_model: source.review_model.clone(),
         model_mappings: source.model_mappings.clone(),
         base_url: source.base_url.clone(),
@@ -325,6 +331,12 @@ pub fn reorder_profile_drafts(
 
     let app = canonical_profile_app(&normalize_token("Tool", &request.app)?);
     let mode = request.mode;
+    if is_codex_family_app(&app) && mode == ProviderApplyMode::Gateway {
+        return Err(
+            "Codex uses API Key / config file mode in XIASS Tools and cannot use Local Gateway mode."
+                .to_string(),
+        );
+    }
     let profiles = load_profiles()?;
     let expected_ids = profiles
         .iter()
@@ -404,6 +416,8 @@ pub fn preview_profile_write(
         provider: plan.provider.clone(),
         protocol: plan.protocol.clone(),
         model: plan.model.clone(),
+        web_search: request.web_search.clone(),
+        image_model: request.image_model.clone(),
         review_model: normalize_profile_review_model(&plan.app, request.review_model.as_deref()),
         model_mappings: normalize_profile_model_mappings(
             &plan.app,
@@ -519,24 +533,32 @@ pub fn preview_profile_apply(
         &paths,
         ProviderApplyMode::Config,
     )?;
-    let gateway_native_diff = build_native_config_preview(
-        &profile,
-        native_config_path.as_deref(),
-        &paths,
-        ProviderApplyMode::Gateway,
-    )?;
+    let gateway_native_diff = if is_codex_tool {
+        None
+    } else {
+        build_native_config_preview(
+            &profile,
+            native_config_path.as_deref(),
+            &paths,
+            ProviderApplyMode::Gateway,
+        )?
+    };
     let config_native_diff = attach_native_config_content_preview(
         config_native_diff,
         &profile,
         &paths,
         ProviderApplyMode::Config,
     );
-    let gateway_native_diff = attach_native_config_content_preview(
-        gateway_native_diff,
-        &profile,
-        &paths,
-        ProviderApplyMode::Gateway,
-    );
+    let gateway_native_diff = if is_codex_tool {
+        None
+    } else {
+        attach_native_config_content_preview(
+            gateway_native_diff,
+            &profile,
+            &paths,
+            ProviderApplyMode::Gateway,
+        )
+    };
     let native_diff = match profile.mode {
         ProviderApplyMode::Config => config_native_diff.clone(),
         ProviderApplyMode::Gateway => gateway_native_diff.clone(),
@@ -620,7 +642,7 @@ fn build_provider_mode_previews(
     let config_supported = config_native_diff.is_some() || official_client_config;
     let config_writes_native_config = native_preview_writes(config_native_diff);
     let gateway_writes_native_config = native_preview_writes(gateway_native_diff);
-    let gateway_supported = !is_official;
+    let gateway_supported = !is_official && !is_codex_tool;
     let config_blocked_reason = if !config_protocol_supported && !is_official {
         Some(format!(
             "Config profiles do not support {} for '{}'.",
@@ -638,7 +660,7 @@ fn build_provider_mode_previews(
         None
     };
 
-    vec![
+    let mut previews = vec![
         ProviderApplyModePreview {
             mode: ProviderApplyMode::Config,
             label: "Client config profile".to_string(),
@@ -664,7 +686,10 @@ fn build_provider_mode_previews(
                 Vec::new()
             },
         },
-        ProviderApplyModePreview {
+    ];
+
+    if !is_codex_tool {
+        previews.push(ProviderApplyModePreview {
             mode: ProviderApplyMode::Gateway,
             label: "Gateway profile".to_string(),
             description: if gateway_writes_native_config {
@@ -703,8 +728,10 @@ fn build_provider_mode_previews(
             } else {
                 Vec::new()
             },
-        },
-    ]
+        });
+    }
+
+    previews
 }
 
 pub(in crate::core::profile) fn attach_native_config_content_preview(

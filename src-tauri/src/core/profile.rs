@@ -1262,7 +1262,7 @@ fn build_profile_write_plan(
     let name = normalize_required("Profile Name", name)?;
     let app = canonical_profile_app(&normalize_token("Client", app)?);
     let provider = normalize_provider_token(provider)?;
-    let mode = normalize_profile_mode(&provider, mode)?;
+    let mode = normalize_profile_mode_for_app(&app, &provider, mode)?;
     ensure_custom_official_profile_allowed(&app, &provider, mode)?;
     let protocol = normalize_protocol(protocol)?;
     ensure_profile_protocol_supported_for_mode(&app, mode, &provider, &protocol)?;

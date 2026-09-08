@@ -29,6 +29,7 @@
   import { mergeDetectionProgressSnapshot } from "./lib/detectionProgress";
   import { REFRESH_CACHE_TTL_MS, readRefreshTimestamp, refreshTimestampFresh, writeRefreshTimestamp } from "./lib/refreshCache";
   import { applyTheme } from "./lib/theme";
+  import { APP_NAME } from "./lib/appInfo";
   import { disposeTerminalSession } from "./lib/terminalSessionStore";
   import { appBrandMarkRecipe, appBrandRecipe, appErrorBannerRecipe, appNavButtonRecipe, appNavLabelRecipe, appNavRecipe, appNavUpdateDotRecipe, appRouteTransitionRecipe, appShellRecipe, appSidebarRecipe, appWorkspaceRecipe } from "../styled-system/recipes";
   import ClaudeDesktop from "./routes/ClaudeDesktop.svelte";
@@ -39,6 +40,7 @@
   import SettingsRoute from "./routes/Settings.svelte";
   import TerminalPanel from "./routes/TerminalPanel.svelte";
   import SetupWizard from "./routes/SetupWizard.svelte";
+  import WfAssistant from "./routes/WfAssistant.svelte";
   import type {
     DetectionProgress,
     DetectionSnapshot,
@@ -51,7 +53,7 @@
     WizardPrefill
   } from "./types";
 
-  type Route = "dashboard" | "chatgptDesktop" | "claudeDesktop" | "wizard" | "profiles" | "gateway" | "settings" | "terminal";
+  type Route = "dashboard" | "chatgptDesktop" | "claudeDesktop" | "wizard" | "profiles" | "gateway" | "wfAssistant" | "settings" | "terminal";
 
   let route: Route = "dashboard";
   let dashboardLoading = true;
@@ -84,6 +86,7 @@
     { id: "claudeDesktop", labelKey: "app.nav.claudeDesktop", icon: "claudeDesktop" },
     { id: "profiles", labelKey: "app.nav.profiles", icon: "profiles" },
     { id: "gateway", labelKey: "app.nav.gateway", icon: "gateway" },
+    { id: "wfAssistant", labelKey: "app.nav.wfAssistant", icon: "rocket" },
     { id: "settings", labelKey: "app.nav.settings", icon: "settings" }
   ];
   const routeEnterTransition = { y: 22, duration: 320, opacity: 0, easing: cubicOut };
@@ -549,7 +552,7 @@
         <BrandLogo />
       </div>
       <div>
-        <strong>CodeStudio Lite</strong>
+        <strong>{APP_NAME}</strong>
       </div>
     </div>
 
@@ -612,6 +615,8 @@
             onUpstreamDeviceIdChange={updateGatewayUpstreamDeviceId}
             onCopyGatewayUrl={copyGatewayUrl}
           />
+        {:else if route === "wfAssistant"}
+          <WfAssistant />
         {:else if route === "terminal"}
           <TerminalPanel onBack={() => { route = "dashboard"; }} />
         {:else}

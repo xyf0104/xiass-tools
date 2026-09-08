@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CodeStudio Lite",
-  "version": "1.5.3",
-  "identifier": "com.codestudio.lite",
+  "productName": "XIASS Tools",
+  "version": "1.8.0",
+  "identifier": "com.xiass.tools",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://127.0.0.1:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "CodeStudio Lite",
+        "title": "XIASS Tools",
         "width": 1100,
         "height": 760,
         "center": true,
@@ -26,10 +26,8 @@
   },
   "plugins": {
     "updater": {
-      "endpoints": [
-        "https://download.codestudio.build/stable/latest.json?r={{current_version}}"
-      ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFERTAzOURDRTUzQTQxRkUKUldUK1FUcmwzRG5nclZQR3Npd3Y4MUVVNEM5anZqQTNwM0FCOEl5VlR4c2RqQk8rT0dsVFhnaWwK"
+      "endpoints": [],
+      "pubkey": ""
     }
   },
   "bundle": {
@@ -38,7 +36,7 @@
     "windows": {
       "allowDowngrades": false,
       "wix": {
-        "upgradeCode": "83dcf1cf-93d9-57d3-b567-bf98f108a380",
+        "upgradeCode": "ECF94FE4-42A4-437A-BE4A-0877FC0EDED0",
         "language": [
           "en-US"
         ]
@@ -53,11 +51,13 @@
           "English"
         ],
         "displayLanguageSelector": true,
-        "startMenuFolder": "CodeStudio Lite"
+        "startMenuFolder": "XIASS Tools"
       }
     },
     "macOS": {
       "signingIdentity": "-",
+      "bundleName": "XIASS Tools",
+      "minimumSystemVersion": "12.0",
       "infoPlist": "Info.plist",
       "dmg": {
         "windowSize": {
@@ -74,6 +74,9 @@
         }
       }
     },
+    "externalBin": [
+      "../sidecars/wf-bridge/bin/xiass-wf-bridge"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

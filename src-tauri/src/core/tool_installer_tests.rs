@@ -649,7 +649,9 @@ fn install_progress_payload_keeps_root_tool_scope() {
     assert_eq!(captured[1].exit_code, Some(0));
 }
 
-fn npm_output_with(engine_mismatches: Vec<crate::core::node_engine::EngineMismatch>) -> InstallCommandOutput {
+fn npm_output_with(
+    engine_mismatches: Vec<crate::core::node_engine::EngineMismatch>,
+) -> InstallCommandOutput {
     InstallCommandOutput {
         engine_mismatches,
         success: true,

@@ -1428,7 +1428,6 @@ fn build_plan(
             .any(|definition| action_interactive(&definition.action));
 
     ToolInstallPlan {
-
         uninstall_path_entries: Vec::new(),
         tool_id: definition.tool.id.to_string(),
         tool_name: definition.tool.name.to_string(),
@@ -1520,7 +1519,6 @@ fn build_update_plan(
     append_path_repair_steps(&mut steps, &definition.action);
 
     ToolInstallPlan {
-
         uninstall_path_entries: Vec::new(),
         tool_id: definition.tool.id.to_string(),
         tool_name: definition.tool.name.to_string(),
@@ -3878,8 +3876,10 @@ fn uninstall_command_preview_for_tool(tool_id: &str, action: &InstallAction) -> 
             .iter()
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>()
-            .join("
-");
+            .join(
+                "
+",
+            );
     }
     match action {
         InstallAction::NpmGlobal(package) => npm_global_command_preview("uninstall", package),
@@ -4078,7 +4078,10 @@ fn run_uninstall_cleanups(
 
     if request.remove_path {
         let Ok(paths) = app_paths() else {
-            notes.push("PATH cleanup was skipped because the home directory could not be resolved.".to_string());
+            notes.push(
+                "PATH cleanup was skipped because the home directory could not be resolved."
+                    .to_string(),
+            );
             return;
         };
         let overrides = cleanup::InstallerOverrides::from_env();
@@ -4210,21 +4213,37 @@ fn run_directory_uninstall(
             Err(err) => problems.push(format!("{} could not be removed: {err}", path.display())),
         }
     }
-    removed.extend(remove_tool_launchers(tool_id, &paths.home_dir, &mut problems));
+    removed.extend(remove_tool_launchers(
+        tool_id,
+        &paths.home_dir,
+        &mut problems,
+    ));
 
     for line in &removed {
-        emit_install_progress(progress, "stdout", format!("Removed {line}
-"), None, false);
+        emit_install_progress(
+            progress,
+            "stdout",
+            format!(
+                "Removed {line}
+"
+            ),
+            None,
+            false,
+        );
     }
     let success = problems.is_empty() && !removed.is_empty();
     Ok(InstallCommandOutput {
         engine_mismatches: Vec::new(),
         success,
         exit_code: Some(if success { 0 } else { 1 }),
-        stdout_tail: removed.join("
-"),
-        stderr_tail: problems.join("
-"),
+        stdout_tail: removed.join(
+            "
+",
+        ),
+        stderr_tail: problems.join(
+            "
+",
+        ),
         missing_command: None,
     })
 }
@@ -4259,11 +4278,7 @@ fn remove_tool_launchers(
         }
         let link_target = std::fs::read_link(&candidate).ok();
         let contents = std::fs::read_to_string(&candidate).ok();
-        if !cleanup::launcher_belongs_to_agent(
-            link_target.as_deref(),
-            contents.as_deref(),
-            &root,
-        ) {
+        if !cleanup::launcher_belongs_to_agent(link_target.as_deref(), contents.as_deref(), &root) {
             problems.push(format!(
                 "{} was left in place because it does not belong to this tool.",
                 candidate.display()

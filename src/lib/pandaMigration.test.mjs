@@ -206,7 +206,7 @@ test("shared panel components use Panda panel and button recipes", () => {
   assert.doesNotMatch(problemList, /class="empty-row"/);
 });
 
-test("shared button typography stays compact after the Panda migration", () => {
+test("shared liquid-glass buttons keep consistent desktop target sizes", () => {
   const pandaConfig = read("panda.config.ts");
   const appNav = recipeBlock(pandaConfig, "appNavRecipe", "appNavButtonRecipe");
   const appNavButton = recipeBlock(pandaConfig, "appNavButtonRecipe", "appNavLabelRecipe");
@@ -221,33 +221,33 @@ test("shared button typography stays compact after the Panda migration", () => {
   const profileUsageTemplateRow = recipeBlock(pandaConfig, "profileUsageTemplateRowRecipe", "profileUsageCodeFieldRecipe");
   const wizardChoiceButton = recipeBlock(pandaConfig, "wizardChoiceButtonRecipe", "wizardModeChoiceRecipe");
 
-  assert.match(appNav, /gap:\s*"8px"/);
-  assert.match(appNavButton, /minHeight:\s*"42px"/);
-  assert.match(appNavButton, /padding:\s*"0 12px"/);
+  assert.match(appNav, /gap:\s*"9px"/);
+  assert.match(appNavButton, /minHeight:\s*"46px"/);
+  assert.match(appNavButton, /padding:\s*"0 13px"/);
   assert.doesNotMatch(appNavButton, /translateX/);
   assert.match(appNavLabel, /fontSize:\s*"14px"/);
-  assert.match(actionButton, /minHeight:\s*"32px"/);
-  assert.match(actionButton, /padding:\s*"0 10px"/);
-  assert.match(actionButton, /fontSize:\s*"11px"/);
+  assert.match(actionButton, /minHeight:\s*"38px"/);
+  assert.match(actionButton, /padding:\s*"0 13px"/);
+  assert.match(actionButton, /fontSize:\s*"12px"/);
   assert.match(actionButton, /"&\[data-refresh-button='true'\]": \{[\s\S]*?fontSize:\s*"12px"/);
   assert.match(actionButton, /"&\[data-refresh-button='true'\]": \{[\s\S]*?"& svg": \{[\s\S]*?width:\s*"15px"/);
-  assert.match(actionButton, /compact:\s*\{[\s\S]*?minHeight:\s*"30px"/);
-  assert.match(actionButton, /compact:\s*\{[\s\S]*?padding:\s*"0 9px"/);
-  assert.match(actionButton, /compact:\s*\{[\s\S]*?fontSize:\s*"10.5px"/);
-  assert.match(iconButton, /width:\s*"32px"/);
-  assert.match(iconButton, /minHeight:\s*"32px"/);
-  assert.match(iconButton, /compact:\s*\{[\s\S]*?height:\s*"28px"/);
-  assert.match(iconButton, /compact:\s*\{[\s\S]*?width:\s*"28px"/);
+  assert.match(actionButton, /compact:\s*\{[\s\S]*?minHeight:\s*"34px"/);
+  assert.match(actionButton, /compact:\s*\{[\s\S]*?padding:\s*"0 11px"/);
+  assert.match(actionButton, /compact:\s*\{[\s\S]*?fontSize:\s*"11px"/);
+  assert.match(iconButton, /width:\s*"38px"/);
+  assert.match(iconButton, /minHeight:\s*"38px"/);
+  assert.match(iconButton, /compact:\s*\{[\s\S]*?height:\s*"34px"/);
+  assert.match(iconButton, /compact:\s*\{[\s\S]*?width:\s*"34px"/);
   assert.match(dashboardCardActions, /"& > button, & \[data-dashboard-overflow-menu\] button": \{[\s\S]*?minHeight:\s*"28px"/);
   assert.match(dashboardCardActions, /"& > button, & \[data-dashboard-overflow-menu\] button": \{[\s\S]*?padding:\s*"0 8px"/);
   assert.match(dashboardCardActions, /"& > button, & \[data-dashboard-overflow-menu\] button": \{[\s\S]*?fontSize:\s*"10.5px"/);
   assert.match(dashboardOverflow, /"& > summary": \{[\s\S]*?width:\s*"32px"/);
   assert.match(dashboardOverflow, /"& > summary": \{[\s\S]*?height:\s*"28px"/);
-  assert.match(desktopTabs, /"& button": \{[\s\S]*?minHeight:\s*"34px"/);
-  assert.match(desktopTabs, /"& button": \{[\s\S]*?padding:\s*"0 10px"/);
-  assert.match(desktopTabs, /"& button": \{[\s\S]*?fontSize:\s*"10.5px"/);
-  assert.match(gatewaySegmented, /"& button": \{[\s\S]*?minHeight:\s*"30px"/);
-  assert.match(gatewaySegmented, /"& button": \{[\s\S]*?fontSize:\s*"10.5px"/);
+  assert.match(desktopTabs, /"& button": \{[\s\S]*?minHeight:\s*"38px"/);
+  assert.match(desktopTabs, /"& button": \{[\s\S]*?padding:\s*"0 12px"/);
+  assert.match(desktopTabs, /"& button": \{[\s\S]*?fontSize:\s*"11px"/);
+  assert.match(gatewaySegmented, /"& button": \{[\s\S]*?minHeight:\s*"38px"/);
+  assert.match(gatewaySegmented, /"& button": \{[\s\S]*?fontSize:\s*"11px"/);
   assert.match(profileToolTabs, /"& > button": \{[\s\S]*?minWidth:\s*"136px"/);
   assert.match(profileToolTabs, /"& > button": \{[\s\S]*?minHeight:\s*"46px"/);
   assert.match(profileToolTabs, /"& > button": \{[\s\S]*?padding:\s*"7px 9px"/);
@@ -255,10 +255,10 @@ test("shared button typography stays compact after the Panda migration", () => {
   assert.match(profileUsageTemplateRow, /"& button": \{[\s\S]*?minHeight:\s*"30px"/);
   assert.match(profileUsageTemplateRow, /"& button": \{[\s\S]*?padding:\s*"0 10px"/);
   assert.match(profileUsageTemplateRow, /"& button": \{[\s\S]*?fontSize:\s*"11px"/);
-  assert.match(wizardChoiceButton, /minHeight:\s*"44px"/);
-  assert.match(wizardChoiceButton, /fontSize:\s*"11px"/);
-  assert.match(wizardChoiceButton, /kind:\s*\{[\s\S]*?tool:\s*\{[\s\S]*?minHeight:\s*"78px"/);
-  assert.match(wizardChoiceButton, /kind:\s*\{[\s\S]*?tool:\s*\{[\s\S]*?padding:\s*"12px 10px 10px"/);
+  assert.match(wizardChoiceButton, /minHeight:\s*"46px"/);
+  assert.match(wizardChoiceButton, /fontSize:\s*"12px"/);
+  assert.match(wizardChoiceButton, /kind:\s*\{[\s\S]*?tool:\s*\{[\s\S]*?minHeight:\s*"86px"/);
+  assert.match(wizardChoiceButton, /kind:\s*\{[\s\S]*?tool:\s*\{[\s\S]*?padding:\s*"14px 11px 12px"/);
 });
 
 test("non-button typography is unchanged by compact button sizing", () => {
@@ -482,8 +482,8 @@ test("desktop client recipes keep panel content comfortably inset and controls c
   const doctorList = recipeBlock(pandaConfig, "doctorListRecipe", "doctorRowRecipe");
 
   assert.match(tabs, /gap:\s*"var\(--space-sm\)"/);
-  assert.match(tabs, /minHeight:\s*"34px"/);
-  assert.match(tabs, /padding:\s*"0 10px"/);
+  assert.match(tabs, /minHeight:\s*"38px"/);
+  assert.match(tabs, /padding:\s*"0 12px"/);
 
   assert.match(metrics, /gap:\s*"var\(--space-md\)"/);
   assert.match(metrics, /padding:\s*"var\(--space-lg\)"/);

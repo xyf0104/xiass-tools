@@ -30,7 +30,10 @@ function initialLocale(): Locale {
     return fallbackLocale;
   }
 
-  return normalizeLocale(localStorage.getItem("codestudio-lite-language"));
+  return normalizeLocale(
+    localStorage.getItem("xiass-tools-language") ??
+      localStorage.getItem("codestudio-lite-language")
+  );
 }
 
 function interpolate(template: string, values?: Record<string, string | number>): string {
@@ -58,6 +61,6 @@ export const t = derived([locale, chatgptDesktopGeneration], ([$locale, $generat
 export function setLocale(nextLocale: Locale) {
   locale.set(nextLocale);
   if (typeof localStorage !== "undefined") {
-    localStorage.setItem("codestudio-lite-language", nextLocale);
+    localStorage.setItem("xiass-tools-language", nextLocale);
   }
 }

@@ -14,10 +14,10 @@ const installerWindowSourcePath = `${burnDirectory}/InstallerWindow.xaml.cs`;
 const buildScriptPath = `${burnDirectory}/build-burn.ps1`;
 const verifyScriptPath = `${burnDirectory}/verify-burn.ps1`;
 
-test("Windows installers keep stable upgrade identity and reject downgrades", () => {
-  assert.equal(config.identifier, "com.codestudio.lite");
+test("Windows installers use the XIASS upgrade identity and reject downgrades", () => {
+  assert.equal(config.identifier, "com.xiass.tools");
   assert.equal(config.bundle.windows.allowDowngrades, false);
-  assert.equal(config.bundle.windows.wix.upgradeCode, "83dcf1cf-93d9-57d3-b567-bf98f108a380");
+  assert.equal(config.bundle.windows.wix.upgradeCode, "ECF94FE4-42A4-437A-BE4A-0877FC0EDED0");
   assert.deepEqual(config.bundle.windows.wix.language, ["en-US"]);
   assert.equal(config.bundle.windows.nsis.installMode, "currentUser");
 });
@@ -28,7 +28,7 @@ test("NSIS uses branded icons and a Chinese-English language selector", () => {
   assert.ok(fs.statSync("src-tauri/icons/icon.ico").size > 0);
   assert.deepEqual(config.bundle.windows.nsis.languages, ["SimpChinese", "TradChinese", "English"]);
   assert.equal(config.bundle.windows.nsis.displayLanguageSelector, true);
-  assert.equal(config.bundle.windows.nsis.startMenuFolder, "CodeStudio Lite");
+  assert.equal(config.bundle.windows.nsis.startMenuFolder, "XIASS Tools");
 });
 
 test("Burn bundle embeds one base MSI without language transforms", () => {

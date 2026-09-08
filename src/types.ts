@@ -509,6 +509,8 @@ export interface SaveProfileDraftRequest {
   baseUrl: string;
   secretProvided: boolean;
   apiKey?: string | null;
+  webSearch?: "live" | "cached" | "disabled" | null;
+  imageModel?: string | null;
 }
 
 export interface UpdateProfileDraftRequest {
@@ -524,6 +526,8 @@ export interface UpdateProfileDraftRequest {
   modelMappings?: ProfileModelMapping[] | null;
   baseUrl: string;
   apiKey?: string | null;
+  webSearch?: "live" | "cached" | "disabled" | null;
+  imageModel?: string | null;
 }
 
 export interface DuplicateProfileDraftRequest {
@@ -554,6 +558,8 @@ export interface PreviewProfileWriteRequest {
   baseUrl: string;
   secretProvided: boolean;
   apiKey?: string | null;
+  webSearch?: "live" | "cached" | "disabled" | null;
+  imageModel?: string | null;
 }
 
 export interface ProfileWritePreviewItem {

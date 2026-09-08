@@ -36,9 +36,9 @@ test("launchpad and API profile navigation copy is localized consistently", () =
   assert.match(enUS, /"profiles\.duplicateProfile": "Duplicate API profile"/);
   assert.match(enUS, /"profiles\.deleteProfile": "Delete API profile"/);
   assert.match(enUS, /"profiles\.providerModeTitle": "Configuration type"/);
-  assert.match(enUS, /"profiles\.mode\.config": "Direct configuration"/);
+  assert.match(enUS, /"profiles\.mode\.config": "API Key \/ Config file"/);
   assert.match(enUS, /"profiles\.mode\.gateway": "Gateway configuration"/);
-  assert.match(enUS, /"profiles\.applyConfigMode": "Apply direct configuration"/);
+  assert.match(enUS, /"profiles\.applyConfigMode": "Apply API Key config"/);
   assert.match(enUS, /"profiles\.applyGatewayMode": "Apply gateway configuration"/);
   assert.match(enUS, /"profiles\.warning\.gatewayWritesClaude": "Gateway configurations write Claude Code settings to the tool-scoped local gateway URL\."/);
   assert.match(enUS, /"profiles\.warning\.configAdapterMissing": "Direct configuration adapter is not implemented for \{app\}\."/);

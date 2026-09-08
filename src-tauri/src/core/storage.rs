@@ -115,6 +115,8 @@ fn load_profiles_with_conn(conn: &Connection) -> Result<Vec<ProfileDraft>, Strin
                     provider: row.get(6)?,
                     protocol: row.get(7)?,
                     model: row.get(8)?,
+                    web_search: None,
+                    image_model: None,
                     review_model: row.get(9)?,
                     model_mappings: Vec::new(),
                     base_url: row.get(11)?,

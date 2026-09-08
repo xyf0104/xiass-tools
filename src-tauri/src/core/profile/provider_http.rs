@@ -149,7 +149,7 @@ pub fn list_profile_models(
                 .to_string(),
         );
     }
-    let mode = normalize_profile_mode(&provider, request.mode.as_ref())?;
+    let mode = normalize_profile_mode_for_app(&app, &provider, request.mode.as_ref())?;
     let protocol = normalize_protocol(request.protocol.as_deref())?;
     ensure_profile_protocol_supported_for_mode(&app, mode, &provider, &protocol)?;
     let base_url = validate_base_url_for_provider(&provider, &request.base_url)?;

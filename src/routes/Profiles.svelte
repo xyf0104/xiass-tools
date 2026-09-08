@@ -16,6 +16,7 @@
     OFFICIAL_PROFILE_NAME_KEYS,
     PROFILE_PROTOCOL_OPTIONS,
     PROFILE_TOOL_LABELS,
+    profileRequiresApiKeyConfig,
     profileSupportsModelMappings as catalogSupportsModelMappings
   } from "../lib/profiles/catalog";
   import {
@@ -688,9 +689,10 @@
   }
 
   function createProfileForCurrentTool() {
+    const selectedTool = selectedProfileGroup?.id ?? undefined;
     onCreateProfile({
-      mode: normalizedModeFilter,
-      toolId: selectedProfileGroup?.id ?? undefined,
+      mode: selectedTool && profileRequiresApiKeyConfig(selectedTool) ? "config" : normalizedModeFilter,
+      toolId: selectedTool,
       toolName: selectedProfileGroup?.label ?? undefined
     });
   }
@@ -1075,6 +1077,9 @@
   }
 
   function errorLabel(message: string) {
+    if (message === "Codex uses API Key / config file mode in XIASS Tools and cannot use Local Gateway mode.") {
+      return $t("wizard.error.codexConfigOnly");
+    }
     if (message === "Profile Name is required" || message === "Configuration name is required") {
       return $t("wizard.error.profileNameRequired");
     }

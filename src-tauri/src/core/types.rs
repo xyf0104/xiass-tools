@@ -555,6 +555,10 @@ pub struct ProfileDraft {
     pub protocol: String,
     pub model: String,
     #[serde(default)]
+    pub web_search: Option<String>,
+    #[serde(default)]
+    pub image_model: Option<String>,
+    #[serde(default)]
     pub review_model: Option<String>,
     #[serde(default)]
     pub model_mappings: Vec<ProfileModelMapping>,
@@ -701,6 +705,10 @@ pub struct SaveProfileDraftRequest {
     pub secret_provided: bool,
     #[serde(default)]
     pub api_key: Option<String>,
+    #[serde(default)]
+    pub web_search: Option<String>,
+    #[serde(default)]
+    pub image_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -725,6 +733,8 @@ pub struct UpdateProfileDraftRequest {
     pub base_url: String,
     #[serde(default)]
     pub api_key: Option<String>,
+    #[serde(default)] pub web_search: Option<String>,
+    #[serde(default)] pub image_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -770,6 +780,8 @@ pub struct PreviewProfileWriteRequest {
     pub secret_provided: bool,
     #[serde(default)]
     pub api_key: Option<String>,
+    #[serde(default)] pub web_search: Option<String>,
+    #[serde(default)] pub image_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

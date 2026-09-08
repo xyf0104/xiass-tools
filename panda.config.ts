@@ -38,11 +38,11 @@ export default defineConfig({
           description: "Application shell grid.",
           base: {
             display: "grid",
-            gridTemplateColumns: "244px minmax(0, 1fr)",
+            gridTemplateColumns: "262px minmax(0, 1fr)",
             height: "100vh",
             minHeight: 0,
             overflow: "hidden",
-            background: "var(--bg)",
+            background: "transparent",
             "@media (max-width: 900px)": {
               gridTemplateColumns: "1fr",
               gridTemplateRows: "auto minmax(0, 1fr)"
@@ -56,19 +56,24 @@ export default defineConfig({
             display: "flex",
             flexDirection: "column",
             minHeight: 0,
-            height: "100vh",
+            height: "calc(100vh - 28px)",
             overflow: "hidden",
-            borderRight: "1px solid var(--border)",
+            margin: "14px 0 14px 14px",
+            border: "1px solid var(--border)",
+            borderRadius: "26px",
             padding: "18px 12px 12px",
-            background: "var(--sidebar-bg)",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 27%), var(--sidebar-bg)",
             color: "var(--text)",
+            boxShadow: "var(--glass-panel-shadow)",
+            backdropFilter: "blur(26px) saturate(145%)",
             "@media (max-width: 900px)": {
               position: "relative",
               zIndex: 2,
               height: "auto",
               maxHeight: "none",
-              borderRight: 0,
-              borderBottom: "1px solid var(--border)",
+              margin: "10px 10px 0",
+              border: "1px solid var(--border)",
               padding: "10px 10px 8px"
             }
           }
@@ -78,17 +83,17 @@ export default defineConfig({
           description: "Application brand block.",
           base: {
             display: "grid",
-            gridTemplateColumns: "34px minmax(0, 1fr)",
+            gridTemplateColumns: "44px minmax(0, 1fr)",
             alignItems: "center",
-            gap: "10px",
-            padding: "0 8px 18px",
+            gap: "12px",
+            padding: "0 8px 20px",
             "& strong": {
               display: "block",
               minWidth: 0,
               overflow: "hidden",
               color: "var(--text)",
-              fontSize: "15px",
-              fontWeight: "700",
+              fontSize: "16px",
+              fontWeight: "760",
               lineHeight: "1.2",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap"
@@ -104,11 +109,14 @@ export default defineConfig({
           base: {
             display: "grid",
             placeItems: "center",
-            width: "34px",
-            height: "34px",
-            borderRadius: "7px",
-            background: "transparent",
+            width: "44px",
+            height: "44px",
+            border: "1px solid var(--border)",
+            borderRadius: "15px",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 36%), var(--brand-icon-bg)",
             color: "var(--brand-icon-ink)",
+            boxShadow: "var(--glass-control-shadow)",
             "& .brand-logo": {
               display: "block",
               width: "100%",
@@ -121,7 +129,7 @@ export default defineConfig({
           description: "Application sidebar navigation list.",
           base: {
             display: "grid",
-            gap: "8px",
+            gap: "9px",
             minHeight: 0,
             overflow: "auto",
             padding: "6px 0",
@@ -140,38 +148,40 @@ export default defineConfig({
             alignItems: "center",
             gap: "12px",
             width: "100%",
-            minHeight: "42px",
-            borderRadius: "7px",
-            padding: "0 12px",
-            background: "transparent",
+            minHeight: "46px",
+            border: "1px solid var(--glass-control-border)",
+            borderRadius: "15px",
+            padding: "0 13px",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 34%), var(--glass-control-bg)",
             color: "var(--nav-icon)",
             textAlign: "left",
-            transition: "background var(--motion-quick), color var(--motion-quick)",
+            boxShadow: "var(--glass-control-shadow)",
+            transition:
+              "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)",
             "&::before": {
-              position: "absolute",
-              inset: "8px 6px 8px auto",
-              width: "3px",
-              borderRadius: "999px",
-              background: "var(--accent)",
-              content: "\"\"",
-              opacity: 0,
-              transform: "scaleY(0.3)",
-              transition: "opacity var(--motion-quick), transform var(--motion-spring)"
+              display: "none"
             },
             _hover: {
-              background: "var(--surface-soft)",
-              color: "var(--nav-icon-hover)"
+              borderColor: "var(--border-strong)",
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 34%), var(--glass-control-hover)",
+              color: "var(--nav-icon-hover)",
+              transform: "translateY(-1px)",
+              boxShadow:
+                "inset 0 1px 0 var(--glass-highlight), 0 12px 28px color-mix(in srgb, var(--modal-shadow) 34%, transparent)"
             },
             "&[data-active='true']": {
-              background: "var(--surface-hover)",
-              color: "var(--nav-icon-hover)"
-            },
-            "&[data-active='true']::before": {
-              opacity: 1,
-              transform: "scaleY(1)"
+              borderColor: "color-mix(in srgb, var(--accent-strong) 48%, var(--border))",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.13), transparent 38%), color-mix(in srgb, var(--accent) 24%, var(--glass-control-active))",
+              color: "var(--accent-strong)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.13), 0 12px 30px color-mix(in srgb, var(--accent) 18%, transparent)"
             },
             "&[data-active='true'] svg": {
-              color: "var(--nav-icon-hover)"
+              color: "var(--accent-strong)",
+              filter: "drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 54%, transparent))"
             },
             "@media (max-width: 900px)": {
               justifyContent: "center",
@@ -238,9 +248,9 @@ export default defineConfig({
             minHeight: 0,
             height: "100vh",
             overflow: "auto",
-            borderLeft: "1px solid var(--workspace-border)",
-            background: "var(--bg)",
-            padding: "var(--space-xl) var(--space-xl) 32px",
+            borderLeft: 0,
+            background: "transparent",
+            padding: "14px 18px 28px",
             "@media (max-width: 900px)": {
               height: "auto",
               padding: "14px"
@@ -405,17 +415,17 @@ export default defineConfig({
             display: "grid",
             gap: "var(--space-lg)",
             width: "100%",
-            maxWidth: "1120px",
+            maxWidth: "1480px",
             minWidth: 0
           },
           variants: {
             width: {
               default: {},
               desktopClient: {
-                maxWidth: "1120px"
+                maxWidth: "1320px"
               },
               full: {
-                maxWidth: "1120px"
+                maxWidth: "none"
               }
             }
           },
@@ -429,14 +439,17 @@ export default defineConfig({
           base: {
             position: "relative",
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "space-between",
             gap: "var(--space-lg)",
             minWidth: 0,
             overflow: "hidden",
             border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            background: "var(--surface)",
+            borderRadius: "24px",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 28%), var(--surface)",
+            boxShadow: "var(--glass-panel-shadow)",
+            backdropFilter: "blur(24px) saturate(145%)",
             padding: "var(--space-xl) var(--space-xl) 20px",
             transition:
               "border-color var(--motion-quick), background var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)",
@@ -526,7 +539,10 @@ export default defineConfig({
             minWidth: 0,
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
-            background: "var(--surface)",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 24%), var(--surface)",
+            boxShadow: "var(--glass-panel-shadow)",
+            backdropFilter: "blur(24px) saturate(145%)",
             transition:
               "border-color var(--motion-quick), background var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)"
           }
@@ -570,15 +586,17 @@ export default defineConfig({
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "6px",
-            minHeight: "32px",
-            border: "1px solid transparent",
-            borderRadius: "7px",
-            padding: "0 10px",
-            fontSize: "11px",
-            fontWeight: "700",
+            gap: "7px",
+            minHeight: "38px",
+            border: "1px solid var(--glass-control-border)",
+            borderRadius: "var(--control-radius)",
+            padding: "0 13px",
+            fontSize: "12px",
+            fontWeight: "720",
             lineHeight: "1.2",
             whiteSpace: "nowrap",
+            boxShadow: "var(--glass-control-shadow)",
+            backdropFilter: "blur(16px) saturate(145%)",
             "& svg": {
               width: "17px",
               height: "17px"
@@ -601,24 +619,33 @@ export default defineConfig({
           variants: {
             tone: {
               primary: {
-                borderColor: "color-mix(in srgb, var(--accent) 52%, transparent)",
-                background: "var(--accent)",
-                color: "var(--accent-ink)",
+                borderColor: "color-mix(in srgb, var(--accent-strong) 66%, transparent)",
+                background:
+                  "linear-gradient(145deg, var(--glass-highlight), transparent 42%), var(--glass-control-active)",
+                color: "var(--text)",
+                boxShadow:
+                  "inset 0 1px 0 rgba(255,255,255,0.24), var(--accent-glow)",
                 _hover: {
-                  background: "var(--accent-hover)",
-                  transform: "translateY(-1px)",
-                  boxShadow: "0 8px 18px color-mix(in srgb, var(--accent) 18%, transparent)"
+                  borderColor: "color-mix(in srgb, var(--accent-strong) 78%, transparent)",
+                  background:
+                    "linear-gradient(145deg, var(--glass-highlight), transparent 42%), var(--glass-control-hover)",
+                  transform: "translateY(-2px)",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.28), 0 16px 34px color-mix(in srgb, var(--accent) 38%, transparent)"
                 }
               },
               secondary: {
-                borderColor: "var(--border)",
-                background: "var(--surface-soft)",
+                borderColor: "var(--glass-control-border)",
+                background:
+                  "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-bg)",
                 color: "var(--text)",
                 _hover: {
                   borderColor: "var(--border-strong)",
-                  background: "var(--surface-hover)",
-                  transform: "translateY(-1px)",
-                  boxShadow: "0 8px 18px color-mix(in srgb, var(--modal-shadow) 18%, transparent)"
+                  background:
+                    "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-hover)",
+                  transform: "translateY(-2px)",
+                  boxShadow:
+                    "inset 0 1px 0 var(--glass-highlight), 0 14px 30px color-mix(in srgb, var(--modal-shadow) 34%, transparent)"
                 }
               }
             },
@@ -627,9 +654,9 @@ export default defineConfig({
                 width: "auto",
                 minWidth: 0,
                 height: "auto",
-                minHeight: "30px",
-                padding: "0 9px",
-                fontSize: "10.5px",
+                minHeight: "34px",
+                padding: "0 11px",
+                fontSize: "11px",
                 lineHeight: "1.25"
               }
             }
@@ -646,20 +673,26 @@ export default defineConfig({
             alignItems: "center",
             justifyContent: "center",
             gap: "7px",
-            width: "32px",
-            minHeight: "32px",
-            border: "1px solid transparent",
-            borderRadius: "7px",
-            background: "var(--surface-soft)",
+            width: "38px",
+            minHeight: "38px",
+            border: "1px solid var(--glass-control-border)",
+            borderRadius: "var(--control-radius)",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-bg)",
             color: "var(--text-soft)",
+            boxShadow: "var(--glass-control-shadow)",
+            backdropFilter: "blur(16px) saturate(145%)",
             whiteSpace: "nowrap",
             transition:
               "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), opacity var(--motion-quick), transform var(--motion-smooth), box-shadow var(--motion-smooth)",
             _hover: {
               borderColor: "var(--border-strong)",
-              background: "var(--surface-hover)",
-              transform: "translateY(-1px)",
-              boxShadow: "0 8px 18px color-mix(in srgb, var(--modal-shadow) 18%, transparent)"
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-hover)",
+              color: "var(--text)",
+              transform: "translateY(-2px)",
+              boxShadow:
+                "inset 0 1px 0 var(--glass-highlight), 0 14px 30px color-mix(in srgb, var(--modal-shadow) 34%, transparent)"
             },
             _disabled: {
               cursor: "not-allowed",
@@ -674,9 +707,9 @@ export default defineConfig({
             },
             compact: {
               true: {
-                width: "28px",
-                height: "28px",
-                minHeight: "28px",
+                width: "34px",
+                height: "34px",
+                minHeight: "34px",
                 padding: 0
               }
             }
@@ -1107,7 +1140,7 @@ export default defineConfig({
             alignSelf: "end",
             alignItems: "center",
             justifyContent: "flex-end",
-            flexFlow: "row nowrap",
+            flexFlow: "row wrap",
             position: "relative",
             gap: "6px",
             gridColumn: "2",
@@ -1897,24 +1930,33 @@ export default defineConfig({
             minWidth: 0,
             "& button": {
               minWidth: 0,
-              minHeight: "30px",
-              border: "1px solid var(--border)",
-              borderRadius: "7px",
-              background: "var(--surface-strong)",
+              minHeight: "38px",
+              border: "1px solid var(--glass-control-border)",
+              borderRadius: "13px",
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-bg)",
               color: "var(--text-soft)",
-              fontSize: "10.5px",
-              fontWeight: "800",
-              transition: "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick)"
+              fontSize: "11px",
+              fontWeight: "760",
+              boxShadow: "var(--glass-control-shadow)",
+              backdropFilter: "blur(16px) saturate(145%)",
+              transition:
+                "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)"
             },
             "& button:hover:not(:disabled)": {
               borderColor: "var(--border-strong)",
-              background: "var(--surface-hover)",
-              color: "var(--text)"
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-hover)",
+              color: "var(--text)",
+              transform: "translateY(-1px)"
             },
             "& button[data-selected='true']": {
-              borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)",
-              background: "color-mix(in srgb, var(--accent) 10%, var(--surface-strong))",
-              color: "var(--accent)"
+              borderColor: "color-mix(in srgb, var(--accent-strong) 52%, var(--border))",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.14), transparent 38%), color-mix(in srgb, var(--accent) 22%, var(--glass-control-active))",
+              color: "var(--accent-strong)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.14), 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent)"
             },
             "@media (max-width: 860px)": {
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))"
@@ -2330,26 +2372,34 @@ export default defineConfig({
               alignItems: "center",
               justifyContent: "center",
               gap: "6px",
-              minHeight: "34px",
-              border: "1px solid var(--border)",
-              borderRadius: "8px",
-              background: "var(--surface-strong)",
+              minHeight: "38px",
+              border: "1px solid var(--glass-control-border)",
+              borderRadius: "13px",
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-bg)",
               color: "var(--text-soft)",
-              padding: "0 10px",
-              fontSize: "10.5px",
-              fontWeight: "800",
+              padding: "0 12px",
+              fontSize: "11px",
+              fontWeight: "760",
+              boxShadow: "var(--glass-control-shadow)",
+              backdropFilter: "blur(16px) saturate(145%)",
               transition:
-                "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick)",
+                "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)",
               _hover: {
                 borderColor: "var(--border-strong)",
-                background: "var(--surface-hover)",
-                color: "var(--text)"
+                background:
+                  "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-hover)",
+                color: "var(--text)",
+                transform: "translateY(-1px)"
               }
             },
             "& button[data-selected='true']": {
-              borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)",
-              background: "color-mix(in srgb, var(--accent) 10%, var(--surface-strong))",
-              color: "var(--accent)"
+              borderColor: "color-mix(in srgb, var(--accent-strong) 52%, var(--border))",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.14), transparent 38%), color-mix(in srgb, var(--accent) 22%, var(--glass-control-active))",
+              color: "var(--accent-strong)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.14), 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent)"
             }
           }
         },
@@ -2730,32 +2780,36 @@ export default defineConfig({
           base: {
             display: "grid",
             gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            gap: "3px",
-            width: "220px",
+            gap: "5px",
+            width: "260px",
             maxWidth: "100%",
             minWidth: 0,
-            padding: "3px",
+            padding: "5px",
             border: "1px solid var(--border)",
-            borderRadius: "8px",
-            background: "var(--surface-strong)",
+            borderRadius: "17px",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 34%), var(--surface-strong)",
+            boxShadow: "var(--glass-control-shadow)",
+            backdropFilter: "blur(18px) saturate(145%)",
             "& button": {
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
               minWidth: 0,
-              minHeight: "30px",
-              border: 0,
-              borderRadius: "6px",
-              background: "transparent",
+              minHeight: "36px",
+              border: "1px solid transparent",
+              borderRadius: "12px",
+              background: "color-mix(in srgb, var(--glass-control-bg) 62%, transparent)",
               color: "var(--text-soft)",
               padding: "0 10px",
-              fontSize: "11px",
-              fontWeight: "800",
+              fontSize: "11.5px",
+              fontWeight: "760",
               whiteSpace: "nowrap",
               transition:
                 "background var(--motion-quick), color var(--motion-quick), box-shadow var(--motion-quick)",
               _hover: {
-                background: "var(--surface-hover)",
+                borderColor: "var(--glass-control-border)",
+                background: "var(--glass-control-hover)",
                 color: "var(--text)"
               },
               _focusVisible: {
@@ -2764,9 +2818,12 @@ export default defineConfig({
               }
             },
             "& button[data-selected='true']": {
-              background: "var(--surface)",
-              color: "var(--accent)",
-              boxShadow: "0 1px 3px color-mix(in srgb, var(--modal-shadow) 20%, transparent)"
+              borderColor: "color-mix(in srgb, var(--accent-strong) 48%, var(--border))",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.14), transparent 40%), color-mix(in srgb, var(--accent) 22%, var(--glass-control-active))",
+              color: "var(--accent-strong)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.14), 0 10px 24px color-mix(in srgb, var(--accent) 18%, transparent)"
             },
             "@media (max-width: 860px)": {
               width: "100%"
@@ -2783,8 +2840,11 @@ export default defineConfig({
             overflow: "visible",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
-            background: "var(--surface)",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 26%), var(--surface)",
             padding: "10px 8px 12px",
+            boxShadow: "var(--glass-panel-shadow)",
+            backdropFilter: "blur(22px) saturate(145%)",
             transition:
               "border-color var(--motion-quick), background var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)"
           }
@@ -2809,9 +2869,10 @@ export default defineConfig({
               minWidth: "136px",
               maxWidth: "196px",
               minHeight: "46px",
-              border: "1px solid var(--border)",
-              borderRadius: "7px",
-              background: "var(--surface-strong)",
+              border: "1px solid var(--glass-control-border)",
+              borderRadius: "15px",
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-bg)",
               color: "var(--text-soft)",
               padding: "7px 9px",
               textAlign: "left",
@@ -2823,7 +2884,8 @@ export default defineConfig({
               willChange: "transform, box-shadow",
               _hover: {
                 borderColor: "var(--border-strong)",
-                background: "var(--surface-hover)",
+                background:
+                  "linear-gradient(145deg, var(--glass-highlight), transparent 38%), var(--glass-control-hover)",
                 color: "var(--text)",
                 transform: "translateY(-2px) scale(1.012)",
                 boxShadow: "0 10px 24px color-mix(in srgb, var(--modal-shadow) 26%, transparent)"
@@ -2848,9 +2910,10 @@ export default defineConfig({
               "--surface-index": "6"
             },
             "& > button[data-selected='true']": {
-              borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)",
-              background: "color-mix(in srgb, var(--accent) 10%, var(--surface-strong))",
-              color: "var(--text)",
+              borderColor: "color-mix(in srgb, var(--accent-strong) 52%, var(--border))",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.14), transparent 38%), color-mix(in srgb, var(--accent) 22%, var(--glass-control-active))",
+              color: "var(--accent-strong)",
               boxShadow:
                 "0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent), 0 10px 24px color-mix(in srgb, var(--modal-shadow) 18%, transparent)"
             },
@@ -3617,8 +3680,11 @@ export default defineConfig({
             overflow: "visible",
             border: "1px solid var(--border)",
             borderRadius: "var(--radius)",
-            background: "var(--surface)",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 24%), var(--surface)",
             padding: "18px",
+            boxShadow: "var(--glass-panel-shadow)",
+            backdropFilter: "blur(24px) saturate(145%)",
             transition:
               "border-color var(--motion-quick), background var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)"
           }
@@ -3682,22 +3748,27 @@ export default defineConfig({
             justifyContent: "center",
             flexWrap: "wrap",
             gap: "8px",
-            minHeight: "44px",
-            border: "1px solid var(--border)",
-            borderRadius: "7px",
-            background: "var(--surface-strong)",
+            minHeight: "46px",
+            border: "1px solid var(--glass-control-border)",
+            borderRadius: "16px",
+            background:
+              "linear-gradient(145deg, var(--glass-highlight), transparent 36%), var(--glass-control-bg)",
             color: "var(--text-soft)",
-            fontSize: "11px",
-            fontWeight: "700",
+            fontSize: "12px",
+            fontWeight: "720",
+            boxShadow: "var(--glass-control-shadow)",
+            backdropFilter: "blur(16px) saturate(145%)",
             transition:
               "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), opacity var(--motion-quick), transform var(--motion-spring), box-shadow var(--motion-smooth)",
             willChange: "transform, box-shadow",
             _hover: {
               borderColor: "var(--border-strong)",
-              background: "var(--surface-hover)",
+              background:
+                "linear-gradient(145deg, var(--glass-highlight), transparent 36%), var(--glass-control-hover)",
               color: "var(--text)",
-              transform: "translateY(-3px) scale(1.008)",
-              boxShadow: "0 14px 30px color-mix(in srgb, var(--modal-shadow) 24%, transparent)"
+              transform: "translateY(-2px) scale(1.006)",
+              boxShadow:
+                "inset 0 1px 0 var(--glass-highlight), 0 15px 32px color-mix(in srgb, var(--modal-shadow) 35%, transparent)"
             },
             _disabled: {
               cursor: "not-allowed",
@@ -3711,10 +3782,12 @@ export default defineConfig({
               textAlign: "center"
             },
             "&[data-selected='true']": {
-              borderColor: "color-mix(in srgb, var(--accent) 44%, transparent)",
-              background: "color-mix(in srgb, var(--accent) 12%, var(--surface-strong))",
-              color: "var(--accent)",
-              boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent)"
+              borderColor: "color-mix(in srgb, var(--accent-strong) 54%, var(--border))",
+              background:
+                "linear-gradient(145deg, rgba(255,255,255,0.14), transparent 38%), color-mix(in srgb, var(--accent) 23%, var(--glass-control-active))",
+              color: "var(--accent-strong)",
+              boxShadow:
+                "inset 0 1px 0 rgba(255,255,255,0.14), 0 14px 30px color-mix(in srgb, var(--accent) 20%, transparent)"
             },
             "@media (prefers-reduced-motion: reduce)": {
               animation: "none",
@@ -3733,8 +3806,8 @@ export default defineConfig({
                 placeItems: "center",
                 alignContent: "center",
                 gap: "6px",
-                minHeight: "78px",
-                padding: "12px 10px 10px",
+                minHeight: "86px",
+                padding: "14px 11px 12px",
                 textAlign: "center",
                 animation: "surface-rise 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards",
                 animationDelay: "calc(min(var(--surface-index, 0), 8) * 28ms)",

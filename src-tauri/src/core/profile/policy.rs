@@ -162,22 +162,31 @@ pub(in crate::core::profile) fn ensure_custom_official_profile_allowed(
     }
 }
 
-pub(in crate::core::profile) fn default_profile_mode(provider: &str) -> ProviderApplyMode {
-    if provider_is_official(provider) {
+pub(in crate::core::profile) fn default_profile_mode_for_app(
+    app: &str,
+    provider: &str,
+) -> ProviderApplyMode {
+    if is_codex_family_app(app) || provider_is_official(provider) {
         ProviderApplyMode::Config
     } else {
         ProviderApplyMode::Gateway
     }
 }
 
-pub(in crate::core::profile) fn normalize_profile_mode(
+pub(in crate::core::profile) fn normalize_profile_mode_for_app(
+    app: &str,
     provider: &str,
     requested: Option<&ProviderApplyMode>,
 ) -> Result<ProviderApplyMode, String> {
     let mode = requested
         .cloned()
-        .unwrap_or_else(|| default_profile_mode(provider));
-    if provider_is_official(provider) && mode == ProviderApplyMode::Gateway {
+        .unwrap_or_else(|| default_profile_mode_for_app(app, provider));
+    if is_codex_family_app(app) && mode == ProviderApplyMode::Gateway {
+        Err(
+            "Codex uses API Key / config file mode in XIASS Tools and cannot use Local Gateway mode."
+                .to_string(),
+        )
+    } else if provider_is_official(provider) && mode == ProviderApplyMode::Gateway {
         Err(
             "Official provider uses the client login directly and cannot use Gateway profiles."
                 .to_string(),
@@ -187,14 +196,18 @@ pub(in crate::core::profile) fn normalize_profile_mode(
     }
 }
 
-pub(in crate::core::profile) fn normalize_stored_profile_mode(
+pub(in crate::core::profile) fn normalize_stored_profile_mode_for_app(
+    app: &str,
     provider: &str,
     value: Option<String>,
 ) -> ProviderApplyMode {
+    if is_codex_family_app(app) {
+        return ProviderApplyMode::Config;
+    }
     let mode = match value.as_deref().map(str::trim) {
         Some("config") => ProviderApplyMode::Config,
         Some("gateway") => ProviderApplyMode::Gateway,
-        _ => default_profile_mode(provider),
+        _ => default_profile_mode_for_app(app, provider),
     };
     if provider_is_official(provider) && mode == ProviderApplyMode::Gateway {
         ProviderApplyMode::Config

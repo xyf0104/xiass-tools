@@ -139,17 +139,17 @@ test("profile-management switch copy is localized and Gateway copy describes run
   const zhTW = read("src/lib/locales/zh-TW.ts");
 
   assert.match(enUS, /"profiles\.viewSwitcherLabel": "Switch profile type"/);
-  assert.match(enUS, /"profiles\.view\.config": "Direct configuration"/);
+  assert.match(enUS, /"profiles\.view\.config": "API Key \/ Config file"/);
   assert.match(enUS, /"profiles\.view\.gateway": "Gateway configuration"/);
   assert.match(enUS, /"gateway\.subtitle": "Manage gateway runtime, privacy filtering, and request logs\."/);
 
   assert.match(zhCN, /"profiles\.viewSwitcherLabel": "切换接入配置类型"/);
-  assert.match(zhCN, /"profiles\.view\.config": "直连配置"/);
+  assert.match(zhCN, /"profiles\.view\.config": "API Key \/ 配置文件"/);
   assert.match(zhCN, /"profiles\.view\.gateway": "网关配置"/);
   assert.match(zhCN, /"gateway\.subtitle": "管理网关运行状态、隐私过滤和请求日志。"/);
 
   assert.match(zhTW, /"profiles\.viewSwitcherLabel": "切換串接設定類型"/);
-  assert.match(zhTW, /"profiles\.view\.config": "直連設定"/);
+  assert.match(zhTW, /"profiles\.view\.config": "API Key \/ 設定檔"/);
   assert.match(zhTW, /"profiles\.view\.gateway": "閘道設定"/);
   assert.match(zhTW, /"gateway\.subtitle": "管理閘道執行狀態、隱私過濾和請求日誌。"/);
 });

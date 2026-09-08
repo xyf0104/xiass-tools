@@ -464,6 +464,8 @@ fn upsert_detected_native_profile(
         provider,
         protocol,
         model,
+        web_search: None,
+        image_model: None,
         review_model,
         model_mappings: Vec::new(),
         base_url,

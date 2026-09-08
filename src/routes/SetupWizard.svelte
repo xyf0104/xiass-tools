@@ -8,6 +8,7 @@
     configProtocolIdsForTool,
     PROFILE_PROTOCOL_OPTIONS,
     PROFILE_TOOL_CATALOG,
+    profileRequiresApiKeyConfig,
     profileSupportsModelMappings as catalogSupportsModelMappings
   } from "../lib/profiles/catalog";
   import {
@@ -195,6 +196,8 @@
   let baseUrl = "";
   let model = "";
   let reviewModel = "";
+  let webSearch: "live" | "cached" | "disabled" = "live";
+  let imageModel = "";
   let modelMappings: ProfileModelMappingForm[] = [];
   let modelOptions: ProfileModelOption[] = [];
   let modelLoading = false;
@@ -281,6 +284,8 @@
     JSON.stringify(activeModelMappings),
     activeBaseUrl.trim(),
     activeSecretProvided ? "secret" : "no-secret",
+    webSearch,
+    imageModel.trim(),
     codexOAuthConfig ? "codex-oauth" : "api"
   ].join("|");
   $: baseUrlErrorKey = providerNeedsBaseUrl(activeProvider) ? baseUrlValidationErrorKey(activeBaseUrl) : null;
@@ -334,8 +339,9 @@
   }
 
   function setProfileMode(nextMode: ProviderApplyMode) {
-    profileMode = nextMode;
-    if (nextMode !== "config") {
+    const normalizedMode = profileRequiresApiKeyConfig(selectedTool) ? "config" : nextMode;
+    profileMode = normalizedMode;
+    if (normalizedMode !== "config") {
       codexOAuthConfig = false;
     }
     resetModelOptions();
@@ -505,7 +511,9 @@
       modelMappings: activeModelMappings,
       baseUrl: normalizeBaseUrl(activeBaseUrl),
       secretProvided: activeSecretProvided,
-      apiKey: activeApiKey
+      apiKey: activeApiKey,
+      webSearch: canonicalProfileToolId(selectedTool) === "codex" ? webSearch : null,
+      imageModel: canonicalProfileToolId(selectedTool) === "codex" ? imageModel.trim() || null : null
     };
   }
 
@@ -751,6 +759,9 @@
   }
 
   function errorLabel(message: string) {
+    if (message === "Codex uses API Key / config file mode in XIASS Tools and cannot use Local Gateway mode.") {
+      return $t("wizard.error.codexConfigOnly");
+    }
     if (message === "Profile Name is required" || message === "Configuration name is required") {
       return $t("wizard.error.profileNameRequired");
     }
@@ -896,7 +907,7 @@
       >
         {#if currentStep === steps.length - 1}
           {saving ? $t("common.saving") : $t("common.save")}
-          <AppIcon name="check" size={16} />
+          <AppIcon name="check" tone="action" size={16} />
         {:else}
           {$t("common.next")}
           <AppIcon name="arrowRight" size={16} />
@@ -961,16 +972,21 @@
             <AppIcon name="profiles" size={18} />
             <span>{$t("profiles.mode.config")}</span>
           </button>
-          <button
-            class={wizardChoiceButtonRecipe({ kind: "compact" })}
-            data-selected={profileMode === "gateway"}
-            type="button"
-            on:click={() => setProfileMode("gateway")}
-          >
-            <AppIcon name="gateway" size={18} />
-            <span>{$t("profiles.mode.gateway")}</span>
-          </button>
+          {#if !profileRequiresApiKeyConfig(selectedTool)}
+            <button
+              class={wizardChoiceButtonRecipe({ kind: "compact" })}
+              data-selected={profileMode === "gateway"}
+              type="button"
+              on:click={() => setProfileMode("gateway")}
+            >
+              <AppIcon name="gateway" size={18} />
+              <span>{$t("profiles.mode.gateway")}</span>
+            </button>
+          {/if}
         </div>
+        {#if profileRequiresApiKeyConfig(selectedTool)}
+          <small class={modelPickerStatusClass}>{$t("wizard.codexConfigOnlyHint")}</small>
+        {/if}
       </div>
       {#if !selectedToolInstalled}
         <div class={wizardInlineNoticeRecipe({ tone: "error" })}>{applyBlockedMessage()}</div>

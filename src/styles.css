@@ -1,50 +1,79 @@
 :root {
+  --icon-info: #78bdff;
+  --icon-success: #6ce3ae;
+  --icon-warning: #ffc56a;
+  --icon-danger: #ff827d;
+  --icon-violet: #c0a5ff;
+  --icon-cyan: #68dce7;
+  --icon-action-orange: #ff9b51;
+  --icon-action-gold: #ffd08a;
+  --icon-action-blue: #80caff;
+  --icon-action-deep: #479cff;
   color-scheme: dark;
   font-family:
-    Inter, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC",
-    "Noto Sans CJK SC", ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei",
+    "Noto Sans CJK SC", "Segoe UI Variable", "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --bg: #0a0b0d;
-  --surface: #101216;
-  --surface-strong: #14171d;
-  --surface-soft: #181b21;
-  --surface-hover: #1d2026;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #e9eaec;
-  --text-soft: #a4a8b3;
-  --text-muted: #7d818c;
-  --nav-text: #eceff4;
-  --nav-text-hover: #f7f8fb;
-  --nav-icon: #c6ccd6;
-  --nav-icon-hover: #eef2f7;
-  --accent: #1f8fff;
+  --bg: #031720;
+  --surface: rgba(7, 35, 47, 0.7);
+  --surface-2: rgba(10, 42, 55, 0.72);
+  --surface-strong: rgba(13, 49, 63, 0.78);
+  --surface-raised: rgba(9, 37, 50, 0.92);
+  --surface-soft: rgba(22, 66, 82, 0.52);
+  --surface-muted: rgba(10, 42, 55, 0.48);
+  --surface-hover: rgba(31, 86, 103, 0.66);
+  --border-subtle: rgba(164, 228, 236, 0.12);
+  --border: rgba(164, 228, 236, 0.22);
+  --border-strong: rgba(175, 236, 243, 0.38);
+  --text: #eefbff;
+  --text-soft: #c2d8e1;
+  --text-muted: #8faab6;
+  --nav-text: #d4e7ee;
+  --nav-text-hover: #f7fdff;
+  --nav-icon: #9bb6c2;
+  --nav-icon-hover: #eafaff;
+  --accent: #2f8df4;
+  --accent-strong: #69b9ff;
   --accent-ink: #ffffff;
-  --brand-icon-bg: #0b0d10;
-  --brand-icon-ink: #f4d94e;
-  --cyan: #5ec8d4;
-  --violet: #b18cf0;
-  --amber: #f0b65a;
-  --danger: #f05a52;
-  --accent-hover: #409cff;
-  --danger-text: #ff9a93;
-  --warn-text: #f7c66f;
-  --info-text: #8bdde6;
-  --sidebar-bg: #0c0d10;
-  --workspace-border: rgba(255, 255, 255, 0.02);
-  --code-bg: #0d0f13;
-  --code-text: #cbd2dc;
+  --brand-icon-bg: rgba(8, 35, 47, 0.62);
+  --brand-icon-ink: #8ce8f2;
+  --cyan: #63e3ec;
+  --violet: #b9a4ff;
+  --amber: #ffc56a;
+  --danger: #ff6961;
+  --accent-hover: #55a9ff;
+  --danger-text: #ffaaa5;
+  --warn-text: #ffd48a;
+  --info-text: #9aecf3;
+  --sidebar-bg: rgba(5, 29, 40, 0.7);
+  --workspace-border: rgba(183, 237, 243, 0.08);
+  --code-bg: rgba(2, 21, 30, 0.72);
+  --code-text: #d5e7ee;
   --control-color-scheme: dark;
-  --progress-bg: #262a31;
-  --tool-hover-bg: #151820;
-  --scrollbar-thumb: rgba(255, 255, 255, 0.14);
-  --modal-shadow: rgba(0, 0, 0, 0.4);
-  --radius: 8px;
-  --motion-quick: 170ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --motion-smooth: 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  --motion-spring: 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  --progress-bg: rgba(133, 190, 202, 0.16);
+  --tool-hover-bg: rgba(26, 75, 91, 0.55);
+  --scrollbar-thumb: rgba(181, 230, 237, 0.24);
+  --modal-shadow: rgba(0, 10, 18, 0.58);
+  --shadow: 0 18px 52px rgba(0, 13, 23, 0.32);
+  --radius: 22px;
+  --control-radius: 14px;
+  --glass-highlight: rgba(239, 255, 255, 0.1);
+  --glass-control-border: rgba(162, 230, 238, 0.27);
+  --glass-control-bg: rgba(18, 59, 74, 0.56);
+  --glass-control-hover: rgba(29, 84, 101, 0.7);
+  --glass-control-active: rgba(38, 101, 119, 0.76);
+  --glass-panel-shadow:
+    inset 0 1px 0 rgba(242, 255, 255, 0.08),
+    0 18px 52px rgba(0, 13, 23, 0.28);
+  --glass-control-shadow:
+    inset 0 1px 0 rgba(240, 255, 255, 0.08),
+    0 8px 24px rgba(0, 12, 22, 0.2);
+  --accent-glow: 0 12px 30px rgba(47, 141, 244, 0.3);
+  --motion-quick: 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-smooth: 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-spring: 360ms cubic-bezier(0.16, 1, 0.3, 1);
   /* Spacing scale used across cards, grids and section headings so layout
      rhythm stays consistent instead of mixing ad-hoc 10/12/14/18px values. */
   --space-xs: 6px;
@@ -57,26 +86,41 @@
 }
 
 :root[data-theme="light"] {
+  --icon-info: #1868b3;
+  --icon-success: #18774d;
+  --icon-warning: #9b5b0b;
+  --icon-danger: #bf3935;
+  --icon-violet: #7951bd;
+  --icon-cyan: #087888;
+  --icon-action-orange: #b64c13;
+  --icon-action-gold: #a86618;
+  --icon-action-blue: #237bb9;
+  --icon-action-deep: #285aca;
   color-scheme: light;
-  --bg: #f5f7fb;
-  --surface: #ffffff;
-  --surface-strong: #f8fafc;
-  --surface-soft: #eef2f7;
-  --surface-hover: #e5eaf2;
-  --border: rgba(15, 23, 42, 0.1);
-  --border-strong: rgba(15, 23, 42, 0.2);
-  --text: #111827;
-  --text-soft: #374151;
-  --text-muted: #6b7280;
-  --nav-text: #101827;
-  --nav-text-hover: #0b1220;
-  --nav-icon: #68717f;
-  --nav-icon-hover: #374151;
+  --bg: #dfeaf0;
+  --surface: rgba(248, 253, 255, 0.7);
+  --surface-2: rgba(245, 251, 254, 0.76);
+  --surface-strong: rgba(255, 255, 255, 0.8);
+  --surface-raised: rgba(255, 255, 255, 0.94);
+  --surface-soft: rgba(232, 244, 249, 0.72);
+  --surface-muted: rgba(236, 246, 250, 0.62);
+  --surface-hover: rgba(219, 238, 246, 0.84);
+  --border-subtle: rgba(21, 71, 91, 0.08);
+  --border: rgba(21, 71, 91, 0.16);
+  --border-strong: rgba(20, 85, 109, 0.28);
+  --text: #102733;
+  --text-soft: #385867;
+  --text-muted: #657f8b;
+  --nav-text: #193744;
+  --nav-text-hover: #071c27;
+  --nav-icon: #547381;
+  --nav-icon-hover: #143846;
   --accent: #0a84ff;
+  --accent-strong: #006bd6;
   --accent-ink: #ffffff;
-  --brand-icon-bg: #0b0d10;
-  --brand-icon-ink: #f4d94e;
-  --cyan: #0e7490;
+  --brand-icon-bg: rgba(236, 249, 252, 0.76);
+  --brand-icon-ink: #047d8a;
+  --cyan: #087f91;
   --violet: #6d28d9;
   --amber: #b45309;
   --danger: #dc2626;
@@ -84,15 +128,28 @@
   --danger-text: #b91c1c;
   --warn-text: #92400e;
   --info-text: #0e7490;
-  --sidebar-bg: #ffffff;
-  --workspace-border: rgba(15, 23, 42, 0.04);
-  --code-bg: #f1f5f9;
+  --sidebar-bg: rgba(248, 253, 255, 0.7);
+  --workspace-border: rgba(15, 58, 75, 0.05);
+  --code-bg: rgba(244, 250, 252, 0.8);
   --code-text: #334155;
   --control-color-scheme: light;
-  --progress-bg: #e2e8f0;
-  --tool-hover-bg: #eef2f7;
-  --scrollbar-thumb: rgba(15, 23, 42, 0.22);
-  --modal-shadow: rgba(15, 23, 42, 0.22);
+  --progress-bg: rgba(39, 90, 111, 0.12);
+  --tool-hover-bg: rgba(224, 241, 247, 0.8);
+  --scrollbar-thumb: rgba(25, 74, 94, 0.26);
+  --modal-shadow: rgba(20, 55, 70, 0.22);
+  --shadow: 0 18px 48px rgba(38, 79, 96, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.82);
+  --glass-control-border: rgba(28, 90, 113, 0.18);
+  --glass-control-bg: rgba(246, 252, 254, 0.68);
+  --glass-control-hover: rgba(228, 242, 248, 0.86);
+  --glass-control-active: rgba(213, 235, 244, 0.92);
+  --glass-panel-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 18px 48px rgba(38, 79, 96, 0.15);
+  --glass-control-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 8px 22px rgba(37, 82, 100, 0.12);
+  --accent-glow: 0 12px 28px rgba(10, 132, 255, 0.24);
 }
 
 * {
@@ -110,7 +167,25 @@ body {
   min-width: 760px;
   min-height: 100vh;
   overflow: hidden;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 14% 10%, rgba(48, 183, 205, 0.17), transparent 31%),
+    radial-gradient(circle at 88% 2%, rgba(47, 141, 244, 0.18), transparent 32%),
+    linear-gradient(rgba(2, 20, 28, 0.34), rgba(2, 18, 26, 0.62)),
+    url("/xiass-api-space-bg.png");
+  background-position: center;
+  background-size: auto, auto, auto, cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root[data-theme="light"] body {
+  background-image:
+    radial-gradient(circle at 14% 10%, rgba(10, 132, 255, 0.13), transparent 34%),
+    radial-gradient(circle at 88% 2%, rgba(6, 182, 212, 0.12), transparent 35%),
+    linear-gradient(rgba(239, 248, 251, 0.84), rgba(222, 237, 243, 0.9)),
+    url("/xiass-api-space-bg.png");
 }
 
 @layer base {
@@ -123,7 +198,24 @@ body {
   }
 
   button {
-    border: 0;
+    min-height: 38px;
+    border: 1px solid var(--glass-control-border);
+    border-radius: var(--control-radius);
+    padding: 0 12px;
+    background:
+      linear-gradient(145deg, var(--glass-highlight), transparent 38%),
+      var(--glass-control-bg);
+    color: inherit;
+    box-shadow: var(--glass-control-shadow);
+    transition:
+      background var(--motion-quick),
+      border-color var(--motion-quick),
+      color var(--motion-quick),
+      box-shadow var(--motion-smooth),
+      transform var(--motion-spring),
+      opacity var(--motion-quick);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   button,
@@ -136,8 +228,28 @@ body {
   input:focus-visible,
   select:focus-visible,
   textarea:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
-    outline-offset: 2px;
+    outline: 2px solid color-mix(in srgb, var(--accent-strong) 82%, white 18%);
+    outline-offset: 3px;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+  }
+
+  button:hover:not(:disabled) {
+    border-color: var(--border-strong);
+    background:
+      linear-gradient(145deg, var(--glass-highlight), transparent 38%),
+      var(--glass-control-hover);
+    box-shadow:
+      inset 0 1px 0 var(--glass-highlight),
+      0 12px 28px color-mix(in srgb, var(--modal-shadow) 30%, transparent);
+    transform: translateY(-1px);
+  }
+
+  button:not(:disabled):active {
+    transform: translateY(0) scale(0.975);
   }
 }
 
@@ -164,7 +276,7 @@ body {
 
 code {
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 6px 8px;
   background: var(--code-bg);
   color: var(--code-text);
@@ -187,12 +299,36 @@ input,
 select,
 textarea {
   width: 100%;
-  min-height: 38px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 0 10px;
-  background: var(--code-bg);
+  min-height: 42px;
+  border: 1px solid var(--glass-control-border);
+  border-radius: var(--control-radius);
+  padding: 0 12px;
+  background:
+    linear-gradient(145deg, var(--glass-highlight), transparent 34%),
+    var(--code-bg);
   color: var(--text);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  transition:
+    border-color var(--motion-quick),
+    background var(--motion-quick),
+    box-shadow var(--motion-smooth);
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--border-strong);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--border));
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 0 0 4px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 
 textarea {
@@ -223,6 +359,65 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
+/* XIASS liquid-glass surfaces. These selectors intentionally target the
+   shared recipe class names so every route receives the same visual language. */
+.cs-app-shell,
+.cs-app-workspace {
+  background: transparent;
+}
+
+.cs-app-sidebar,
+.cs-top-strip,
+.cs-panel,
+.cs-wizard-panel,
+.cs-dashboard-card,
+.cs-profile-card,
+.cs-tool-card,
+.cs-gateway-panel,
+.cs-dashboard-modal-panel,
+.cs-desktop-client-modal-panel {
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+  backdrop-filter: blur(24px) saturate(145%);
+}
+
+.cs-action-button,
+.cs-icon-button,
+.cs-app-nav-button,
+.cs-wizard-choice-button,
+.cs-gateway-segmented button,
+.cs-desktop-client-tabs button,
+.cs-profile-mode-switcher button,
+.cs-profile-tool-tabs > button,
+.cs-dashboard-card-actions button,
+.cs-profile-card-actions button,
+.cs-tool-action button,
+.cs-native-toggle {
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+  backdrop-filter: blur(16px) saturate(145%);
+  -webkit-font-smoothing: antialiased;
+}
+
+.cs-dashboard-modal-backdrop,
+.cs-desktop-client-modal-backdrop {
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter: blur(16px) saturate(120%);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .cs-app-sidebar,
+  .cs-top-strip,
+  .cs-panel,
+  .cs-wizard-panel,
+  .cs-dashboard-card,
+  .cs-profile-card,
+  .cs-tool-card,
+  .cs-gateway-panel,
+  .cs-dashboard-modal-panel,
+  .cs-desktop-client-modal-panel {
+    background: var(--surface-raised);
+  }
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -251,8 +446,39 @@ input[type="checkbox"] {
   }
 }
 
+.xiass-icon {
+  flex-shrink: 0;
+}
+
+.xiass-icon--action {
+  filter: drop-shadow(0 0 3px rgb(82 166 255 / 28%));
+}
+
+/* The glass stays quiet: colour and hover shimmer belong to the action glyph. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):hover .xiass-icon--action {
+    animation: xiass-icon-shimmer 650ms ease-out 1;
+  }
+}
+
+@keyframes xiass-icon-shimmer {
+  0%, 100% { opacity: 1; }
+  40% { opacity: 0.62; }
+}
+
 @media (max-width: 900px) {
   body {
     min-width: 360px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

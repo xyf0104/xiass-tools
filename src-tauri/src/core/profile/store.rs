@@ -11,7 +11,8 @@ pub(in crate::core::profile) fn load_profiles() -> Result<Vec<ProfileDraft>, Str
         if is_builtin_profile_id(&profile.id) {
             continue;
         }
-        let mode = normalize_stored_profile_mode(
+        let mode = normalize_stored_profile_mode_for_app(
+            &app,
             &profile.provider,
             Some(provider_apply_mode_value(&profile.mode).to_string()),
         );
@@ -90,6 +91,8 @@ pub(in crate::core::profile) fn builtin_official_profiles() -> Vec<ProfileDraft>
             provider: "official".to_string(),
             protocol: (*protocol).to_string(),
             model: String::new(),
+            web_search: None,
+            image_model: None,
             review_model: None,
             model_mappings: Vec::new(),
             base_url: String::new(),

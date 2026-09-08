@@ -5,12 +5,12 @@
 //! "Quit"; clicking the icon shows the window. Quitting via the tray shuts
 //! down the Local Gateway before exit.
 
-use crate::core::gateway;
+use crate::core::{gateway, wf_bridge};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
-pub const TRAY_ID: &str = "codestudio-lite";
+pub const TRAY_ID: &str = "xiass-tools";
 
 /// Localized tray menu labels for the app's supported languages.
 struct TrayLabels {
@@ -26,19 +26,19 @@ impl TrayLabels {
             Self {
                 show: "显示主窗口",
                 quit: "退出",
-                tooltip: "CodeStudio Lite",
+                tooltip: "XIASS Tools",
             }
         } else if normalized.eq_ignore_ascii_case("zh-TW") || normalized.starts_with("zh-Hant") {
             Self {
                 show: "顯示主視窗",
                 quit: "退出",
-                tooltip: "CodeStudio Lite",
+                tooltip: "XIASS Tools",
             }
         } else {
             Self {
                 show: "Show main window",
                 quit: "Quit",
-                tooltip: "CodeStudio Lite",
+                tooltip: "XIASS Tools",
             }
         }
     }
@@ -148,6 +148,7 @@ fn show_main_window(app: &AppHandle) {
 }
 
 fn quit_app(app: &AppHandle) {
+    wf_bridge::stop_for_app_exit();
     gateway::shutdown_for_app_exit();
     app.exit(0);
 }

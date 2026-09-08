@@ -26,6 +26,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::activity_log::load_activity_log,
             commands::app_updater::application_update_target,
@@ -99,6 +100,13 @@ pub fn run() {
             commands::usage_query::query_profile_usage,
             commands::usage_query::save_usage_script,
             commands::usage_query::test_usage_script,
+            commands::wf_bridge::wf_bridge_get_session,
+            commands::wf_bridge::wf_bridge_get_status,
+            commands::wf_bridge::wf_bridge_handle_host_action,
+            commands::wf_bridge::wf_bridge_export_helper_transfer,
+            commands::wf_bridge::wf_bridge_restore_helper_transfer,
+            commands::wf_bridge::wf_bridge_get_helper_diagnostics,
+            commands::wf_bridge::wf_bridge_stop,
         ])
         .setup(|app| {
             // A successful Windows update relaunches before Burn has fully

@@ -184,3 +184,7 @@ export function profileSupportsReviewModel(toolId: string): boolean {
 export function profileSupportsModelMappings(toolId: string): boolean {
   return Boolean(profileToolDefinition(toolId)?.supportsModelMappings);
 }
+
+export function profileRequiresApiKeyConfig(toolId: string): boolean {
+  return canonicalProfileToolId(toolId) === "codex";
+}

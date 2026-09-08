@@ -4,7 +4,7 @@ import test from "node:test";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
-test("dashboard cards keep installed status and three actions on one compact row", () => {
+test("dashboard cards allow direct actions to wrap without hiding configuration", () => {
   const styles = read("src/styles.css");
   const pandaConfig = read("panda.config.ts");
 
@@ -14,7 +14,7 @@ test("dashboard cards keep installed status and three actions on one compact row
   assert.doesNotMatch(styles, /\.card-action-overflow\s*\{/);
   assert.match(pandaConfig, /dashboardCardRecipe:[\s\S]*?gridTemplateColumns: "minmax\(86px, auto\) minmax\(220px, 1fr\)"/);
   assert.match(pandaConfig, /dashboardCardStateRecipe:[\s\S]*?minWidth: "86px"/);
-  assert.match(pandaConfig, /dashboardCardActionsRecipe:[\s\S]*?flexFlow: "row nowrap"/);
+  assert.match(pandaConfig, /dashboardCardActionsRecipe:[\s\S]*?flexFlow: "row wrap"/);
   assert.match(pandaConfig, /dashboardCardActionsRecipe:[\s\S]*?gap: "6px"/);
   assert.match(pandaConfig, /actionButtonRecipe:[\s\S]*?compact:[\s\S]*?minHeight: "34px"/);
   assert.match(pandaConfig, /iconButtonRecipe:[\s\S]*?compact:[\s\S]*?minHeight: "30px"/);
@@ -84,11 +84,11 @@ test("dashboard overflow menu visibility stays in the recipe layer", () => {
   assert.match(svelte, /on:click=\{\(event\) => toggleOverflowDetails/);
 });
 
-test("dashboard only folds actions after two direct buttons", () => {
+test("dashboard exposes all current actions with configuration after launch", () => {
   const svelte = read("src/routes/Dashboard.svelte");
 
   assert.match(svelte, /const dashboardCardActions: DashboardCardAction\[\] = \["update", "repair", "launch", "configure"\]/);
-  assert.match(svelte, /function visibleDashboardActionLimit\(_?tool: ToolStatus\)\s*\{[\s\S]*return 2/);
+  assert.match(svelte, /function visibleDashboardActionLimit\(_?tool: ToolStatus\)\s*\{[\s\S]*return dashboardCardActions.length/);
   assert.match(svelte, /function shouldShowDashboardOverflow\(tool: ToolStatus\)\s*\{[\s\S]*availableDashboardActionCount\(tool\) > visibleDashboardActionLimit\(tool\)/);
   assert.match(svelte, /function isDashboardActionVisible\(tool: ToolStatus, action: DashboardCardAction\)\s*\{[\s\S]*const index = dashboardActionIndex\(tool, action\);[\s\S]*return index >= 0 && index < visibleDashboardActionLimit\(tool\)/);
   assert.match(svelte, /function isDashboardActionOverflowed\(tool: ToolStatus, action: DashboardCardAction\)\s*\{[\s\S]*const index = dashboardActionIndex\(tool, action\);[\s\S]*return index >= 0 && index >= visibleDashboardActionLimit\(tool\)/);

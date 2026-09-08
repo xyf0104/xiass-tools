@@ -157,10 +157,7 @@ fn hermes_root(
 /// `~/.grok/config.toml`, `managed_config.toml` and `requirements.toml` are the
 /// agent's configuration and are deliberately absent: config removal is a
 /// separate, opt-in step, so the install root itself is never a target.
-pub fn grok_removable_paths(
-    home_dir: &Path,
-    overrides: &InstallerOverrides,
-) -> Vec<PathBuf> {
+pub fn grok_removable_paths(home_dir: &Path, overrides: &InstallerOverrides) -> Vec<PathBuf> {
     let root = grok_root(home_dir);
     let mut paths = vec![
         grok_bin_dir(home_dir, overrides),
@@ -268,10 +265,7 @@ pub fn launcher_belongs_to_agent(
 ///
 /// The shared-directory check runs again here rather than trusting the caller:
 /// this is the last point before something is deleted from the user's disk.
-pub fn partition_removable(
-    paths: &[PathBuf],
-    home_dir: &Path,
-) -> (Vec<PathBuf>, Vec<String>) {
+pub fn partition_removable(paths: &[PathBuf], home_dir: &Path) -> (Vec<PathBuf>, Vec<String>) {
     let mut allowed = Vec::new();
     let mut refused = Vec::new();
     for path in paths {
@@ -565,10 +559,7 @@ try {
 /// are present, so an uninstall never rewrites a PATH it had no reason to
 /// touch.
 #[cfg(target_os = "windows")]
-pub fn remove_from_user_path(
-    targets: &[PathBuf],
-    home_dir: &Path,
-) -> Result<Vec<String>, String> {
+pub fn remove_from_user_path(targets: &[PathBuf], home_dir: &Path) -> Result<Vec<String>, String> {
     if targets.is_empty() {
         return Ok(Vec::new());
     }
@@ -689,11 +680,7 @@ pub struct ProfileCleanup {
 /// and the replacement is written to a temporary file in the same directory and
 /// renamed over the original, so an interrupted run cannot leave a truncated
 /// profile behind. Files without the markers are not touched at all.
-pub fn remove_profile_block(
-    home_dir: &Path,
-    open: &str,
-    close: &str,
-) -> ProfileCleanup {
+pub fn remove_profile_block(home_dir: &Path, open: &str, close: &str) -> ProfileCleanup {
     let mut cleanup = ProfileCleanup::default();
     for profile in shell_profile_candidates(home_dir) {
         let Ok(content) = std::fs::read_to_string(&profile) else {
@@ -791,10 +778,7 @@ mod tests {
         vec![
             PathEntry::new("%SystemRoot%\\system32", "C:\\Windows\\system32"),
             PathEntry::new("%JAVA_HOME%\\bin", "C:\\Program Files\\Java\\jdk-21\\bin"),
-            PathEntry::new(
-                "%USERPROFILE%\\.grok\\bin",
-                "C:\\Users\\dev\\.grok\\bin",
-            ),
+            PathEntry::new("%USERPROFILE%\\.grok\\bin", "C:\\Users\\dev\\.grok\\bin"),
             PathEntry::new("C:\\tools", "C:\\tools"),
         ]
     }
@@ -841,10 +825,20 @@ mod tests {
     #[test]
     fn a_sibling_directory_with_a_shared_prefix_is_kept() {
         let entries = vec![
-            PathEntry::new("C:\\Users\\dev\\.grok\\bin-old", "C:\\Users\\dev\\.grok\\bin-old"),
-            PathEntry::new("C:\\Users\\dev\\.grok\\binary", "C:\\Users\\dev\\.grok\\binary"),
+            PathEntry::new(
+                "C:\\Users\\dev\\.grok\\bin-old",
+                "C:\\Users\\dev\\.grok\\bin-old",
+            ),
+            PathEntry::new(
+                "C:\\Users\\dev\\.grok\\binary",
+                "C:\\Users\\dev\\.grok\\binary",
+            ),
         ];
-        let prune = prune_windows_path(&entries, &[PathBuf::from("C:/Users/dev/.grok/bin")], &home());
+        let prune = prune_windows_path(
+            &entries,
+            &[PathBuf::from("C:/Users/dev/.grok/bin")],
+            &home(),
+        );
 
         assert!(!prune.changed);
         assert_eq!(
@@ -859,7 +853,10 @@ mod tests {
     fn shared_directories_are_never_pruned_even_when_requested() {
         let entries = vec![
             PathEntry::new("C:\\Users\\dev\\.local\\bin", "C:\\Users\\dev\\.local\\bin"),
-            PathEntry::new("C:\\Users\\dev\\AppData\\Roaming\\npm", "C:\\Users\\dev\\AppData\\Roaming\\npm"),
+            PathEntry::new(
+                "C:\\Users\\dev\\AppData\\Roaming\\npm",
+                "C:\\Users\\dev\\AppData\\Roaming\\npm",
+            ),
             PathEntry::new("/usr/local/bin", "/usr/local/bin"),
         ];
         let prune = prune_windows_path(
@@ -898,7 +895,11 @@ mod tests {
             PathEntry::new("", ""),
             PathEntry::new("C:\\Users\\dev\\.grok\\bin", "C:\\Users\\dev\\.grok\\bin"),
         ];
-        let prune = prune_windows_path(&entries, &[PathBuf::from("C:/Users/dev/.grok/bin")], &home());
+        let prune = prune_windows_path(
+            &entries,
+            &[PathBuf::from("C:/Users/dev/.grok/bin")],
+            &home(),
+        );
 
         assert_eq!(prune.updated_raw, "C:\\tools;");
     }
@@ -944,7 +945,9 @@ mod tests {
 
     #[test]
     fn a_profile_without_the_block_is_reported_as_unchanged() {
-        assert!(strip_marker_block("export EDITOR=vim\n", GROK_BLOCK_OPEN, GROK_BLOCK_CLOSE).is_none());
+        assert!(
+            strip_marker_block("export EDITOR=vim\n", GROK_BLOCK_OPEN, GROK_BLOCK_CLOSE).is_none()
+        );
     }
 
     /// Hermes puts `~/.local/bin` on PATH, and so do pipx, uv and Claude Code's
@@ -968,7 +971,8 @@ mod tests {
     /// selectivity are all verifiable here.
     #[test]
     fn rewriting_a_profile_backs_it_up_and_leaves_other_files_alone() {
-        let home = std::env::temp_dir().join(format!("funtoolkit-profile-{}", uuid::Uuid::new_v4()));
+        let home =
+            std::env::temp_dir().join(format!("funtoolkit-profile-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
         let zshrc = home.join(".zshrc");
         std::fs::write(&zshrc, ZSHRC).unwrap();
@@ -986,7 +990,10 @@ mod tests {
         assert!(rewritten.contains("export EDITOR=vim"));
         assert!(rewritten.contains("alias ll="));
         // A profile without the markers is untouched, and gets no backup.
-        assert_eq!(std::fs::read_to_string(&bashrc).unwrap(), "export EDITOR=nano\n");
+        assert_eq!(
+            std::fs::read_to_string(&bashrc).unwrap(),
+            "export EDITOR=nano\n"
+        );
         let backups: Vec<_> = std::fs::read_dir(&home)
             .unwrap()
             .filter_map(Result::ok)
@@ -999,7 +1006,10 @@ mod tests {
         assert!(!std::fs::read_dir(&home)
             .unwrap()
             .filter_map(Result::ok)
-            .any(|entry| entry.file_name().to_string_lossy().contains("funtoolkit-tmp")));
+            .any(|entry| entry
+                .file_name()
+                .to_string_lossy()
+                .contains("funtoolkit-tmp")));
         std::fs::remove_dir_all(home).unwrap();
     }
 
@@ -1007,7 +1017,8 @@ mod tests {
     /// left exactly as it was.
     #[test]
     fn an_incomplete_block_is_reported_and_the_file_is_untouched() {
-        let home = std::env::temp_dir().join(format!("funtoolkit-profile-{}", uuid::Uuid::new_v4()));
+        let home =
+            std::env::temp_dir().join(format!("funtoolkit-profile-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
         let zshrc = home.join(".zshrc");
         let original = "# >>> grok installer >>>\nexport PATH=\"$HOME/.grok/bin:$PATH\"\n";
@@ -1025,7 +1036,14 @@ mod tests {
     #[test]
     fn every_shell_profile_the_installers_touch_is_examined() {
         let candidates = shell_profile_candidates(Path::new("/home/dev"));
-        for expected in [".bashrc", ".zshrc", ".zprofile", ".bash_profile", ".profile", ".config/fish/config.fish"] {
+        for expected in [
+            ".bashrc",
+            ".zshrc",
+            ".zprofile",
+            ".bash_profile",
+            ".profile",
+            ".config/fish/config.fish",
+        ] {
             assert!(
                 candidates.contains(&PathBuf::from("/home/dev").join(expected)),
                 "{expected} is not examined"
@@ -1085,7 +1103,6 @@ mod removal_tests {
         PathBuf::from("C:/Users/dev/AppData/Local")
     }
 
-
     /// `agent` sits in the same directory as every other tool's launcher. A
     /// file that does not point back into the Grok install root belongs to
     /// somebody else.
@@ -1131,7 +1148,6 @@ mod removal_tests {
         assert!(!launcher_belongs_to_agent(None, None, &grok));
     }
 
-
     /// A path prefix must not be enough: `~/.grok-backup` is not inside
     /// `~/.grok`.
     #[test]
@@ -1142,7 +1158,6 @@ mod removal_tests {
             &home().join(".grok")
         ));
     }
-
 
     /// The last checkpoint before anything leaves the disk.
     #[test]
@@ -1160,7 +1175,6 @@ mod removal_tests {
         assert!(refused.iter().all(|message| message.contains("shared")));
     }
 
-
     #[test]
     fn grok_removes_only_its_own_directories() {
         let paths = grok_removable_paths(&home(), &InstallerOverrides::default());
@@ -1173,23 +1187,34 @@ mod removal_tests {
         }
     }
 
-
     /// The Hermes data root also holds sessions, memories and logs, which are
     /// the user's work, so only the tooling subdirectories may be removed.
     #[test]
     fn hermes_removes_its_tooling_but_never_the_data_root() {
-        let windows = hermes_removable_paths(&home(), &local_app_data(), HostPlatform::Windows, &InstallerOverrides::default());
+        let windows = hermes_removable_paths(
+            &home(),
+            &local_app_data(),
+            HostPlatform::Windows,
+            &InstallerOverrides::default(),
+        );
         let root = local_app_data().join("hermes");
         assert!(windows.contains(&root.join("hermes-agent")));
         assert!(windows.contains(&root.join("git")));
         assert!(windows.contains(&root.join("node")));
-        assert!(!windows.contains(&root), "the data root must never be removed");
+        assert!(
+            !windows.contains(&root),
+            "the data root must never be removed"
+        );
 
-        let unix = hermes_removable_paths(&home(), &local_app_data(), HostPlatform::Macos, &InstallerOverrides::default());
+        let unix = hermes_removable_paths(
+            &home(),
+            &local_app_data(),
+            HostPlatform::Macos,
+            &InstallerOverrides::default(),
+        );
         assert!(unix.contains(&home().join(".hermes/hermes-agent")));
         assert!(!unix.contains(&home().join(".hermes")));
     }
-
 
     /// The Hermes installer puts `node`, `npm` and `npx` symlinks in the same
     /// shared directory as its own launchers. Removing those would break the
@@ -1206,15 +1231,26 @@ mod removal_tests {
         assert!(launchers.contains(&home().join(".local/bin/hermes")));
     }
 
-
     /// Verified against the vendor install scripts.
     #[test]
     fn path_entries_match_what_each_installer_actually_adds() {
         assert_eq!(
-            installer_path_entries("grok", &home(), &local_app_data(), HostPlatform::Windows, &InstallerOverrides::default()),
+            installer_path_entries(
+                "grok",
+                &home(),
+                &local_app_data(),
+                HostPlatform::Windows,
+                &InstallerOverrides::default()
+            ),
             vec![home().join(".grok/bin")]
         );
-        let hermes = installer_path_entries("hermes", &home(), &local_app_data(), HostPlatform::Windows, &InstallerOverrides::default());
+        let hermes = installer_path_entries(
+            "hermes",
+            &home(),
+            &local_app_data(),
+            HostPlatform::Windows,
+            &InstallerOverrides::default(),
+        );
         let root = local_app_data().join("hermes");
         assert_eq!(
             hermes,
@@ -1226,17 +1262,35 @@ mod removal_tests {
             ]
         );
         // The Unix Hermes installer only adds the shared ~/.local/bin.
-        assert!(installer_path_entries("hermes", &home(), &local_app_data(), HostPlatform::Macos, &InstallerOverrides::default()).is_empty());
+        assert!(installer_path_entries(
+            "hermes",
+            &home(),
+            &local_app_data(),
+            HostPlatform::Macos,
+            &InstallerOverrides::default()
+        )
+        .is_empty());
         // npm, Homebrew and desktop installers never touch PATH.
-        for tool_id in ["codex-cli", "claude", "openclaw", "codex-desktop", "claude-desktop"] {
+        for tool_id in [
+            "codex-cli",
+            "claude",
+            "openclaw",
+            "codex-desktop",
+            "claude-desktop",
+        ] {
             assert!(
-                installer_path_entries(tool_id, &home(), &local_app_data(), HostPlatform::Windows, &InstallerOverrides::default())
-                    .is_empty(),
+                installer_path_entries(
+                    tool_id,
+                    &home(),
+                    &local_app_data(),
+                    HostPlatform::Windows,
+                    &InstallerOverrides::default()
+                )
+                .is_empty(),
                 "{tool_id} should not report PATH entries"
             );
         }
     }
-
 
     /// The single rule that protects every unrelated tool on the machine.
     #[test]
@@ -1256,7 +1310,6 @@ mod removal_tests {
             );
         }
     }
-
 
     #[test]
     fn an_agent_owned_directory_is_not_treated_as_shared() {
