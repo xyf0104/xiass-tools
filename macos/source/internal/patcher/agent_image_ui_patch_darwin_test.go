@@ -231,8 +231,15 @@ func writeDarwinAgentLanguageServerUIFixture(t *testing.T, path string) {
 		return flate.NewWriter(destination, flate.BestSpeed)
 	})
 	entries := map[string]string{
-		"index.html":            `<!doctype html><html><body><div id="root"></div></body></html>`,
-		"main.js":               darwinAgentImageUIFixture() + strings.Repeat("/* deterministic Agent UI compression margin */", 8192),
+		"index.html": `<!doctype html><html><body><div id="root"></div></body></html>`,
+		// Keep enough *compressed* room for the production Zopfli rebuild.  A
+		// repeated comment is intentionally not used here: DEFLATE compresses it
+		// almost completely, so the synthetic archive can still be smaller than
+		// the patched renderer even though its source is much longer.  This
+		// deterministic, printable marker has high entropy while remaining valid
+		// JavaScript comment text and therefore models the incompressible slack in
+		// the real embedded Agent bundle.
+		"main.js":               darwinAgentImageUIFixture() + darwinAgentUICompressionMargin(),
 		"compiled_tailwind.css": `.generated-image{max-width:100%;height:auto}`,
 		"jetbox.css":            `.artifact-image{object-fit:contain}`,
 	}
@@ -261,6 +268,25 @@ func writeDarwinAgentLanguageServerUIFixture(t *testing.T, path string) {
 	if recognized, err := validateDarwinAgentEmbeddedUISource(path); err != nil || !recognized {
 		t.Fatalf("synthetic Darwin Agent Language Server was not production-valid: recognized=%t err=%v", recognized, err)
 	}
+}
+
+func darwinAgentUICompressionMargin() string {
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const marginSize = 64 * 1024
+	var builder strings.Builder
+	builder.Grow(marginSize + len("/* deterministic Agent UI compression margin  */"))
+	builder.WriteString("/* deterministic Agent UI compression margin ")
+	state := uint32(0x9e3779b9)
+	for i := 0; i < marginSize; i++ {
+		// A small deterministic xorshift keeps the fixture reproducible while
+		// avoiding long repeated DEFLATE sequences.
+		state ^= state << 13
+		state ^= state >> 17
+		state ^= state << 5
+		builder.WriteByte(alphabet[state%uint32(len(alphabet))])
+	}
+	builder.WriteString(" */")
+	return builder.String()
 }
 
 // darwinAgentImageUIFixture is frozen from the verified Agent 2.0.6/2.0.10/

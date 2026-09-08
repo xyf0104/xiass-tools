@@ -32,7 +32,7 @@ import {
 const embeddedParams = new URLSearchParams(window.location.search);
 const embeddedMode = embeddedParams.get("embedded") === "1";
 const embeddedVersionPillLabel = "由宿主更新";
-const versionPillLabel = computed(() => embeddedMode ? embeddedVersionPillLabel : "v1.7.6");
+const versionPillLabel = computed(() => embeddedMode ? embeddedVersionPillLabel : "v1.8.0");
 setEmbeddedRuntimeMode(embeddedMode);
 if (embeddedMode) document.documentElement.dataset.embedded = "true";
 const embeddedModuleID = embeddedParams.get("module") || "antigravity";
@@ -486,7 +486,7 @@ onUnmounted(() => {
             <path d="M12 3v9m5.66-5.66A8 8 0 1 1 6.34 6.34" />
           </svg>
         </button>
-        <span class="version-pill" :title="embeddedMode ? '版本与更新由宿主 XIASS Tools 管理' : 'XIASS Tools v1.7.6'">{{ versionPillLabel }}</span>
+        <span class="version-pill" :title="embeddedMode ? '版本与更新由宿主 XIASS Tools 管理' : 'XIASS Tools v1.8.0'">{{ versionPillLabel }}</span>
       </div>
     </aside>
 

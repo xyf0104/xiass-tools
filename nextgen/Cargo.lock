@@ -7836,7 +7836,7 @@ dependencies = [
 
 [[package]]
 name = "xiass-tools"
-version = "1.7.6"
+version = "1.8.0"
 dependencies = [
  "aes",
  "aes-gcm",

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.8.0] - 2026-09-08
+
+### Release
+
+- Continued the complete integrated Antigravity WF workspace with runtime overview, models and image generation, upstream routing, official accounts, multi-instance launch, wakeup tasks, account verification, and terminal permissions.
+- Continued the Codex API Key configuration flow with an isolated provider, model catalog, Web Search, and `gpt-image-2` image-generation capability handling plus verified recovery points.
+- Unified macOS Universal and Windows x64 installer publishing with application startup, WF bridge, and uninstall lifecycle validation.
+- Continued the XIASS dark liquid-glass theme, transparent brand mark, and high-contrast interactive controls.
+
 ## [1.7.6] - 2026-09-07
 
 ### Fixed

@@ -3,6 +3,18 @@ const EN_SECTION_HEADER = '## Changelog (English)';
 const GITHUB_RELEASE_TAG_BASE_URL =
   'https://github.com/xyf0104/Antigravity-WF-Assistant/releases/tag/v';
 const RELEASE_HIGHLIGHTS: Record<string, { zh: string; en: string }> = {
+  '1.8.0': {
+    zh: `### 完整版更新
+
+- **Antigravity WF 融合工作台**：继续提供模型、生图、上游代理、官方账号、应用多开、唤醒任务、账号验证与终端权限。
+- **Codex API Key 配置**：保留独立 Provider、模型目录、Web Search、gpt-image-2 图片能力和校验恢复点。
+- **双平台发布**：macOS Universal 与 Windows x64 安装包均执行应用、WF bridge 与卸载生命周期验证。`,
+    en: `### Complete release update
+
+- **Integrated Antigravity WF workspace**: runtime overview, models and image generation, upstream routing, official accounts, multi-instance launch, wakeup tasks, account verification, and terminal permissions.
+- **Codex API Key configuration**: isolated providers, model catalog, Web Search, gpt-image-2 image capability, and verified recovery points.
+- **Dual-platform publishing**: macOS Universal and Windows x64 installers run application, WF bridge, and uninstall lifecycle validation.`,
+  },
   '1.3.1': {
     zh: `### 重要更新
 
