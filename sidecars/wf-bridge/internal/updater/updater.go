@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	Repository     = "xyf0104/Antigravity-WF-Assistant"
-	CurrentVersion = "1.7.5"
+	Repository     = "xyf0104/xiass-tools"
+	CurrentVersion = "1.9.1"
 	maxAssetBytes  = int64(2 << 30) // installers are normally tens of MB
 	// CheckTimeout keeps a background update check from blocking the UI when a
 	// network, DNS resolver, proxy, or captive portal is unhealthy.

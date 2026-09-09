@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
 )
 
 // ErrCodexHistoryWriteUnsafe means local Codex history must remain untouched.

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
-	"antigravity-wf-assistant/internal/upstream"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/upstream"
 )
 
 func TestAccountCardDiscoveryAndDetailedTestBypassPoolEligibility(t *testing.T) {

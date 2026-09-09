@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"antigravity-wf-assistant/internal/oauthflow"
-	"antigravity-wf-assistant/internal/storage"
-	"antigravity-wf-assistant/internal/upstream"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/oauthflow"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/upstream"
 )
 
 const (

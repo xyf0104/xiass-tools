@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"antigravity-wf-assistant/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
 )
 
 func TestClaudeCodeDetectsCLIAndConfiguration(t *testing.T) {

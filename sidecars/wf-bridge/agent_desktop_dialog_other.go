@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 
-	"antigravity-wf-assistant/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
 )
 
 func selectAgentDesktopNativeTarget(*App, context.Context, agent.ID) (string, bool, error) {

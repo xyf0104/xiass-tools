@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"antigravity-wf-assistant/internal/oauthflow"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/oauthflow"
 )
 
 const oauthRefreshLeadTime = 5 * time.Minute

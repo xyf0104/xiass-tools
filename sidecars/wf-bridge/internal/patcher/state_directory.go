@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // xiassPatcherStorageDir is the one source of truth for non-secret patcher

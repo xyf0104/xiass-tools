@@ -11,7 +11,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 describe("XIASS GitHub update source", () => {
   it("keeps the inherited signed update channel disabled for ordinary builds", () => {
     expect(APP_UPDATER_ENABLED).toBe(false);
-    expect(APP_LATEST_RELEASE_API_URL).toBe("https://api.github.com/repos/xyf0104/Antigravity-WF-Assistant/releases/latest");
+    expect(APP_LATEST_RELEASE_API_URL).toBe("https://api.github.com/repos/xyf0104/xiass-tools/releases/latest");
   });
 
   it("uses the native authoritative release lookup", async () => {
@@ -41,7 +41,7 @@ describe("XIASS GitHub update source", () => {
     const release = await loadGitHubApplicationRelease();
     expect(release.version).toBe("1.8.8");
     expect(release.installer).toBeNull();
-    expect(release.url).toBe("https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest");
+    expect(release.url).toBe("https://github.com/xyf0104/xiass-tools/releases/latest");
     expect(fetchMock).toHaveBeenCalledWith(APP_LATEST_RELEASE_API_URL,
       expect.objectContaining({ credentials: "omit", cache: "no-store", signal: expect.any(AbortSignal) }));
   });

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/agent"
-	"antigravity-wf-assistant/internal/claudeconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/claudeconfig"
 )
 
 func TestClaudeCodeProductionAdapterUsesPlatformAwareCLIDiscovery(t *testing.T) {

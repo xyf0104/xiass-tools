@@ -5,7 +5,7 @@ import AppIcon from "../components/AppIcon.svelte";
 afterEach(cleanup);
 
 describe("XIASS coloured icons", () => {
-  it.each(["arrowRight", "play", "power", "update", "install", "apply", "add"])("renders %s as a solid high-contrast action glyph", (name) => {
+  it.each(["arrowRight", "play", "power", "update", "install", "apply", "add", "save"])("renders %s as a solid high-contrast action glyph", (name) => {
     const { container } = render(AppIcon, { name });
     expect(container.querySelector("svg")?.classList.contains("xiass-icon--action")).toBe(true);
     expect(container.querySelector("linearGradient")).toBeNull();

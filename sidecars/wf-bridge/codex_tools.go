@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/codexconfig"
-	"antigravity-wf-assistant/internal/storage"
-	"antigravity-wf-assistant/internal/upstream"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/upstream"
 )
 
 // CodexConfigurationStatus is a credential-safe view for the renderer. The

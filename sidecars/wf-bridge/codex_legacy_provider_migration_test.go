@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
 )
 
 func TestGetCodexConfigurationOnlyReportsSafeLegacyMigrationEligibility(t *testing.T) {

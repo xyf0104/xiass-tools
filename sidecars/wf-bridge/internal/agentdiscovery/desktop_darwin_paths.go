@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"antigravity-wf-assistant/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
 )
 
 type desktopSpec struct {

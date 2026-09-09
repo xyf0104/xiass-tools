@@ -3,8 +3,8 @@ package proxy
 import (
 	"strings"
 
-	"antigravity-wf-assistant/internal/storage"
-	"antigravity-wf-assistant/internal/upstream"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/upstream"
 )
 
 // isOpenAICodexOAuthModel identifies both an already-selected runtime account

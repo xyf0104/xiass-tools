@@ -26,9 +26,9 @@ import (
 	"syscall"
 	"time"
 
-	"antigravity-wf-assistant/internal/diagnostics"
-	"antigravity-wf-assistant/internal/proxy"
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/diagnostics"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/proxy"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // The WF bridge embeds the already-tested Vue application. XIASS Tools loads

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/totp"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/totp"
 )
 
 type appTOTPStore struct{ values map[string]string }

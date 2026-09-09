@@ -81,7 +81,7 @@ test("R2 updater release commands do not depend on GitHub workflows", () => {
 test("XIASS README directs installers and online updates to its own GitHub releases", () => {
   const readme = read("README.md");
 
-  assert.match(readme, /github\.com\/xyf0104\/Antigravity-WF-Assistant\/releases\/latest/);
+  assert.match(readme, /github\.com\/xyf0104\/xiass-tools\/releases\/latest/);
   assert.match(readme, /下载更新/);
   assert.doesNotMatch(readme, /安装包不再通过 GitHub Releases 提供|installers are no longer distributed through GitHub Releases/);
 });
@@ -144,7 +144,7 @@ test("settings hands signed installer updates to Burn or DMG", () => {
   assert.match(store, /isTauri\(\) && APP_UPDATER_ENABLED \? fetchTauriRelease\(\) : fetchGitHubRelease\(\)/);
   assert.match(store, /installInFlight/);
   assert.match(store, /loadGitHubApplicationRelease/);
-  assert.match(appInfo, /xyf0104\/Antigravity-WF-Assistant/);
+  assert.match(appInfo, /xyf0104\/xiass-tools/);
   assert.match(appInfo, /api\.github\.com/);
   assert.match(store, /pendingUpdate\.rawJson/);
   assert.match(store, /installerArtifactForTarget/);

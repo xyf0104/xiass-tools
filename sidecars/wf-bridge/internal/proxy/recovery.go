@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 const upstreamStreamTimeout = 15 * time.Minute

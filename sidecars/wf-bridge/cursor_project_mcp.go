@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/mcpconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/mcpconfig"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

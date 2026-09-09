@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // acquireAttemptModel selects an account for one upstream attempt. After the

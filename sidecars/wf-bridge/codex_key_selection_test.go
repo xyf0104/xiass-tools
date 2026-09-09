@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"antigravity-wf-assistant/internal/codexconfig"
-	"antigravity-wf-assistant/internal/codexselection"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexselection"
 )
 
 func TestCodexXIASSSelectionLifecycleUsesNativeCredentialAndConsumesOnlyOnSuccess(t *testing.T) {

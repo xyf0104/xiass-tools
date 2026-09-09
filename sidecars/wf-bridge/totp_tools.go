@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/totp"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/totp"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

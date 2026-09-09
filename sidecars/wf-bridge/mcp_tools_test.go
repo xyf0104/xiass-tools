@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/mcpconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/mcpconfig"
 )
 
 func TestTargetScopedMCPBridgeLifecycleUsesOnlyVerifiedRecoveryPoints(t *testing.T) {

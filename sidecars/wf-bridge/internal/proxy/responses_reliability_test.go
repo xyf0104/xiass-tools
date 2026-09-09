@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 func TestForwardOpenAIAutoRoutesOrdinaryChatToChatCompletions(t *testing.T) {

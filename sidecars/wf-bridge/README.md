@@ -3,8 +3,8 @@
 This sidecar is the embedded Antigravity WF helper used by XIASS Tools. It is
 built with the `wfbridge` Go build tag and listens only on `127.0.0.1`.
 
-The implementation is ported from the sibling `Antigravity-WF-Assistant-GitHub`
-project. Its upstream license and the original source boundary are preserved
+The implementation is integrated into the `xiass-tools` repository and keeps
+the original source boundary. Its upstream license and source boundary are preserved
 in `UPSTREAM-LICENSE.txt` and the repository-level `ORIGIN_AND_LICENSE.md`.
 
 The parent Tauri process creates a per-process bearer token, passes it through

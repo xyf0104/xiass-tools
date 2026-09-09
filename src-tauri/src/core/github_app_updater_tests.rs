@@ -34,8 +34,8 @@ fn matches_all_three_supported_platform_installers() {
 
 #[test]
 fn page_fallback_discovers_the_latest_version_and_platform_asset_without_api_metadata() {
-    let page = r#"<include-fragment src="https://github.com/xyf0104/Antigravity-WF-Assistant/releases/expanded_assets/v1.8.7"></include-fragment>"#;
-    let assets = r#"<li><a href="/xyf0104/Antigravity-WF-Assistant/releases/download/v1.8.7/XIASS.Tools_1.8.7_aarch64.dmg">XIASS.Tools_1.8.7_aarch64.dmg</a>
+    let page = r#"<include-fragment src="https://github.com/xyf0104/xiass-tools/releases/expanded_assets/v1.8.7"></include-fragment>"#;
+    let assets = r#"<li><a href="/xyf0104/xiass-tools/releases/download/v1.8.7/XIASS.Tools_1.8.7_aarch64.dmg">XIASS.Tools_1.8.7_aarch64.dmg</a>
       <clipboard-copy value="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></clipboard-copy></li>"#;
     let version = page_release_version(page).unwrap();
     let asset = installer_from_assets_page(assets, &version, "darwin-aarch64")
@@ -49,7 +49,7 @@ fn page_fallback_discovers_the_latest_version_and_platform_asset_without_api_met
 
 #[test]
 fn page_fallback_reports_a_missing_platform_asset_without_guessing_a_filename() {
-    let assets = r#"<li><a href="/xyf0104/Antigravity-WF-Assistant/releases/download/v1.8.7/XIASS.Tools_1.8.7_x64.dmg">XIASS.Tools_1.8.7_x64.dmg</a></li>"#;
+    let assets = r#"<li><a href="/xyf0104/xiass-tools/releases/download/v1.8.7/XIASS.Tools_1.8.7_x64.dmg">XIASS.Tools_1.8.7_x64.dmg</a></li>"#;
     assert!(
         installer_from_assets_page(assets, "1.8.7", "darwin-aarch64")
             .unwrap()

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/patcher"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/patcher"
 )
 
 const antigravityInstallStateFile = "antigravity-install-state.json"

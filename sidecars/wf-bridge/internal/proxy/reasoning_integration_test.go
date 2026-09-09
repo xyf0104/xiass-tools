@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // These tests exercise the real Antigravity routing path rather than only the

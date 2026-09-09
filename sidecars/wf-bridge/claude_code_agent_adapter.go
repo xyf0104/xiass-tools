@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/agent"
-	"antigravity-wf-assistant/internal/agentdiscovery"
-	"antigravity-wf-assistant/internal/claudeconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agentdiscovery"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/claudeconfig"
 )
 
 // claudeCodeAgentAdapter is the concrete Claude Code integration. It owns no

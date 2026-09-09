@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"antigravity-wf-assistant/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
 )
 
 func TestLaunchDetectedAgentUsesOnlyVerifiedCursorAndWindsurfTargets(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"errors"
 	"strings"
 
-	"antigravity-wf-assistant/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

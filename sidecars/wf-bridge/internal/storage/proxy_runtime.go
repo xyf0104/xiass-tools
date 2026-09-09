@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"antigravity-wf-assistant/internal/proxyendpoint"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/proxyendpoint"
 )
 
 // proxyRuntime is intentionally separate from settings.json and all account or

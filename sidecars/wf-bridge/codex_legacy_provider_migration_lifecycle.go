@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"antigravity-wf-assistant/internal/codexconfig"
-	"antigravity-wf-assistant/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
 )
 
 // CodexLegacyProviderMigrationLifecycleStatus is the renderer-safe result of

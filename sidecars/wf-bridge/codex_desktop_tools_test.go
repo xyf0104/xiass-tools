@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
 )
 
 func TestCodexDesktopRendererDTOAndFailureMessageDoNotExposeLocalDetails(t *testing.T) {

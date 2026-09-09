@@ -24,7 +24,7 @@ vi.mock("./githubAppUpdate", () => ({
 let updates: typeof import("./appUpdateStore");
 const release: GitHubApplicationRelease = {
   version: "1.8.9", name: "XIASS Tools v1.8.9", publishedAt: null,
-  url: "https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest",
+  url: "https://github.com/xyf0104/xiass-tools/releases/latest",
   installer: { filename: "XIASS.Tools_1.8.9_aarch64.dmg", url: "https://github.com/fixture", size: 100, sha256: "a".repeat(64) }
 };
 

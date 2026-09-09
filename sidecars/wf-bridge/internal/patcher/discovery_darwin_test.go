@@ -83,14 +83,18 @@ func TestSelectDarwinInstallationsHonorsExplicitRecoveryPath(t *testing.T) {
 }
 
 func TestDarwinDiscoverySkipsXIASSHelperBundle(t *testing.T) {
-	app := filepath.Join(t.TempDir(), "Antigravity WF助手.app")
-	writeDarwinUnpackedDiscoveryFixture(t, app, xiassToolsBundleIdentifier)
-	normalized := normalizeAppBundlePath(app)
-	if targets := selectDarwinInstallations([]string{normalized}, nil, func(string) bool { return true }); len(targets) != 0 {
-		t.Fatalf("XIASS helper bundle was exposed as an Antigravity target: %+v", targets)
-	}
-	if targets := selectDarwinInstallationsQuick([]string{normalized}, nil, func(string) bool { return true }); len(targets) != 0 {
-		t.Fatalf("XIASS helper bundle was exposed by quick discovery: %+v", targets)
+	for _, identifier := range []string{xiassToolsBundleIdentifier, legacyXIASSHelperBundleIdentifier} {
+		t.Run(identifier, func(t *testing.T) {
+			app := filepath.Join(t.TempDir(), "Antigravity WF助手.app")
+			writeDarwinUnpackedDiscoveryFixture(t, app, identifier)
+			normalized := normalizeAppBundlePath(app)
+			if targets := selectDarwinInstallations([]string{normalized}, nil, func(string) bool { return true }); len(targets) != 0 {
+				t.Fatalf("XIASS helper bundle was exposed as an Antigravity target: %+v", targets)
+			}
+			if targets := selectDarwinInstallationsQuick([]string{normalized}, nil, func(string) bool { return true }); len(targets) != 0 {
+				t.Fatalf("XIASS helper bundle was exposed by quick discovery: %+v", targets)
+			}
+		})
 	}
 }
 

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"antigravity-wf-assistant/internal/proxy"
-	"antigravity-wf-assistant/internal/storage"
-	"antigravity-wf-assistant/internal/updater"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/proxy"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/updater"
 )
 
 func TestApplicationQuitIsOnlyInterceptedUntilNativeExitIsRequested(t *testing.T) {

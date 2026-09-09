@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	"antigravity-wf-assistant/internal/proxyendpoint"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/proxyendpoint"
 )
 
 func TestProxyRuntimeStagesFallbackUntilExplicitCommit(t *testing.T) {

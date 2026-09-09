@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"antigravity-wf-assistant/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
 )
 
 // CodexDesktopControlStatus is the Wails-safe projection of desktop lifecycle

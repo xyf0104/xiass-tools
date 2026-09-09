@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 type promptCacheResult struct {

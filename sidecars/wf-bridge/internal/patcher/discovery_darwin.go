@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 const (
@@ -322,11 +322,14 @@ func darwinBundleIdentifierIsAntigravity(path string) bool {
 		strings.HasSuffix(identifier, ".antigravity")
 }
 
-const xiassToolsBundleIdentifier = "com.wufeng.antigravity-wf-assistant"
+const xiassToolsBundleIdentifier = "com.xiass.tools"
+
+// Keep excluding the legacy helper during installation discovery after the rename.
+const legacyXIASSHelperBundleIdentifier = "com.wufeng.antigravity-wf-assistant"
 
 func darwinBundleIdentifierIsXIASSHelper(path string) bool {
 	identifier := strings.ToLower(strings.TrimSpace(darwinBundleValue(path, "CFBundleIdentifier")))
-	return identifier == strings.ToLower(xiassToolsBundleIdentifier)
+	return identifier == xiassToolsBundleIdentifier || identifier == legacyXIASSHelperBundleIdentifier
 }
 
 func darwinTrustedCandidateHasExpectedIdentity(path string) bool {

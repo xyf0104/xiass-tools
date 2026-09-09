@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 func decodeAntigravityStreamResponse(t *testing.T, out string) map[string]any {

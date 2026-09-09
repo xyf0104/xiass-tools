@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 const (

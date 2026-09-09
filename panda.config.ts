@@ -598,8 +598,8 @@ export default defineConfig({
             boxShadow: "var(--glass-control-shadow)",
             backdropFilter: "blur(16px) saturate(145%)",
             "& svg": {
-              width: "17px",
-              height: "17px"
+              width: "16px",
+              height: "16px"
             },
             "&[data-refresh-button='true']": {
               fontSize: "12px",
@@ -628,6 +628,10 @@ export default defineConfig({
                 background:
                   "linear-gradient(118deg, #ff7a3d 0%, #ffb454 31%, #2f8df4 74%, #1856c8 100%)",
                 color: "#ffffff",
+                "& svg": {
+                  width: "18px",
+                  height: "18px"
+                },
                 "& .xiass-icon--action": {
                   filter: "brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0,0,0,.28))"
                 },

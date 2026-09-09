@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/claudeconfig"
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/claudeconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 type embeddedClaudeCodeActionStub struct {

@@ -116,6 +116,37 @@ describe("Codex desktop two-step workflow", () => {
     await fireEvent.click(ui.getByRole("button", { name: "返回选择配置" }));
     expect(ui.getByRole("button", { name: /XIASS API/ }).getAttribute("aria-pressed")).toBe("true");
   });
+  it("moves keyboard focus to the destination step without losing the choice", async () => {
+    const ui = screen(); await next(ui);
+    expect(document.activeElement).toBe(ui.getByRole("heading", { name: "使用所选配置启动" }));
+    await fireEvent.click(ui.getByRole("button", { name: "返回选择配置" }));
+    expect(document.activeElement).toBe(ui.getByRole("heading", { name: "选择配置" }));
+    expect(ui.getByRole("button", { name: /XIASS API/ }).getAttribute("aria-pressed")).toBe("true");
+  });
+  it("keeps name, endpoint and model in a single accessible launch summary", async () => {
+    const ui = screen(); await next(ui);
+    const details = ui.container.querySelector("dl.desktop-launch-summary")!;
+    expect(Array.from(details.querySelectorAll("dt"), (node) => node.textContent)).toEqual(["配置名称", "Base URL", "模型"]);
+    expect(Array.from(details.querySelectorAll("dd"), (node) => node.textContent)).toEqual([custom.name, custom.baseUrl, custom.model]);
+    expect(ui.container.querySelector(".cs-desktop-client-preview-list")).toBeNull();
+  });
+  it("disables every step switch while writing and launching", async () => {
+    let finish!: (value: unknown) => void;
+    calls.applyProfile.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const ui = screen(); await next(ui);
+    await fireEvent.click(ui.getByRole("button", { name: "启动" }));
+    for (const button of ui.container.querySelectorAll(".desktop-workflow-nav button, .desktop-workflow-actions button")) {
+      expect(button.hasAttribute("disabled")).toBe(true);
+    }
+    finish({ verified: true, nativeVerified: true, mode: "config", summary: summary() });
+    await waitFor(() => expect(calls.launch).toHaveBeenCalledOnce());
+  });
+  it("keeps New Configuration available with an empty profile list", () => {
+    const ui = screen(summary([]));
+    expect(ui.getByRole("button", { name: "下一步" }).hasAttribute("disabled")).toBe(true);
+    expect(ui.getByRole("button", { name: "新建配置" }).hasAttribute("disabled")).toBe(false);
+    expect(calls.applyProfile).not.toHaveBeenCalled();
+  });
   it("preserves install, launch enhancement, update and settings panels in Utilities", async () => {
     const ui = screen();
     await fireEvent.click(ui.getByRole("button", { name: "辅助功能" }));

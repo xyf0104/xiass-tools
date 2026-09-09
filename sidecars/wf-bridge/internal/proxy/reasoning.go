@@ -3,7 +3,7 @@ package proxy
 import (
 	"strings"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // applyOpenAIChatReasoning adds only the parameters that the selected model's

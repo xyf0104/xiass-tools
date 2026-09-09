@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // Antigravity executes a native image tool in two requests. The agent turn

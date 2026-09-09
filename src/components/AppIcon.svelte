@@ -97,7 +97,7 @@
   } satisfies Record<string, UiIcon>;
 
   export type AppIconName = keyof typeof appIcons;
-  const actionIcons = new Set(["arrowRight", "play", "power", "rocket", "install", "download", "update", "restart", "apply", "wizard", "add"]);
+  const actionIcons = new Set(["arrowRight", "play", "power", "rocket", "install", "download", "update", "restart", "apply", "save", "wizard", "add"]);
   const iconTones: Partial<Record<AppIconName, string>> = {
     check: "success", warning: "warning", error: "danger", delete: "danger", stop: "danger",
     key: "warning", folder: "warning", clock: "warning", repair: "warning",

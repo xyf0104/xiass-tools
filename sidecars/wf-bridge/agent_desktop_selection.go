@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"antigravity-wf-assistant/internal/agent"
-	"antigravity-wf-assistant/internal/agentdiscovery"
-	"antigravity-wf-assistant/internal/launcher"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agentdiscovery"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/launcher"
 )
 
 // AgentDesktopSelectionStatus is the redacted, renderer-safe result of an

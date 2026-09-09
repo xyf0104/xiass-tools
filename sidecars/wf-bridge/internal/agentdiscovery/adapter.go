@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
 )
 
 const defaultVersionTimeout = 2 * time.Second

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode"
 
-	"antigravity-wf-assistant/internal/claudeconfig"
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/claudeconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // ClaudeCodeApplyInput is an inbound-only Wails DTO. Credential and AuthToken

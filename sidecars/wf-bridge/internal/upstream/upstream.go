@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // DefaultXIASSBaseURL intentionally contains only the domain. The resolver

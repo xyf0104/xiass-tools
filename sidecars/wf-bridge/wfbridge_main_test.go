@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"antigravity-wf-assistant/internal/storage"
-	"antigravity-wf-assistant/internal/updater"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/updater"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )

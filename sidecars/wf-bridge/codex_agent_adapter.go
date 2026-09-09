@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"antigravity-wf-assistant/internal/agent"
-	"antigravity-wf-assistant/internal/codexconfig"
-	"antigravity-wf-assistant/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/agent"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
 )
 
 // codexAgentAdapter exposes the verified, local Codex configuration lifecycle

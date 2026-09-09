@@ -307,7 +307,7 @@ it("Settings downloads updates inside the app instead of opening a web page", as
   expect(apiMocks.openExternalUrl).not.toHaveBeenCalled();
   expect(screen.queryByRole("button", { name: "Open installer" })).toBeNull();
   expect(screen.getByRole("link", { name: "Release notes" }).getAttribute("href"))
-    .toBe("https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest");
+    .toBe("https://github.com/xyf0104/xiass-tools/releases/latest");
 });
 
 it("Settings shows real download progress and disables duplicate actions", () => {

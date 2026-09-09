@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/patcher"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/patcher"
 )
 
 func writeDarwinInstallStateExecutable(t *testing.T, root, name, contents string) string {

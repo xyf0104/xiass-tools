@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/codexconfig"
-	"antigravity-wf-assistant/internal/codexdesktop"
-	"antigravity-wf-assistant/internal/codexselection"
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexselection"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // These tests are an acceptance contract for users moving from the first-party

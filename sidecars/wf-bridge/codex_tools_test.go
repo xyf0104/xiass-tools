@@ -15,9 +15,9 @@ import (
 	"strings"
 	"testing"
 
-	"antigravity-wf-assistant/internal/codexconfig"
-	"antigravity-wf-assistant/internal/codexdesktop"
-	"antigravity-wf-assistant/internal/storage"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexconfig"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/codexdesktop"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 func TestRestoreCodexConfigurationRefusesWhileDesktopIsRunningOrUnverified(t *testing.T) {

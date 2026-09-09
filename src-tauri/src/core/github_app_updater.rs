@@ -9,7 +9,7 @@ use std::time::Duration;
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
-const REPOSITORY: &str = "xyf0104/Antigravity-WF-Assistant";
+const REPOSITORY: &str = "xyf0104/xiass-tools";
 pub const PROGRESS_EVENT: &str = "github-app-update-progress";
 static DOWNLOAD_LOCK: Mutex<()> = Mutex::new(());
 static DOWNLOADED_INSTALLER: Mutex<Option<VerifiedInstaller>> = Mutex::new(None);

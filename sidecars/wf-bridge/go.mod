@@ -1,4 +1,4 @@
-module antigravity-wf-assistant
+module github.com/xyf0104/xiass-tools/wf-bridge
 
 go 1.25.0
 
