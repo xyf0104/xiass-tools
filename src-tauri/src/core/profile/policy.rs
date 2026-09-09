@@ -53,14 +53,23 @@ pub(in crate::core::profile) fn normalize_token(
 
 pub(in crate::core::profile) fn normalize_provider_token(value: &str) -> Result<String, String> {
     let trimmed = normalize_required("Provider", value)?;
-    if trimmed
-        .chars()
-        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.'))
-    {
-        Ok(trimmed)
-    } else {
-        Err("Provider can only contain letters, numbers, '-', '_' and '.'".to_string())
+    // Provider is a display name, not a filesystem or TOML table identifier.
+    // Keep spaces and Unicode; the serializers escape quotes and punctuation.
+    if value.chars().any(char::is_control) {
+        return Err("Profile name cannot contain control characters.".to_string());
     }
+    Ok(trimmed)
+}
+
+pub(in crate::core::profile) fn normalize_profile_provider(name: &str, provider: &str) -> Result<String, String> {
+    if provider_is_official(provider.trim()) {
+        return Ok("official".to_string());
+    }
+    let name = normalize_provider_token(name)?;
+    if provider_is_official(&name) {
+        return Err("The profile name 'official' is reserved for client OAuth login.".to_string());
+    }
+    Ok(name)
 }
 
 pub(in crate::core::profile) fn validate_base_url(value: &str) -> Result<String, String> {

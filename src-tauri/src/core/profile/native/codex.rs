@@ -244,7 +244,7 @@ fn preview_config(
     } else {
         (
             provider_id_for_profile(profile),
-            profile.provider.trim().to_string(),
+            profile.name.trim().to_string(),
             wire_api_for_protocol(&profile.protocol)?.to_string(),
             profile_runtime_base_url_for_protocol(&profile.protocol, &profile.base_url),
         )
@@ -853,7 +853,7 @@ pub(in crate::core::profile) fn codex_direct_config_content(
     set_review_model(&mut document, profile, model);
     remove_provider_entry(&mut document, &provider_id);
     document["model_providers"][&provider_id] = toml_edit::Item::Table(toml_edit::Table::new());
-    document["model_providers"][&provider_id]["name"] = toml_edit::value(profile.provider.trim());
+    document["model_providers"][&provider_id]["name"] = toml_edit::value(profile.name.trim());
     document["model_providers"][&provider_id]["wire_api"] =
         toml_edit::value(wire_api_for_protocol(&profile.protocol)?);
     document["model_providers"][&provider_id]["base_url"] = toml_edit::value(

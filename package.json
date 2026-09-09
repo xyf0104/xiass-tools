@@ -1,7 +1,7 @@
 {
   "name": "xiass-tools",
   "private": true,
-  "version": "1.8.9",
+  "version": "1.9.0",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -31,7 +31,7 @@
     "icons": "tauri icon public/icon.png && node scripts/sharpen-small-icons.mjs",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test:unit": "tsc -p tsconfig.tests.json && node --test src/lib/*.test.mjs scripts/tests/*.test.mjs",
-    "test:components": "vitest run src/lib/macosApplicationScope.component.test.ts src/lib/appIcon.component.test.ts src/lib/windowDragRegion.component.test.ts src/lib/githubAppUpdate.test.ts src/lib/appUpdateStore.test.ts",
+    "test:components": "vitest run src/lib/macosApplicationScope.component.test.ts src/lib/appIcon.component.test.ts src/lib/windowDragRegion.component.test.ts src/lib/githubAppUpdate.test.ts src/lib/appUpdateStore.test.ts src/lib/desktopWorkflow.component.test.ts",
     "test": "npm run check && npm run test:unit && npm run test:components"
   },
   "dependencies": {

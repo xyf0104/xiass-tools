@@ -1,5 +1,23 @@
 use super::*;
 
+#[test]
+fn xiass_profile_name_is_the_provider_display_name() {
+    for name in ["XIASS API", "我的 API", "API \"测试\""] {
+        assert_eq!(normalize_profile_provider(name, "compatible").unwrap(), name);
+        let mut profile = test_profile("codex", ProviderApplyMode::Config);
+        profile.name = name.to_string();
+        profile.provider = name.to_string();
+        profile.protocol = PROTOCOL_OPENAI_RESPONSES.to_string();
+        let content = codex_direct_config_content("", &profile).unwrap();
+        let config: toml::Value = toml::from_str(&content).unwrap();
+        assert_eq!(read_toml_string(&config, "model_provider").as_deref(), Some("custom"));
+        assert_eq!(toml_lookup(&config, "model_providers.custom.name").and_then(|v| v.as_str()), Some(name));
+    }
+    assert_eq!(normalize_profile_provider("Codex Official", "official").unwrap(), "official");
+    assert!(normalize_profile_provider("official", "compatible").is_err());
+    assert!(normalize_profile_provider("a\nb", "compatible").is_err());
+}
+
 fn test_app_config() -> AppConfig {
     AppConfig {
         active_profiles_by_mode: ActiveProfilesByMode::default(),
@@ -1480,6 +1498,7 @@ model:
 fn codex_direct_config_rewrites_legacy_inline_provider_to_custom_table() {
     let mut profile = test_profile("codex", ProviderApplyMode::Config);
     profile.provider = "compatible".to_string();
+    profile.name = "XIASS API".to_string();
     profile.protocol = PROTOCOL_OPENAI_RESPONSES.to_string();
     profile.model = "gpt-5.5".to_string();
     profile.base_url = "https://api.apikey.fun/v1".to_string();
@@ -1505,7 +1524,7 @@ model_reasoning_effort = "xhigh"
     );
     assert_eq!(
         toml_lookup(&value, "model_providers.custom.name").and_then(|item| item.as_str()),
-        Some("compatible")
+        Some("XIASS API")
     );
     assert_eq!(
         toml_lookup(&value, "model_providers.custom.base_url").and_then(|item| item.as_str()),

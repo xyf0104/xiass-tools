@@ -434,6 +434,7 @@ pub fn get_helper_diagnostics() -> Result<WfHelperDiagnosticSnapshot, String> {
 pub fn call_method(method: &str, args: Vec<serde_json::Value>) -> Result<serde_json::Value, String> {
     let expected = match method {
         "GetTOTPEntries" => 0,
+        "RenameTOTPEntry" => 2,
         "PreviewTOTP" | "AddTOTPEntry" | "GenerateTOTPCode" | "DeleteTOTPEntry" => 1,
         "ExportTOTPEncryptedToPath" | "ImportTOTPEncryptedFromPath" => 2,
         _ => return Err("WF 方法未获准由 XIASS Tools 原生页面调用".to_string()),

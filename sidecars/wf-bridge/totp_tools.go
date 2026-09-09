@@ -70,6 +70,17 @@ func (a *App) AddTOTPEntry(input totp.ImportInput) TOTPStatus {
 	return a.GetTOTPEntries()
 }
 
+func (a *App) RenameTOTPEntry(id, label string) TOTPStatus {
+	vault, err := a.getTOTPVault()
+	if err != nil {
+		return TOTPStatus{Message: "本机验证器尚未完成初始化。"}
+	}
+	if _, err := vault.Rename(id, label); err != nil {
+		return TOTPStatus{Message: "无法重命名。请确认验证器存在，名称非空、不含控制字符且不超过 200 字节。"}
+	}
+	return a.GetTOTPEntries()
+}
+
 func (a *App) GenerateTOTPCode(id string) TOTPCodeResult {
 	vault, err := a.getTOTPVault()
 	if err != nil {

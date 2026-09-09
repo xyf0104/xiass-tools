@@ -12,16 +12,7 @@ pub fn run() {
         // the user is brought back to the existing app instead of spawning a
         // duplicate.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            use tauri::Manager;
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = window.set_skip_taskbar(false);
-                }
-            }
+            crate::core::tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -138,6 +129,13 @@ pub fn run() {
                 }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("failed to run CodeStudio Lite");
+        .build(tauri::generate_context!())
+        .expect("failed to build XIASS Tools")
+        .run(|_app, _event| {
+            // macOS Dock clicks go through Reopen, not the single-instance callback.
+            #[cfg(target_os = "macos")]
+            if matches!(_event, tauri::RunEvent::Reopen { .. }) {
+                crate::core::tray::show_main_window(_app);
+            }
+        });
 }

@@ -12,6 +12,8 @@
     "src/lib/detectionProgress.ts",
     "src/lib/profiles/catalog.ts",
     "src/lib/profiles/profileUsageController.ts",
-    "src/lib/profiles/presentation.ts"
+    "src/lib/profiles/presentation.ts",
+    "src/lib/profiles/xiass.ts",
+    "src/lib/chatgptDesktopProfiles.ts"
   ]
 }

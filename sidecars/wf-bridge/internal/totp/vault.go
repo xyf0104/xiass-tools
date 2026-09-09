@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	keyring "github.com/zalando/go-keyring"
 )
@@ -124,6 +125,42 @@ func (vault *Vault) Add(input ImportInput) (Entry, error) {
 	// the next vault operation sees the live ID and removes the journal without
 	// touching its secret.
 	_ = vault.clearPendingCleanupLocked()
+	return entry, nil
+}
+
+// Rename updates public metadata only; the credential ID and secret stay intact.
+func (vault *Vault) Rename(id, label string) (Entry, error) {
+	if vault == nil {
+		return Entry{}, errors.New("TOTP vault is unavailable")
+	}
+	id = strings.TrimSpace(id)
+	if !validID(id) {
+		return Entry{}, errors.New("invalid TOTP entry ID")
+	}
+	if strings.IndexFunc(label, unicode.IsControl) >= 0 {
+		return Entry{}, errors.New("invalid TOTP label")
+	}
+	label = strings.TrimSpace(label)
+	vault.mu.Lock()
+	defer vault.mu.Unlock()
+	document, err := vault.loadLocked()
+	if err != nil {
+		return Entry{}, err
+	}
+	index := findEntry(document.Entries, id)
+	if index < 0 {
+		return Entry{}, errors.New("TOTP entry does not exist")
+	}
+	entry := document.Entries[index]
+	entry.Label = label
+	entry.UpdatedAt = vault.now().UTC()
+	if err := validateEntry(entry); err != nil {
+		return Entry{}, err
+	}
+	document.Entries[index] = entry
+	if err := vault.saveLocked(document); err != nil {
+		return Entry{}, err
+	}
 	return entry, nil
 }
 

@@ -683,6 +683,10 @@ pub(in crate::core::profile) fn normalize_detected_provider(
     let from_provider = raw_provider
         .strip_prefix("codestudio-")
         .unwrap_or(raw_provider);
+    // Human-readable provider names written by XIASS must survive a rescan.
+    if from_provider.contains(' ') && normalize_provider_token(from_provider).is_ok() {
+        return from_provider.to_string();
+    }
     if let Some(provider) = normalize_detected_provider_display_token(from_provider) {
         return provider;
     }

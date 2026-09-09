@@ -297,6 +297,7 @@ export interface WizardPrefill {
   toolId?: string;
   toolName?: string;
   mode?: ProviderApplyMode;
+  lockTool?: boolean;
 }
 
 export interface Problem {
@@ -650,6 +651,7 @@ export interface PreviewProfileApplyResult {
 
 export interface ApplyProfileRequest {
   profileId: string;
+  reapply?: boolean;
   restartAfterApply?: boolean;
   syncClaudeVsCode?: boolean;
 }

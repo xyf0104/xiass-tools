@@ -7,6 +7,7 @@
     listProfileModels,
     previewProfileApply,
     reorderProfileDrafts,
+    saveProfileDraft,
     updateProfileDraft
   } from "../lib/api";
   import { t, type TranslationKey } from "../lib/i18n";
@@ -38,9 +39,11 @@
     profileDisplayName as resolveProfileDisplayName,
     profileIconIsImage,
     profileIconTextTooLong,
+    profileIconValue,
     profileModelOptionLabel,
     providerIsOfficial
   } from "../lib/profiles/presentation";
+  import { canReuseProfileKeyForModels, createXiassApiTemplate, profileNameErrorKey, profileProviderFromName, XIASS_API_TEMPLATE_ID } from "../lib/profiles/xiass";
   import AppIcon from "../components/AppIcon.svelte";
   import DismissibleNotice from "../components/DismissibleNotice.svelte";
   import ModelSelectInput from "../components/ModelSelectInput.svelte";
@@ -324,7 +327,12 @@
     syncClaudeVsCodePlugin = false;
   }
   $: editIconTooLong = profileIconTextTooLong(editForm.icon);
-  $: editBaseUrlErrorKey = providerNeedsBaseUrl(editForm.provider)
+  $: editingTemplate = pendingEdit?.id === XIASS_API_TEMPLATE_ID;
+  $: editOfficial = providerIsOfficial(pendingEdit?.provider ?? "");
+  $: editProvider = profileProviderFromName(editForm.name, editOfficial);
+  $: editNameErrorKey = profileNameErrorKey(editForm.name, editOfficial);
+  $: editIconPreview = pendingEdit ? profileIconValue({ ...pendingEdit, icon: editForm.icon }, editForm.name) : "";
+  $: editBaseUrlErrorKey = providerNeedsBaseUrl(editProvider)
     ? baseUrlValidationErrorKey(editForm.baseUrl)
     : null;
   $: availableEditProtocolOptions = pendingEdit
@@ -346,7 +354,7 @@
         profileId: pendingEdit.id,
         app: pendingEdit.app,
         mode: editForm.mode,
-        provider: editForm.provider,
+        provider: pendingEdit && !editingTemplate ? pendingEdit.provider : editProvider,
         protocol: editForm.protocol,
         baseUrl: editForm.baseUrl,
         apiKey: editForm.apiKey
@@ -359,30 +367,30 @@
   }
   $: canSaveEdit =
     Boolean(pendingEdit) &&
-    editForm.name.trim().length > 0 &&
+    !editNameErrorKey &&
     !editIconTooLong &&
-    editForm.provider.trim().length > 0 &&
-    (!providerIsOfficial(editForm.provider) || editableOfficialProfileAllowed(pendingEdit, editForm.mode)) &&
+    editProvider.length > 0 &&
+    (!editOfficial || editableOfficialProfileAllowed(pendingEdit, editForm.mode)) &&
     isProtocolAllowedForToolMode(pendingEdit?.app ?? "", editForm.mode, editForm.protocol) &&
-    (!providerNeedsBaseUrl(editForm.provider) || editBaseUrlErrorKey === null) &&
-    (!providerRequiresApiKey(editForm.provider) || Boolean(pendingEdit?.authRef) || editForm.apiKey.trim().length > 0) &&
+    (!providerNeedsBaseUrl(editProvider) || editBaseUrlErrorKey === null) &&
+    (!providerRequiresApiKey(editProvider) || Boolean(pendingEdit?.authRef) || editForm.apiKey.trim().length > 0) &&
     editModelMappingsValid &&
     editCodexContextValid &&
     !pendingEdit?.isBuiltin &&
     editingId === null;
   $: canFetchEditModels =
     Boolean(pendingEdit) &&
-    !providerIsOfficial(editForm.provider) &&
-    editForm.provider.trim().length > 0 &&
+    !editOfficial &&
+    !editNameErrorKey &&
     isProtocolAllowedForToolMode(pendingEdit?.app ?? "", editForm.mode, editForm.protocol) &&
-    (!providerNeedsBaseUrl(editForm.provider) || editBaseUrlErrorKey === null) &&
-    (!providerRequiresApiKey(editForm.provider) ||
+    (!providerNeedsBaseUrl(editProvider) || editBaseUrlErrorKey === null) &&
+    (!providerRequiresApiKey(editProvider) ||
       editForm.apiKey.trim().length > 0 ||
-      (pendingEdit?.provider === editForm.provider && Boolean(pendingEdit?.authRef))) &&
+      (pendingEdit && canReuseProfileKeyForModels(pendingEdit, editForm.protocol, editForm.baseUrl))) &&
     editingId === null &&
     !editModelLoading;
   $: editModelFetchDisabled =
-    !pendingEdit || providerIsOfficial(editForm.provider) || editingId !== null || editModelLoading;
+    !pendingEdit || editOfficial || editingId !== null || editModelLoading;
   $: editModelStatus = editModelLoading
     ? $t("profiles.fetchingModels")
     : editModelError
@@ -544,10 +552,10 @@
 
     try {
       const result = await listProfileModels({
-        profileId: pendingEdit.id,
+        profileId: editingTemplate ? null : pendingEdit.id,
         app: pendingEdit.app,
         mode: editForm.mode,
-        provider: editForm.provider,
+        provider: editingTemplate ? editProvider : pendingEdit.provider,
         protocol: editForm.protocol,
         baseUrl: normalizeBaseUrl(editForm.baseUrl),
         apiKey: editForm.apiKey.trim() || null
@@ -580,13 +588,12 @@
     editError = null;
 
     try {
-      const updated = await updateProfileDraft({
-        profileId: pendingEdit.id,
+      const request = {
         name: editForm.name,
         icon: normalizedProfileIcon(editForm.icon),
         remark: editForm.remark,
         mode: pendingEdit.mode,
-        provider: editForm.provider,
+        provider: editProvider,
         protocol: editForm.protocol,
         model: editForm.model,
         webSearch: editSupportsReviewModel ? editForm.webSearch : null,
@@ -597,7 +604,10 @@
         modelMappings: modelMappingsForRequest(pendingEdit.app, editForm.modelMappings),
         baseUrl: normalizeBaseUrl(editForm.baseUrl),
         apiKey: editForm.apiKey.trim().length > 0 ? editForm.apiKey : null
-      });
+      };
+      const updated = editingTemplate
+        ? await saveProfileDraft({ ...request, app: pendingEdit.app, secretProvided: Boolean(editForm.apiKey.trim()) })
+        : await updateProfileDraft({ ...request, profileId: pendingEdit.id });
       await onProfileSwitched(updated);
       pendingEdit = null;
       editForm = emptyEditForm();
@@ -1433,6 +1443,7 @@
             onDuplicate={handleDuplicate}
             onDelete={openDelete}
             onReorder={persistProfileOrder}
+            onSetupXiass={() => openEdit(createXiassApiTemplate())}
           />
         {/if}
       {:else}
@@ -1461,8 +1472,8 @@
       <div class={cx(desktopClientModalPanelRecipe(), modalPanelWideClass)} role="dialog" aria-modal="true" aria-labelledby="edit-title">
         <div class={desktopClientModalBodyRecipe()}>
           <div>
-          <h2 id="edit-title">{$t("profiles.editTitle", { name: pendingEdit.name })}</h2>
-          <p>{$t("profiles.editDescription")}</p>
+          <h2 id="edit-title">{editingTemplate ? $t("profiles.xiassOfficial") : $t("profiles.editTitle", { name: pendingEdit.name })}</h2>
+          <p>{$t(editingTemplate ? "profiles.xiassSetupHint" : "profiles.editDescription")}</p>
         </div>
 
         {#if editError}
@@ -1471,10 +1482,10 @@
 
         <div class={profileIconEditorRecipe()}>
           <div class={profileAvatarRecipe({ size: "large" })} aria-hidden="true">
-            {#if profileIconIsImage(editForm.icon.trim())}
-              <img src={editForm.icon.trim()} alt="" />
+            {#if profileIconIsImage(editIconPreview)}
+              <img src={editIconPreview} alt="" />
             {:else}
-              <span>{editForm.icon.trim() || profileDisplayName(pendingEdit).trim().charAt(0).toUpperCase() || "?"}</span>
+              <span>{editIconPreview}</span>
             {/if}
           </div>
           <label>
@@ -1504,31 +1515,33 @@
           <label>
             {$t("wizard.profileName")}
             <input bind:value={editForm.name} disabled={editingId !== null} />
+            {#if editNameErrorKey}<small class={profileFieldErrorRecipe()}>{$t(editNameErrorKey)}</small>{/if}
           </label>
-          <label>
-            {$t("profiles.remarkLabel")}
-            <textarea bind:value={editForm.remark} rows="2" disabled={editingId !== null} placeholder={$t("profiles.remarkPlaceholder")}></textarea>
-          </label>
+          {#if !editOfficial}
+            <label>
+              {$t("wizard.providerBaseUrl")}
+              <input value={editForm.baseUrl} disabled={editingId !== null} on:input={handleEditBaseUrlInput} on:blur={normalizeEditBaseUrlInput} />
+              {#if editBaseUrlErrorKey}<small class={profileFieldErrorRecipe()}>{$t(editBaseUrlErrorKey)}</small>{/if}
+            </label>
+          {/if}
           <label>
             {$t("profiles.tool")}
             <input value={toolLabels[pendingEdit.app] ?? pendingEdit.app} disabled />
           </label>
           <label>
-            {$t("profiles.providerModeTitle")}
-            <input value={applyModeLabel(pendingEdit.mode)} disabled />
+            {$t(editForm.mode === "gateway" ? "wizard.upstreamApi" : "wizard.protocol")}
+            <select bind:value={editForm.protocol} disabled={editingId !== null}>
+              {#each availableEditProtocolOptions as option}
+                <option value={option.id}>{$t(option.labelKey)}</option>
+              {/each}
+            </select>
           </label>
-          <label>
-            {$t("common.provider")}
-            <input bind:value={editForm.provider} disabled={editingId !== null} />
-          </label>
-        <label>
-          {$t(editForm.mode === "gateway" ? "wizard.upstreamApi" : "wizard.protocol")}
-          <select bind:value={editForm.protocol} disabled={editingId !== null}>
-            {#each availableEditProtocolOptions as option}
-              <option value={option.id}>{$t(option.labelKey)}</option>
-            {/each}
-          </select>
-        </label>
+          {#if !editOfficial}
+            <label>
+              {$t("wizard.providerApiKey")}
+              <input type="password" bind:value={editForm.apiKey} autocomplete="off" placeholder={$t(pendingEdit.authRef ? "profiles.keepExistingSecret" : "profiles.newSecretRequired")} disabled={editingId !== null} />
+            </label>
+          {/if}
           <div class={modelPickerClass}>
             <label for={`${editModelListId}-input`}>{$t("common.model")}</label>
             <div class={modelPickerRowClass}>
@@ -1688,31 +1701,6 @@
                 {/if}
               {/if}
             </section>
-          {/if}
-          {#if providerNeedsBaseUrl(editForm.provider)}
-            <label>
-              {$t("wizard.providerBaseUrl")}
-              <input
-                value={editForm.baseUrl}
-                disabled={editingId !== null}
-                on:input={handleEditBaseUrlInput}
-                on:blur={normalizeEditBaseUrlInput}
-              />
-              {#if editBaseUrlErrorKey}
-                <small class={profileFieldErrorRecipe()}>{$t(editBaseUrlErrorKey)}</small>
-              {/if}
-            </label>
-          {/if}
-          {#if providerRequiresApiKey(editForm.provider)}
-            <label>
-              {$t("wizard.providerApiKey")}
-              <input
-                type="password"
-                bind:value={editForm.apiKey}
-                placeholder={$t(pendingEdit.authRef ? "profiles.keepExistingSecret" : "profiles.newSecretRequired")}
-                disabled={editingId !== null}
-              />
-            </label>
           {/if}
         </div>
 

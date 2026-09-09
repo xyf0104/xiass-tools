@@ -916,6 +916,8 @@ pub struct PreviewProfileApplyResult {
 pub struct ApplyProfileRequest {
     pub profile_id: String,
     #[serde(default)]
+    pub reapply: bool,
+    #[serde(default)]
     pub restart_after_apply: bool,
     #[serde(default)]
     pub sync_claude_vs_code: bool,

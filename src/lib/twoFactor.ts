@@ -30,6 +30,7 @@ export const twoFactorApi = {
   add: (input: TOTPInput) => callWfMethod<TOTPResult>("AddTOTPEntry", [input]),
   code: (id: string) => callWfMethod<TOTPCodeResult>("GenerateTOTPCode", [id]),
   remove: (id: string) => callWfMethod<TOTPResult>("DeleteTOTPEntry", [id]),
+  rename: (id: string, label: string) => callWfMethod<TOTPResult>("RenameTOTPEntry", [id, label]),
   export: (password: string, destination: string) => callWfMethod<TOTPResult>("ExportTOTPEncryptedToPath", [password, destination]),
   import: (password: string, source: string) => callWfMethod<TOTPResult>("ImportTOTPEncryptedFromPath", [password, source])
 };

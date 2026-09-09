@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
+    applyProfile,
     openChatGPTDesktopPath,
   } from "../lib/api";
   import {
@@ -24,6 +25,9 @@
   import AppIcon from "../components/AppIcon.svelte";
   import DismissibleNotice from "../components/DismissibleNotice.svelte";
   import StatusPill from "../components/StatusPill.svelte";
+  import ToolIcon from "../components/ToolIcon.svelte";
+  import { activeDesktopCodexProfileId, desktopCodexProfiles, resolveDesktopCodexSelection } from "../lib/chatgptDesktopProfiles";
+  import { profileDisplayName, profileIconIsImage, profileIconValue, profileUsesToolIcon, providerIsOfficial } from "../lib/profiles/presentation";
   import { css, cx } from "../../styled-system/css";
   import {
     actionButtonRecipe,
@@ -42,6 +46,7 @@
     emptyRowRecipe,
     nativeToggleRecipe,
     panelRecipe,
+    profileAvatarRecipe,
     routeStackRecipe,
     sectionHeadingRecipe,
     spinRecipe,
@@ -51,8 +56,26 @@
   } from "../../styled-system/recipes";
   import type {
     ChatGPTDesktopProgress,
+    ProfileDraft,
+    ProfileSummary,
     Severity
   } from "../types";
+
+  export let profileSummary: ProfileSummary | null = null;
+  export let selectedCodexProfileId: string | null = null;
+  export let onCreateCodexProfile: () => void = () => {};
+  export let onProfileApplied: (summary: ProfileSummary) => void | Promise<void> = () => {};
+
+  let activeSection: "select" | "launch" | "utilities" = "select";
+  let profileApplying = false;
+  let profileApplyError: string | null = null;
+  $: codexProfiles = desktopCodexProfiles(profileSummary);
+  $: activeCodexProfileId = activeDesktopCodexProfileId(profileSummary);
+  $: if (profileSummary) selectedCodexProfileId = resolveDesktopCodexSelection(profileSummary, selectedCodexProfileId);
+  $: selectedProfile = codexProfiles.find((profile) => profile.id === selectedCodexProfileId) ?? null;
+  $: workflowBusy = profileApplying || Object.values(view.kindViews).some((kind) => kind.busyAction !== null);
+  // Installation started from the launchpad must still expose its progress.
+  $: if (busyAction === "install" || busyAction === "stage") activeSection = "utilities";
 
   $: view = $chatgptDesktopView;
   $: installKinds = view.installKinds;
@@ -116,7 +139,28 @@
   }
 
   async function launchCodex() {
-    await launchManagedChatGPTDesktop();
+    if (!selectedProfile || !canLaunch || workflowBusy) return;
+    const profileId = selectedProfile.id;
+    profileApplying = true;
+    profileApplyError = null;
+    dismissSuccess();
+    try {
+      const result = await applyProfile({ profileId, restartAfterApply: false, reapply: true });
+      if (!result.verified || !result.nativeVerified || result.mode !== "config") {
+        throw new Error($t("chatgptDesktop.configVerificationFailed"));
+      }
+      profileSummary = result.summary;
+      await onProfileApplied(result.summary);
+      await launchManagedChatGPTDesktop(true);
+    } catch (err) {
+      profileApplyError = err instanceof Error ? err.message : String(err);
+    } finally {
+      profileApplying = false;
+    }
+  }
+
+  function displayProfileName(profile: ProfileDraft) {
+    return profileDisplayName(profile, $t("profiles.officialProfile.codex"));
   }
 
   async function refreshCodex() {
@@ -213,35 +257,46 @@
   <section class={topStripRecipe()}>
     <div>
       <h1>{$t("chatgptDesktop.title")}</h1>
-      <p>{$t("chatgptDesktop.subtitle")}</p>
+      <p>{$t("chatgptDesktop.workflowSubtitle")}</p>
       <div class={statusStripRecipe()}>
         <StatusPill status={statusTone} label={statusLabel} />
         <span>{state ? $t("dashboard.lastScan", { time: new Date(state.generatedAt).toLocaleString() }) : $t("dashboard.waitingForScan")}</span>
       </div>
     </div>
     <div class={topActionsRecipe()}>
-      <button class={actionButtonRecipe({ tone: "primary" })} disabled={!canLaunch || busyAction !== null} on:click={launchCodex}>
-        {#if busyAction === "launch"}
-          <AppIcon name="loading" size={16} class={spinRecipe()} />
-          {$t("toolLaunch.starting")}
-        {:else}
-          <AppIcon name="play" size={16} />
-          {$t("chatgptDesktop.launch")}
-        {/if}
+      <button class={actionButtonRecipe({ tone: "primary" })} disabled={workflowBusy} on:click={onCreateCodexProfile}>
+        <AppIcon name="add" size={16} />
+        {$t("common.createConfig")}
       </button>
-      <button class={actionButtonRecipe()} data-refresh-button="true" disabled={kindView.loading || busyAction !== null} on:click={refreshCodex}>
+      <button class={actionButtonRecipe()} data-refresh-button="true" disabled={kindView.loading || workflowBusy} on:click={refreshCodex}>
         <AppIcon name={kindView.loading ? "loading" : "refresh"} size={15} class={kindView.loading ? spinRecipe() : ""} />
         {$t(kindView.loading ? "common.refreshing" : "common.refresh")}
       </button>
     </div>
   </section>
 
-  {#if isWindows && installKinds}
+  <nav class={cx(panelRecipe(), "desktop-workflow-nav")} aria-label={$t("chatgptDesktop.workflowNavigation")}>
+    <button class={actionButtonRecipe()} data-active={activeSection === "select"} aria-current={activeSection === "select" ? "step" : undefined} disabled={workflowBusy} on:click={() => activeSection = "select"}>
+      <AppIcon name="profiles" tone="info" size={19} />
+      1 · {$t("chatgptDesktop.selectConfig")}
+    </button>
+    <button class={actionButtonRecipe()} data-active={activeSection === "launch"} aria-current={activeSection === "launch" ? "step" : undefined} disabled={!selectedProfile || workflowBusy} on:click={() => activeSection = "launch"}>
+      <AppIcon name="play" tone="action" size={19} />
+      2 · {$t("chatgptDesktop.launch")}
+    </button>
+    <button class={actionButtonRecipe()} data-active={activeSection === "utilities"} aria-current={activeSection === "utilities" ? "page" : undefined} on:click={() => activeSection = "utilities"}>
+      <AppIcon name="settings" tone="violet" size={19} />
+      {$t("chatgptDesktop.utilities")}
+    </button>
+  </nav>
+
+  {#if activeSection !== "select" && isWindows && installKinds}
     <div class={desktopClientTabsRecipe()} role="tablist">
       <button
         role="tab"
         data-selected={effectiveSelectedKind === "msix"}
         aria-selected={effectiveSelectedKind === "msix"}
+        disabled={workflowBusy}
         on:click={() => setChatGPTDesktopSelectedKind("msix")}
       >
         {$t("desktopClient.kind.windowsApp")}
@@ -250,6 +305,7 @@
         role="tab"
         data-selected={effectiveSelectedKind === "portable"}
         aria-selected={effectiveSelectedKind === "portable"}
+        disabled={workflowBusy}
         on:click={() => setChatGPTDesktopSelectedKind("portable")}
       >
         {$t("desktopClient.kind.exe")}
@@ -263,6 +319,95 @@
   {#if success}
     <DismissibleNotice tone="success" message={brandDesktopText(formatNoticeMessage(success))} on:dismiss={dismissSuccess} />
   {/if}
+
+  {#if profileApplyError}
+    <DismissibleNotice tone="error" message={profileApplyError} on:dismiss={() => profileApplyError = null} />
+  {/if}
+
+  {#if activeSection === "select"}
+    <section class={panelRecipe()} aria-labelledby="desktop-select-title">
+      <div class={sectionHeadingRecipe()}>
+        <div class={headingCopyClass}>
+          <h2 id="desktop-select-title">{$t("chatgptDesktop.selectConfig")}</h2>
+          <p>{$t("chatgptDesktop.selectConfigHint")}</p>
+        </div>
+      </div>
+      <div class="desktop-profile-list" role="group" aria-label={$t("chatgptDesktop.selectConfig")}>
+        {#each codexProfiles as profile (profile.id)}
+          {@const name = displayProfileName(profile)}
+          {@const icon = profileIconValue(profile, name)}
+          <button type="button" class="desktop-profile-option" data-selected={selectedCodexProfileId === profile.id}
+            aria-pressed={selectedCodexProfileId === profile.id} disabled={workflowBusy}
+            on:click={() => { selectedCodexProfileId = profile.id; profileApplyError = null; }}>
+            <span class={profileAvatarRecipe()} aria-hidden="true">
+              {#if profileUsesToolIcon(profile)}
+                <ToolIcon toolId="codex" label={name} variant="heading" />
+              {:else if profileIconIsImage(icon)}<img src={icon} alt="" />
+              {:else}<span>{icon}</span>{/if}
+            </span>
+            <span class="desktop-profile-copy">
+              <strong>{name}</strong>
+              <span>{providerIsOfficial(profile.provider) ? $t("profiles.officialProfileEndpoint") : profile.baseUrl}</span>
+              {#if profile.model}<small>{$t("common.model")}: {profile.model}</small>{/if}
+            </span>
+            <span class="desktop-profile-flags">
+              {#if activeCodexProfileId === profile.id}<span class="desktop-profile-active">{$t("common.active")}</span>{/if}
+              <span class="desktop-selection-mark" data-checked={selectedCodexProfileId === profile.id}>
+                {#if selectedCodexProfileId === profile.id}<AppIcon name="check" tone="success" size={22} />{/if}
+              </span>
+            </span>
+          </button>
+        {:else}
+          <div class={emptyRowRecipe()}>{profileSummary ? $t("chatgptDesktop.noCodexProfiles") : $t("common.loading")}</div>
+        {/each}
+      </div>
+      <div class={desktopClientActionsRecipe()}>
+        <button class={actionButtonRecipe({ tone: "primary" })} disabled={!selectedProfile || workflowBusy} on:click={() => activeSection = "launch"}>
+          {$t("common.next")}<AppIcon name="arrowRight" size={16} />
+        </button>
+      </div>
+    </section>
+  {:else if activeSection === "launch"}
+    <section class={panelRecipe()} aria-labelledby="desktop-launch-title">
+      <div class={sectionHeadingRecipe()}>
+        <div class={headingCopyClass}>
+          <h2 id="desktop-launch-title">{$t("chatgptDesktop.launchWithConfig")}</h2>
+          <p>{$t("chatgptDesktop.launchWithConfigHint")}</p>
+        </div>
+      </div>
+      {#if selectedProfile}
+        <div class={desktopClientPreviewListRecipe()}>
+          <div><strong>{$t("wizard.profileName")}</strong><span>{displayProfileName(selectedProfile)}</span></div>
+          <div><strong>{$t("wizard.providerBaseUrl")}</strong><span>{providerIsOfficial(selectedProfile.provider) ? $t("profiles.officialProfileEndpoint") : selectedProfile.baseUrl}</span></div>
+          <div><strong>{$t("common.model")}</strong><span>{selectedProfile.model || $t("chatgptDesktop.clientDefaultModel")}</span></div>
+        </div>
+        {#if providerIsOfficial(selectedProfile.provider)}
+          <p class="desktop-launch-hint">{$t("chatgptDesktop.officialLoginHint")}</p>
+        {/if}
+      {/if}
+      {#if !canLaunch}<p class="desktop-launch-hint">{$t("chatgptDesktop.installBeforeLaunch")}</p>{/if}
+      <div class={desktopClientActionsRecipe()}>
+        <button class={actionButtonRecipe()} disabled={workflowBusy} on:click={() => activeSection = "select"}>
+          <AppIcon name="arrowLeft" size={16} />{$t("chatgptDesktop.backToSelection")}
+        </button>
+        {#if canLaunch}
+          <button class={actionButtonRecipe({ tone: "primary" })} disabled={!selectedProfile || workflowBusy} on:click={launchCodex}>
+            <AppIcon name={workflowBusy ? "loading" : "play"} size={17} class={workflowBusy ? spinRecipe() : ""} />
+            {profileApplying && busyAction !== "launch" ? $t("chatgptDesktop.applyingConfig") : busyAction === "launch" ? $t("toolLaunch.starting") : $t("chatgptDesktop.launch")}
+          </button>
+        {:else}
+          <button class={actionButtonRecipe({ tone: "primary" })} disabled={workflowBusy} on:click={() => activeSection = "utilities"}>
+            <AppIcon name="download" size={17} />{$t("chatgptDesktop.openInstallTools")}
+          </button>
+        {/if}
+        <button class={actionButtonRecipe()} on:click={() => activeSection = "utilities"}>
+          <AppIcon name="settings" size={16} />{$t("chatgptDesktop.utilities")}
+        </button>
+      </div>
+    </section>
+  {/if}
+
+  {#if activeSection === "utilities"}
 
   <section class={panelRecipe()}>
     <div class={sectionHeadingRecipe()}>
@@ -376,7 +521,7 @@
       </div>
     </div>
     <div class={desktopClientActionsRecipe()}>
-      <button class={actionButtonRecipe()} disabled={!canStage || busyAction !== null} on:click={stagePackage}>
+      <button class={actionButtonRecipe()} disabled={!canStage || workflowBusy} on:click={stagePackage}>
         <AppIcon name="download" size={16} />
         {busyAction === "stage" ? $t("chatgptDesktop.staging") : $t("chatgptDesktop.stage")}
       </button>
@@ -384,11 +529,11 @@
         <AppIcon name="folder" size={16} />
         {$t("chatgptDesktop.openStagingPath")}
       </button>
-      <button class={actionButtonRecipe({ tone: "primary" })} disabled={!canInstall || busyAction !== null} on:click={installOrUpdate}>
+      <button class={actionButtonRecipe({ tone: "primary" })} disabled={!canInstall || workflowBusy} on:click={installOrUpdate}>
         <AppIcon name="rocket" size={16} />
         {busyAction === "install" ? $t("chatgptDesktop.installing") : installed ? $t("chatgptDesktop.update") : $t("chatgptDesktop.install")}
       </button>
-      <button class={actionButtonRecipe()} disabled={!canUninstall || busyAction !== null} on:click={() => setChatGPTDesktopConfirmUninstall(true)}>
+      <button class={actionButtonRecipe()} disabled={!canUninstall || workflowBusy} on:click={() => setChatGPTDesktopConfirmUninstall(true)}>
         <AppIcon name="delete" size={16} />
         {$t("common.uninstall")}
       </button>
@@ -556,6 +701,7 @@
     {/if}
   </section>
 
+  {/if}
 </div>
 
 {#if confirmUninstall}
@@ -580,7 +726,7 @@
 
       <div class={desktopClientModalActionsRecipe()}>
         <button class={actionButtonRecipe()} on:click={() => setChatGPTDesktopConfirmUninstall(false)}>{$t("common.cancel")}</button>
-        <button class={actionButtonRecipe({ tone: "primary" })} disabled={busyAction !== null} on:click={removeCodex}>
+        <button class={actionButtonRecipe({ tone: "primary" })} disabled={workflowBusy} on:click={removeCodex}>
           <AppIcon name="delete" size={16} />
           {busyAction === "uninstall" ? $t("chatgptDesktop.uninstalling") : $t("chatgptDesktop.confirmUninstall")}
         </button>
@@ -588,3 +734,33 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .desktop-workflow-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px; }
+  .desktop-workflow-nav button { min-height: 46px; }
+  .desktop-workflow-nav button[data-active="true"] {
+    border-color: var(--accent); color: var(--text);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--amber) 20%, var(--surface)), color-mix(in srgb, var(--accent) 24%, var(--surface)));
+  }
+  .desktop-profile-list { display: grid; gap: 12px; padding: 16px 20px 4px; }
+  .desktop-profile-option { display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0; min-height: 86px; padding: 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface-soft); color: var(--text); text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease; }
+  .desktop-profile-option:hover { border-color: var(--accent); }
+  .desktop-profile-option[data-selected="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
+  .desktop-profile-option:focus-visible, .desktop-workflow-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .desktop-profile-copy { display: grid; flex: 1; min-width: 0; gap: 5px; }
+  .desktop-profile-copy strong { font-size: 16px; line-height: 1.4; color: var(--text); overflow-wrap: anywhere; }
+  .desktop-profile-copy > span, .desktop-profile-copy small { font-size: 13px; line-height: 1.5; color: var(--text-soft); overflow-wrap: anywhere; }
+  .desktop-profile-flags { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .desktop-profile-active { color: var(--text); background: var(--surface); padding: 5px 9px; border-radius: 10px; font-size: 12px; }
+  .desktop-selection-mark { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: 50%; }
+  .desktop-selection-mark[data-checked="true"] { border-color: transparent; }
+  .desktop-launch-hint { margin: 12px 20px; color: var(--text-soft); font-size: 13px; line-height: 1.6; }
+  @media (max-width: 620px) {
+    .desktop-workflow-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .desktop-workflow-nav button:last-child { grid-column: 1 / -1; }
+    .desktop-profile-option { flex-wrap: wrap; padding: 12px; }
+    .desktop-profile-flags { margin-left: auto; }
+    .desktop-profile-list { padding-inline: 12px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .desktop-profile-option { transition: none; } }
+</style>

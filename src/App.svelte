@@ -67,6 +67,8 @@
   let error: string | null = null;
   let gatewayBusy = false;
   let wizardPrefill: WizardPrefill | null = null;
+  let wizardReturnRoute: "profiles" | "chatgptDesktop" = "profiles";
+  let desktopCodexProfileId: string | null = null;
   let profileManagementMode: ProviderApplyMode = "config";
   let backgroundDetectionTimers: number[] = [];
   let backgroundDetectionInterval: number | null = null;
@@ -433,7 +435,7 @@
         await refreshDashboard({ quiet: true, scheduleFollowup: true, showRefreshIndicator: true, waitForUpdates: true });
       }
     } else if (currentRoute === "chatgptDesktop") {
-      await ensureChatGPTDesktopLoaded();
+      await Promise.all([ensureChatGPTDesktopLoaded(), refreshAfterProfileChange()]);
     } else if (currentRoute === "claudeDesktop") {
       await ensureClaudeDesktopLoaded();
     } else if (currentRoute === "profiles" || currentRoute === "gateway") {
@@ -537,8 +539,14 @@
   });
 
   function openWizard(prefill: WizardPrefill | null = null) {
+    wizardReturnRoute = "profiles";
     wizardPrefill = prefill;
     route = "wizard";
+  }
+
+  function createDesktopCodexProfile() {
+    openWizard({ toolId: "codex", toolName: "Codex", mode: "config", lockTool: true });
+    wizardReturnRoute = "chatgptDesktop";
   }
 
   function configureTool(tool: ToolStatus) {
@@ -601,14 +609,27 @@
             onNavigateToClient={navigateToClient}
           />
         {:else if route === "chatgptDesktop"}
-          <ChatGPTDesktop />
+          <ChatGPTDesktop
+            {profileSummary}
+            bind:selectedCodexProfileId={desktopCodexProfileId}
+            onCreateCodexProfile={createDesktopCodexProfile}
+            onProfileApplied={async (summary) => {
+              applyProfileSummary(summary);
+              await refreshAfterProfileChange();
+            }}
+          />
         {:else if route === "claudeDesktop"}
           <ClaudeDesktop />
         {:else if route === "wizard"}
-          <SetupWizard {snapshot} prefill={wizardPrefill} onProfileSaved={(profile) => {
+          <SetupWizard {snapshot} prefill={wizardPrefill} onCancel={() => { route = wizardReturnRoute; }} onProfileSaved={(profile) => {
             applySavedProfile(profile);
             profileManagementMode = profile.mode;
-            route = "profiles";
+            if (wizardReturnRoute === "chatgptDesktop") {
+              desktopCodexProfileId = profile.id;
+              route = "chatgptDesktop";
+            } else {
+              route = "profiles";
+            }
           }} />
         {:else if route === "profiles"}
           <Profiles

@@ -10,7 +10,7 @@ function componentInvocation(source, component) {
   return match[0];
 }
 
-test("App owns the active profile-management mode and returns every saved profile to Access Profiles", () => {
+test("App owns the active mode and returns saved profiles to their originating workflow", () => {
   const app = read("src/App.svelte");
   const profilesInvocation = componentInvocation(app, "Profiles");
   const gatewayInvocation = componentInvocation(app, "Gateway");
@@ -21,6 +21,7 @@ test("App owns the active profile-management mode and returns every saved profil
     /onProfileSaved=\{\(profile\) => \{[\s\S]*?applySavedProfile\(profile\);[\s\S]*?profileManagementMode = profile\.mode;[\s\S]*?route = "profiles";/
   );
   assert.doesNotMatch(app, /route = mode === "gateway" \? "gateway" : "profiles"/);
+  assert.match(app, /if \(wizardReturnRoute === "chatgptDesktop"\) \{\s*desktopCodexProfileId = profile.id;\s*route = "chatgptDesktop";\s*\} else \{\s*route = "profiles";/);
 
   assert.match(profilesInvocation, /bind:modeFilter=\{profileManagementMode\}/);
   assert.match(profilesInvocation, /onCreateProfile=\{\(prefill\) => openWizard\(prefill \?\? null\)\}/);
@@ -44,7 +45,7 @@ test("saved and edited profiles update the shared summary before background refr
     app,
     /async function refreshAfterProfileChange\(profile\?: ProfileDraft\) \{[\s\S]*?applySavedProfile\(profile\);[\s\S]*?await refreshProfileAndGatewayOnly\(\);/
   );
-  assert.match(profiles, /const updated = await updateProfileDraft\(\{[\s\S]*?await onProfileSwitched\(updated\);/);
+  assert.match(profiles, /const updated = editingTemplate\s*\? await saveProfileDraft\([\s\S]*?: await updateProfileDraft\([\s\S]*?await onProfileSwitched\(updated\);/);
   assert.match(profiles, /const duplicated = await duplicateProfileDraft\(\{ profileId: profile\.id \}\);[\s\S]*?await onProfileSwitched\(duplicated\);/);
   assert.match(profileList, /const nextKey = profileListContentKey\(`\$\{nextMode\}:\$\{nextToolId\}`, nextProfiles\);/);
   assert.doesNotMatch(profileList, /profileIdsFromItems\(nextProfiles\)\.join\("\|"\)/);
@@ -180,7 +181,7 @@ test("Codex profiles own an optional review model across forms, cards, mocks, an
   assert.equal((types.match(/reviewModel\?: string \| null;/g) ?? []).length, 3);
   assert.match(rustTypes, /pub review_model: Option<String>,/);
 
-  assert.match(wizard, /let reviewModel = "";/);
+  assert.match(wizard, /let reviewModel: string = XIASS_API_PRESET.reviewModel;/);
   assert.match(wizard, /\$: supportsReviewModel = canonicalProfileToolId\(selectedTool\) === "codex";/);
   assert.match(wizard, /reviewModel: activeReviewModel/);
   assert.match(wizard, /\{#if supportsReviewModel\}[\s\S]*?profiles\.reviewModelLabel[\s\S]*?bind:value=\{reviewModel\}/);

@@ -36,6 +36,8 @@
   let confirmation = "";
   let dialogError = "";
   let deleting: TOTPEntry | null = null;
+  let renamingId: string | null = null;
+  let renameLabel = "";
 
   $: migrationCredentials = migrationBatchCredentials(migration);
   $: shownEntries = activeList === "saved" ? entries : recent.map((item) => ({ ...item.entry, id: item.id }));
@@ -110,19 +112,37 @@
     busy = "save"; clearFeedback();
     try {
       const before = new Set(entries.map((entry) => entry.id));
-      const result = check(await twoFactorApi.add(item.input));
+      const result = check(await twoFactorApi.add({ ...item.input, label: label.trim() || item.entry.label }));
       if (disposed) return;
       entries = result.entries || entries;
       const saved = entries.find((entry) => !before.has(entry.id));
       // After saving, reference the system vault and release the draft secret.
       if (saved) {
-        const updated = { ...item, input: undefined, savedId: saved.id };
+        const updated = { ...item, entry: saved, input: undefined, savedId: saved.id };
         currentQuery = updated;
         recent = recent.map((query) => query.id === item.id ? updated : query);
         if (codes[item.id]) codes = { ...codes, [saved.id]: codes[item.id] };
       } else { currentQuery = null; recent = recent.filter((query) => query.id !== item.id); }
       clearDraft(); activeList = "saved";
       notice = "已保存到系统凭据库。可在下方显示、复制动态验证码，并导出加密备份。";
+    } catch (cause) { if (!disposed) error = message(cause); }
+    finally { busy = ""; }
+  }
+
+  async function renameEntry(entry: TOTPEntry) {
+    if (busy || loading || !renameLabel.trim()) return;
+    busy = "rename"; clearFeedback();
+    try {
+      const result = check(await twoFactorApi.rename(entry.id, renameLabel.trim()));
+      if (disposed) return;
+      entries = result.entries || entries;
+      const updated = entries.find((item) => item.id === entry.id);
+      if (updated) {
+        recent = recent.map((item) => item.savedId === entry.id ? { ...item, entry: updated } : item);
+        if (currentQuery?.savedId === entry.id) currentQuery = { ...currentQuery, entry: updated };
+      }
+      renamingId = null; renameLabel = "";
+      notice = "验证器名称已更新，原有密钥与验证码算法保持不变。";
     } catch (cause) { if (!disposed) error = message(cause); }
     finally { busy = ""; }
   }
@@ -286,8 +306,8 @@
       <form class="query-main" on:submit|preventDefault={query}>
         <label for="totp-value">验证器链接或 Base32 密钥</label>
         <textarea id="totp-value" bind:value rows="2" autocomplete="off" spellcheck="false" placeholder="otpauth://totp/… 或 Base32 Secret" disabled={Boolean(busy)} on:input={invalidateQuery}></textarea>
-        <details class="advanced"><summary>名称与高级参数（可选）</summary><div class="advanced-fields">
-          <label>识别名称<input bind:value={label} maxlength="200" disabled={Boolean(busy)} placeholder="例如：XIASS API" on:input={invalidateQuery} /></label>
+        <label>验证器名称（可选）<input bind:value={label} maxlength="200" disabled={Boolean(busy)} placeholder="例如：XIASS API，可在保存前自定义" /></label>
+        <details class="advanced"><summary>高级参数（可选）</summary><div class="advanced-fields">
           <label>算法<select bind:value={algorithm} disabled={Boolean(busy)} on:change={invalidateQuery}><option>SHA1</option><option>SHA256</option><option>SHA512</option></select></label>
           <label>位数<select bind:value={digits} disabled={Boolean(busy)} on:change={invalidateQuery}><option value={6}>6 位</option><option value={8}>8 位</option></select></label>
           <label>周期（秒）<input type="number" min="15" max="120" bind:value={period} disabled={Boolean(busy)} on:input={invalidateQuery} /></label>
@@ -301,7 +321,7 @@
       </form>
       <div class="query-preview">
         {#if currentQuery}
-          <strong>{currentQuery.entry.label}</strong>
+          <strong>{currentQuery.input ? label.trim() || currentQuery.entry.label : currentQuery.entry.label}</strong>
           <output aria-label="查询结果验证码">{codeRemaining(previewCode, now) > 0 ? previewCode?.value : "··· ···"}</output>
           <span>{codeRemaining(previewCode, now) > 0 ? `${codeRemaining(previewCode, now)} 秒后更新` : "等待更新"}</span>
           <button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy)} on:click={() => void copyCode(currentQuery!.id)}><AppIcon name="copy" tone="cyan" size={16} />复制验证码</button>
@@ -333,8 +353,18 @@
           <div class="actions entry-actions">
             <button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy)} on:click={() => void showCode(entry.id)}><AppIcon name="eye" size={16} />{codes[entry.id] ? "刷新" : "显示验证码"}</button>
             <button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy)} on:click={() => void copyCode(entry.id)} aria-label={`复制 ${entry.label} 的验证码`}><AppIcon name="copy" tone="cyan" size={16} />复制</button>
-            {#if activeList === "saved"}<button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy)} on:click={() => openModal("delete", entry)} aria-label={`删除 ${entry.label}`}><AppIcon name="delete" tone="danger" size={16} /></button>{/if}
+            {#if activeList === "saved"}
+              <button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy) || loading} on:click={() => { renamingId = entry.id; renameLabel = entry.label; }} aria-label={`重命名 ${entry.label}`}><AppIcon name="edit" tone="violet" size={16} />重命名</button>
+              <button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy)} on:click={() => openModal("delete", entry)} aria-label={`删除 ${entry.label}`}><AppIcon name="delete" tone="danger" size={16} /></button>
+            {/if}
           </div>
+          {#if renamingId === entry.id && activeList === "saved"}
+            <form class="entry-rename" on:submit|preventDefault={() => renameEntry(entry)}>
+              <label>新名称<input bind:value={renameLabel} maxlength="200" required disabled={Boolean(busy)} /></label>
+              <button class={actionButtonRecipe({ compact: true, tone: "primary" })} type="submit" disabled={Boolean(busy) || loading || !renameLabel.trim()}>{busy === "rename" ? "保存中…" : "保存名称"}</button>
+              <button class={actionButtonRecipe({ compact: true })} type="button" disabled={Boolean(busy)} on:click={() => { renamingId = null; renameLabel = ""; }}>取消</button>
+            </form>
+          {/if}
         </article>
       {/each}
     </div>{:else}<div class="empty-list"><AppIcon name={activeList === "saved" ? "shield" : "clock"} tone="violet" size={30} /><strong>{loading ? "正在读取本机验证器…" : activeList === "saved" ? "还没有保存的验证器" : "还没有临时查询"}</strong><span>{activeList === "saved" ? "在上方查询后保存，或导入已有的加密备份。" : "输入链接或密钥，点击“查询”即可开始。"}</span></div>{/if}
@@ -366,20 +396,20 @@
   .feedback { padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
   .feedback.error { color: var(--danger-text); background: color-mix(in srgb, var(--danger) 12%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
   .feedback.notice { color: var(--info-text); background: color-mix(in srgb, var(--cyan) 9%, var(--surface)); }
-  .query-panel { padding: 20px; }
+  .query-panel { padding: 16px; }
   .query-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(210px, .36fr); gap: 18px; margin-top: 18px; }
   .query-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
   label { display: grid; gap: 7px; color: var(--text-soft); font-size: 13px; font-weight: 700; }
   textarea { min-height: 76px; padding: 12px; resize: vertical; font: 13px/1.5 ui-monospace, "SFMono-Regular", monospace; }
   .advanced summary { cursor: pointer; color: var(--text-soft); font-size: 12px; padding: 6px 0; }
-  .advanced-fields { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .advanced-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
   .advanced p, .query-hint { color: var(--text-soft); font-size: 12px; line-height: 1.7; }
   .query-hint { margin: 16px 0 0; }
   .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .actions :global(button) { min-height: 40px; }
-  .query-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px 14px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface-soft); text-align: center; }
+  .query-preview { display: flex; flex-direction: column; align-items: center; align-self: start; justify-content: center; gap: 10px; min-height: 132px; padding: 14px 12px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-soft); text-align: center; }
   .query-preview strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
-  .query-preview output { color: var(--accent-strong); font: 800 clamp(26px, 3vw, 34px)/1.25 ui-monospace, "SFMono-Regular", monospace; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+  .query-preview output { color: var(--accent-strong); font: 800 clamp(24px, 2.6vw, 30px)/1.25 ui-monospace, "SFMono-Regular", monospace; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
   .query-preview span { color: var(--text-soft); font-size: 12px; line-height: 1.5; }
   .hidden-file { display: none; }
   .migration-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
@@ -391,13 +421,15 @@
   .list-tabs button.active { color: var(--text); background: var(--surface-soft); border-color: var(--border-strong); }
   .list-tabs small { min-width: 20px; font-variant-numeric: tabular-nums; }
   .recent-hint { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 18px; color: var(--text-soft); font-size: 12px; }
-  .entry-row { display: grid; grid-template-columns: minmax(160px, 1fr) 140px auto; gap: 16px; align-items: center; padding: 16px 18px; }
+  .entry-row { display: grid; grid-template-columns: minmax(140px, 1fr) 130px auto; gap: 12px; align-items: center; padding: 12px 16px; }
+  .entry-rename { grid-column: 1 / -1; display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+  .entry-rename label { flex: 1; min-width: 160px; }
   .entry-row + .entry-row { border-top: 1px solid var(--border-subtle); }
   .entry-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .entry-identity > div { display: grid; gap: 5px; min-width: 0; }
   .entry-identity strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
   .entry-identity span, .entry-identity small { color: var(--text-soft); font-size: 12px; overflow-wrap: anywhere; }
-  .entry-mark { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
+  .entry-mark { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
   .entry-code { display: grid; gap: 5px; }
   .entry-code output { color: var(--accent-strong); font: 750 22px/1.2 ui-monospace, "SFMono-Regular", monospace; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
   .entry-code span { font-size: 12px; color: var(--text-soft); }
@@ -405,7 +437,7 @@
   .empty-list { display: grid; justify-items: center; gap: 12px; padding: 42px 20px; text-align: center; color: var(--text-soft); }
   .empty-list strong { font-size: 14px; color: var(--text); }
   .empty-list span { font-size: 13px; line-height: 1.6; }
-  .two-factor-dialog { width: min(490px, calc(100vw - 48px)); max-height: calc(100vh - 64px); padding: 24px; border: 1px solid var(--border-strong); border-radius: 22px; background: var(--surface-raised); color: var(--text); box-shadow: var(--shadow); }
+  .two-factor-dialog { width: min(420px, calc(100vw - 48px)); max-height: calc(100vh - 64px); padding: 18px; border: 1px solid var(--border-strong); border-radius: 18px; background: var(--surface-raised); color: var(--text); box-shadow: var(--shadow); }
   .two-factor-dialog::backdrop { background: rgba(1, 13, 22, .6); backdrop-filter: blur(10px); }
   .two-factor-dialog form { display: grid; gap: 16px; }
   .two-factor-dialog p { margin: 0; color: var(--text-soft); line-height: 1.7; font-size: 13px; }

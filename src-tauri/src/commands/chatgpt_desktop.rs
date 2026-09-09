@@ -79,10 +79,16 @@ pub async fn uninstall_chatgpt_desktop(
 }
 
 #[tauri::command]
-pub async fn launch_chatgpt_desktop() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| chatgpt_desktop::launch())
-        .await
-        .map_err(|err| err.to_string())?
+pub async fn launch_chatgpt_desktop(restart_after_config: Option<bool>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if restart_after_config.unwrap_or(false) {
+            chatgpt_desktop::restart().map(|_| ())
+        } else {
+            chatgpt_desktop::launch()
+        }
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]

@@ -59,7 +59,7 @@ export function createBrowserProfileApply(state: BrowserMockState, dependencies:
     const profile = store.all().find((draft) => draft.id === request.profileId);
     if (!profile) throw new Error(`Profile '${request.profileId}' does not exist`);
     const active = state.activeProfilesByMode[profile.mode];
-    if (Object.entries(active).some(([app, id]) => canonicalProfileToolId(app) === canonicalProfileToolId(profile.app) && id === profile.id)) {
+    if (!request.reapply && Object.entries(active).some(([app, id]) => canonicalProfileToolId(app) === canonicalProfileToolId(profile.app) && id === profile.id)) {
       throw new Error("Profile is already active for this tool and profile category.");
     }
     const result = await preview(request);

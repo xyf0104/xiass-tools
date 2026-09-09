@@ -1,7 +1,8 @@
 import type { ProfileDraft, ProfileModelOption } from "../../types";
+import { isXiassApiProfile, XIASS_PROFILE_LOGO } from "./xiass.js";
 
 export function providerIsOfficial(providerId: string): boolean {
-  return providerId.trim() === "official";
+  return providerId.trim().toLowerCase() === "official";
 }
 
 export function profileUsesToolIcon(profile: ProfileDraft): boolean {
@@ -28,11 +29,11 @@ export function profileRemark(profile: ProfileDraft): string {
 
 export function profileIconValue(profile: ProfileDraft, displayName: string): string {
   const icon = profile.icon?.trim();
-  return icon || displayName.trim().charAt(0).toUpperCase() || "?";
+  return icon || (isXiassApiProfile(profile) ? XIASS_PROFILE_LOGO : displayName.trim().charAt(0).toUpperCase() || "?");
 }
 
 export function profileIconIsImage(value: string): boolean {
-  return value.startsWith("data:image/");
+  return value === XIASS_PROFILE_LOGO || value.startsWith("data:image/");
 }
 
 export function normalizedProfileIcon(value: string): string | null {

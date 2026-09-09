@@ -204,6 +204,11 @@ fn resolve_model_list_api_key(
     if !profile.provider.eq_ignore_ascii_case(provider) {
         return Err("Provider API key is required after changing Provider.".to_string());
     }
+    if profile.base_url.trim().trim_end_matches('/') != request.base_url.trim().trim_end_matches('/')
+        || profile.protocol.trim() != request.protocol.as_deref().unwrap_or("").trim()
+    {
+        return Err("Provider API key is required after changing the endpoint or protocol.".to_string());
+    }
     let Some(auth_ref) = profile.auth_ref.as_deref() else {
         return Err("Stored Provider API key is missing for this profile.".to_string());
     };

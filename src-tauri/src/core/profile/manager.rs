@@ -135,7 +135,7 @@ pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<Profil
         return Err("Built-in official profiles cannot be modified.".to_string());
     }
     let name = normalize_required("Profile Name", &request.name)?;
-    let provider = normalize_provider_token(&request.provider)?;
+    let provider = normalize_profile_provider(&name, &request.provider)?;
     let app = canonical_profile_app(&existing.app);
     let mode = normalize_profile_mode_for_app(&app, &provider, request.mode.as_ref())?;
     let protocol = normalize_protocol(request.protocol.as_deref())?;
@@ -281,7 +281,7 @@ pub fn duplicate_profile_draft(
         app,
         is_builtin: false,
         mode: source.mode,
-        provider: source.provider.clone(),
+        provider: normalize_profile_provider(&source.name, &source.provider)?,
         protocol: source.protocol.clone(),
         model: source.model.clone(),
         web_search: source.web_search.clone(),
@@ -928,7 +928,7 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
     if clean_active_profiles(&mut config, &profiles) {
         write_app_config(&config)?;
     }
-    if profile_is_active(&config, &profile) {
+    if profile_is_active(&config, &profile) && !request.reapply {
         return Err("Profile is already active for this tool and mode.".to_string());
     }
     let mut backup_targets = Vec::new();
@@ -953,6 +953,9 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
             .into_iter()
             .all(|verified| verified)
     };
+    if !native_plans.is_empty() && !native_verified {
+        return Err("Native configuration did not pass verification; the active profile was not changed.".to_string());
+    }
     activate_profile_for_tool(&mut config, &profile, &profiles);
     write_app_config(&config)?;
     let verified = verify_active_profile(&config, &profile);

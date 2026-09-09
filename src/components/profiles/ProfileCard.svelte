@@ -32,6 +32,7 @@
   export let active = false;
   export let dragActive = false;
   export let canSort = false;
+  export let template = false;
   export let applyingId: string | null = null;
   export let duplicatingId: string | null = null;
   export let deletingId: string | null = null;
@@ -77,7 +78,7 @@
   data-drag-active={dragActive}
 >
   <div class={profileCardMainRecipe()}>
-    <span
+    {#if !template}<span
       class={profileDragHandleRecipe()}
       aria-label={$t("profiles.dragHandle")}
       aria-disabled={!canSort}
@@ -85,7 +86,7 @@
       use:dragHandle
     >
       <AppIcon name="drag" size={16} />
-    </span>
+    </span>{/if}
     <div class={profileAvatarRecipe()} data-profile-avatar aria-hidden="true">
       {#if profileUsesToolIcon(profile)}
         <ToolIcon toolId={profile.app} label={displayName} variant="heading" />
@@ -104,12 +105,22 @@
       {/if}
     </div>
   </div>
-  {#if profile.isBuiltin}
+  {#if template}
+    <div class={profileCardStatusRecipe()}>
+      <StatusPill status="info" label={$t("profiles.xiassOfficial")} />
+    </div>
+  {:else if profile.isBuiltin}
     <div class={profileCardStatusRecipe()}>
       <StatusPill status="info" label={$t("profiles.builtinOfficial")} />
     </div>
   {/if}
   <div class={profileCardActionsRecipe()}>
+    {#if template}
+      <button class={actionButtonRecipe({ tone: "primary" })} disabled={actionsBusy} on:click={() => onEdit(profile)}>
+        <AppIcon name="add" size={16} />
+        {$t("common.configure")}
+      </button>
+    {:else}
     <button
       class={actionButtonRecipe({ tone: "primary" })}
       disabled={active || applyingId !== null}
@@ -136,6 +147,7 @@
       <button class={iconButtonRecipe({ danger: true })} title={$t("profiles.deleteProfile")} disabled={actionsBusy} on:click={() => onDelete(profile)}>
         <AppIcon name={deletingId === profile.id ? "loading" : "delete"} class={deletingId === profile.id ? spinRecipe() : undefined} size={16} />
       </button>
+    {/if}
     {/if}
   </div>
 </article>

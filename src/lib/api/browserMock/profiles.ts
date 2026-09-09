@@ -13,6 +13,7 @@ import type {
   UpdateProfileDraftRequest
 } from "../../../types";
 import { canonicalProfileToolId } from "../../profiles/catalog";
+import { profileNameErrorKey, profileProviderFromName } from "../../profiles/xiass";
 import {
   ensureBrowserProfileProtocolSupported,
   ensureCustomOfficialProfileAllowed,
@@ -120,6 +121,8 @@ export function createBrowserProfiles(state: BrowserMockState, dependencies: Bro
       };
     },
     async save(request: SaveProfileDraftRequest): Promise<ProfileDraft> {
+      if (profileNameErrorKey(request.name, providerIsOfficial(request.provider))) throw new Error("Invalid profile name.");
+      request = { ...request, provider: profileProviderFromName(request.name, providerIsOfficial(request.provider)) };
       const app = canonicalProfileToolId(request.app);
       const mode = normalizeBrowserProfileMode(request.provider, request.mode);
       ensureCustomOfficialProfileAllowed(app, request.provider, mode);
@@ -163,6 +166,8 @@ export function createBrowserProfiles(state: BrowserMockState, dependencies: Bro
     },
 
     async update(request: UpdateProfileDraftRequest): Promise<ProfileDraft> {
+      if (profileNameErrorKey(request.name, providerIsOfficial(request.provider))) throw new Error("Invalid profile name.");
+      request = { ...request, provider: profileProviderFromName(request.name, providerIsOfficial(request.provider)) };
       if (store.isBuiltinId(request.profileId)) throw new Error("Built-in official profiles cannot be modified.");
       const index = state.profileDrafts.findIndex((draft) => draft.id === request.profileId);
       if (index === -1) throw new Error(`Profile '${request.profileId}' does not exist`);

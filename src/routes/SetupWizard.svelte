@@ -3,6 +3,7 @@
   import { fade, fly } from "svelte/transition";
   import { detectEnvironment, listProfileModels, openExternalUrl, previewProfileWrite, saveProfileDraft, startCodexOAuthLogin } from "../lib/api";
   import { t, type TranslationKey } from "../lib/i18n";
+  import { profileNameErrorKey, profileProviderFromName, XIASS_API_PRESET } from "../lib/profiles/xiass";
   import {
     canonicalProfileToolId,
     configProtocolIdsForTool,
@@ -174,6 +175,9 @@
   export let onProfileSaved: (profile: ProfileDraft) => void | Promise<void> = () => {};
   export let prefill: WizardPrefill | null = null;
   export let snapshot: DetectionSnapshot | null = null;
+  export let onCancel: () => void = () => {};
+  $: toolLocked = Boolean(prefill?.lockTool && prefill?.toolId);
+  $: firstStep = toolLocked ? 1 : 0;
 
   type ToolDefaults = {
     id: string;
@@ -205,15 +209,14 @@
 
   let currentStep = 0;
   let selectedTool = "codex";
-  let provider = "compatible";
   let profileMode: ProviderApplyMode = "config";
   let protocol = "openai-responses";
-  let profileName = $t("wizard.defaultProfile.codex");
+  let profileName: string = XIASS_API_PRESET.name;
   let profileRemark = "";
   let apiKey = "";
-  let baseUrl = "";
-  let model = "";
-  let reviewModel = "";
+  let baseUrl: string = XIASS_API_PRESET.baseUrl;
+  let model: string = XIASS_API_PRESET.model;
+  let reviewModel: string = XIASS_API_PRESET.reviewModel;
   let webSearch: "live" | "cached" | "disabled" = "live";
   let imageModel = "";
   let modelContextWindow = 372000;
@@ -246,6 +249,7 @@
       resetDraftState();
     }
     appliedPrefillKey = prefillKey(prefill);
+    if (prefill.lockTool && prefill.toolId) currentStep = 1;
   }
 
   $: if (snapshot?.codexAuth) {
@@ -257,7 +261,8 @@
   $: if (!canUseCodexOAuthConfig && codexOAuthConfig) {
     codexOAuthConfig = false;
   }
-  $: activeProvider = codexOAuthConfig ? "official" : provider;
+  $: activeProvider = profileProviderFromName(profileName, codexOAuthConfig);
+  $: nameErrorKey = profileNameErrorKey(profileName, codexOAuthConfig);
   $: activeProtocol = codexOAuthConfig ? "openai-responses" : protocol;
   $: activeModel = codexOAuthConfig ? "" : model;
   $: supportsReviewModel = canonicalProfileToolId(selectedTool) === "codex";
@@ -322,7 +327,7 @@
     void refreshWritePreview(previewRequestKey);
   }
   $: canApply =
-    profileName.trim().length > 0 &&
+    !nameErrorKey &&
     selectedTool.trim().length > 0 &&
     selectedToolInstalled &&
     activeProvider.trim().length > 0 &&
@@ -353,7 +358,7 @@
     currentStep === 0
       ? selectedToolInstalled
       : currentStep === 1
-        ? profileName.trim().length > 0 &&
+        ? !nameErrorKey &&
           activeProvider.trim().length > 0 &&
           isProtocolAllowedForToolMode(selectedTool, profileMode, activeProtocol) &&
           (!providerNeedsBaseUrl(activeProvider) || baseUrlErrorKey === null) &&
@@ -364,7 +369,7 @@
         : true;
 
   function prefillKey(value: WizardPrefill) {
-    return `${value.toolId ?? ""}:${value.toolName ?? ""}:${value.mode ?? "config"}`;
+    return `${value.toolId ?? ""}:${value.toolName ?? ""}:${value.mode ?? "config"}:${Boolean(value.lockTool)}`;
   }
 
   function setProfileMode(nextMode: ProviderApplyMode) {
@@ -393,7 +398,6 @@
     const canonicalToolId = canonicalProfileToolId(toolId);
     const defaults = toolDefaults.find((tool) => tool.id === canonicalToolId);
     selectedTool = defaults?.id ?? canonicalToolId;
-    provider = "compatible";
     setProfileMode(mode);
     protocol = defaults?.protocol ?? "openai-chat-completions";
     profileName = defaults?.profileNameKey
@@ -404,6 +408,12 @@
     baseUrl = defaults?.baseUrl ?? "";
     model = defaults?.model ?? "";
     reviewModel = "";
+    if (canonicalToolId === "codex") {
+      profileName = XIASS_API_PRESET.name;
+      baseUrl = XIASS_API_PRESET.baseUrl;
+      model = XIASS_API_PRESET.model;
+      reviewModel = XIASS_API_PRESET.reviewModel;
+    }
     webSearch = "live";
     imageModel = "";
     modelContextWindow = 372000;
@@ -425,8 +435,6 @@
       model = "";
       modelMappings = [];
       protocol = "openai-responses";
-    } else {
-      provider = "compatible";
     }
     writePreview = null;
     writePreviewKey = null;
@@ -741,7 +749,7 @@
   }
 
   function providerLabel(providerId: string) {
-    return providerId === "official" ? $t("wizard.provider.official") : $t("wizard.provider.compatible");
+    return providerId === "official" ? $t("wizard.provider.official") : providerId;
   }
 
   function applyModeLabel(mode: ProviderApplyMode) {
@@ -956,10 +964,10 @@
   <section class={topStripRecipe()}>
     <div>
       <h1>{$t(steps[currentStep])}</h1>
-      <p>{$t("wizard.progress", { current: currentStep + 1, total: steps.length })}</p>
+      <p>{$t("wizard.progress", { current: currentStep + 1 - firstStep, total: steps.length - firstStep })}{#if toolLocked} · Codex · {$t("profiles.mode.config")}{/if}</p>
     </div>
     <div class={wizardActionsRecipe()}>
-      <button class={actionButtonRecipe()} title={$t("common.back")} disabled={currentStep === 0} on:click={() => (currentStep -= 1)}>
+      <button class={actionButtonRecipe()} title={$t("common.back")} disabled={saving || (!toolLocked && currentStep === 0)} on:click={() => currentStep > firstStep ? currentStep -= 1 : onCancel()}>
         <AppIcon name="arrowLeft" size={16} />
         {$t("common.back")}
       </button>
@@ -982,6 +990,7 @@
 
   <div class={wizardStepperRecipe()}>
     {#each steps as step, index}
+      {#if index >= firstStep}
       <div
         class={wizardStepItemRecipe()}
         data-step-state={index === currentStep ? "active" : index < currentStep ? "done" : "idle"}
@@ -991,9 +1000,10 @@
         {#if index < currentStep}
           <AppIcon name="check" size={14} />
         {:else}
-          <span>{index + 1}</span>
+          <span>{index + 1 - firstStep}</span>
         {/if}
       </div>
+      {/if}
     {/each}
   </div>
 
@@ -1090,11 +1100,14 @@
         <label>
           {$t("wizard.profileName")}
           <input bind:value={profileName} />
+          {#if nameErrorKey}<small class={wizardFieldErrorRecipe()}>{$t(nameErrorKey)}</small>{/if}
         </label>
+        {#if !supportsReviewModel}
         <label class={wizardWideFieldRecipe()}>
           {$t("profiles.remarkLabel")}
           <textarea bind:value={profileRemark} rows="2" placeholder={$t("profiles.remarkPlaceholder")}></textarea>
         </label>
+        {/if}
         {#if !codexOAuthConfig}
           <label>
             {$t(profileMode === "gateway" ? "wizard.upstreamApi" : "wizard.protocol")}

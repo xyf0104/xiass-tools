@@ -742,9 +742,35 @@ export async function removeChatGPTDesktop() {
   );
 }
 
-export async function launchManagedChatGPTDesktop() {
+export async function launchManagedChatGPTDesktop(restartAfterConfig = false) {
   const installKind = get(chatgptDesktopView).selectedKind;
-  await runAction(installKind, "launch", launchChatGPTDesktop, async () => {
+  await runAction(installKind, "launch", async () => {
+    // Debounced option edits must reach disk before the native launcher reads
+    // them. Wait for an existing save, then persist the latest revision only.
+    while (settingsSaveInFlight) {
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    }
+    if (settingsSaveTimer !== null) {
+      window.clearTimeout(settingsSaveTimer);
+      settingsSaveTimer = null;
+    }
+    const draft = get(chatgptDesktopView).settingsDraft;
+    if (draft && settingsKey(draft) !== lastSavedSettingsKey) {
+      const revision = settingsSaveRevision;
+      patch({ settingsSaveStatus: "saving" });
+      try {
+        const saved = await updateChatGPTDesktopSettings(draft);
+        lastSavedSettingsKey = settingsKey(saved);
+        lastSavedSettings = { ...saved };
+        if (revision === settingsSaveRevision) patch({ settingsSaveStatus: "saved" });
+        else scheduleSettingsAutoSave();
+      } catch (err) {
+        patch({ settingsSaveStatus: "error" });
+        throw err;
+      }
+    }
+    await launchChatGPTDesktop(restartAfterConfig);
+  }, async () => {
     patch({ success: { key: "chatgptDesktop.launchRequested" } });
   });
 }

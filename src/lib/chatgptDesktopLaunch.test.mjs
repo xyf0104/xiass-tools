@@ -20,9 +20,9 @@ test("ChatGPT desktop exposes a single patch-backed launch entrypoint", () => {
   assert.match(route, /launchManagedChatGPTDesktop/);
   assert.doesNotMatch(route, /launchManagedChatGPTDesktopPatched|patchLaunch|chatgptDesktop\.patchLaunch/);
   assert.doesNotMatch(store, /launchManagedChatGPTDesktopPatched|launchPatchedChatGPTDesktop|patchLaunch/);
-  assert.match(api, /invoke\("launch_chatgpt_desktop"\)/);
+  assert.match(api, /invoke\("launch_chatgpt_desktop", \{ restartAfterConfig \}\)/);
   assert.doesNotMatch(api, /launchPatchedChatGPTDesktop|launch_chatgpt_desktop_patched/);
-  assert.match(commands, /pub async fn launch_chatgpt_desktop\(\)/);
+  assert.match(commands, /pub async fn launch_chatgpt_desktop\(restart_after_config: Option<bool>\)/);
   assert.doesNotMatch(commands, /launch_chatgpt_desktop_patched|launch_patched/);
   assert.doesNotMatch(lib, /launch_chatgpt_desktop_patched/);
   assert.match(core, /fn launch_detected_chatgpt_desktop\([\s\S]*enhancement::launch/);
@@ -301,8 +301,8 @@ test("Codex enhancement injection runs after launch without blocking the command
     .at(0);
 
   assert.ok(launchBody, "Codex launch body should be present");
-  assert.match(commands, /pub async fn launch_chatgpt_desktop\(\) -> Result<\(\), String>/);
-  assert.match(commands, /spawn_blocking\(\|\| chatgpt_desktop::launch\(\)\)/);
+  assert.match(commands, /pub async fn launch_chatgpt_desktop\(restart_after_config: Option<bool>\) -> Result<\(\), String>/);
+  assert.match(commands, /spawn_blocking\(move \|\| \{[\s\S]*chatgpt_desktop::restart\(\)[\s\S]*chatgpt_desktop::launch\(\)/);
   assert.doesNotMatch(launchBody, /inject_codex_enhancements\(debug_port/);
   assert.match(launchBody, /enhancement::launch\(settings/);
   assert.match(enhancement, /thread::spawn\(move \|\| controller\.run\(\)\)/);

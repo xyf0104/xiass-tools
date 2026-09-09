@@ -1159,9 +1159,9 @@ export async function uninstallChatGPTDesktop(
   };
 }
 
-export async function launchChatGPTDesktop(): Promise<void> {
+export async function launchChatGPTDesktop(restartAfterConfig = false): Promise<void> {
   if (isTauri()) {
-    return invoke("launch_chatgpt_desktop");
+    return invoke("launch_chatgpt_desktop", { restartAfterConfig });
   }
 }
 

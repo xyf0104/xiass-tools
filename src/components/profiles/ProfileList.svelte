@@ -10,6 +10,7 @@
   import { nextSortableProfileIds, profileDragDisabled, profileListContentKey } from "../../lib/profileSortable";
   import type { ProfileDraft, ProviderApplyMode } from "../../types";
   import ProfileCard from "./ProfileCard.svelte";
+  import { createXiassApiTemplate, isXiassApiProfile } from "../../lib/profiles/xiass";
   import { profileGridRecipe, profileSortableRowRecipe, profileToolSectionRecipe } from "../../../styled-system/recipes";
 
   export let profiles: ProfileDraft[] = [];
@@ -26,6 +27,7 @@
   export let onDuplicate: (profile: ProfileDraft) => void;
   export let onDelete: (profile: ProfileDraft) => void;
   export let onReorder: (profileIds: string[]) => Promise<void>;
+  export let onSetupXiass: (() => void) | null = null;
 
   let items: ProfileDraft[] = [];
   let sourceItems: ProfileDraft[] = [];
@@ -35,7 +37,10 @@
   const flipDurationMs = 220;
   const dropTargetStyle = { outline: "none" };
 
-  $: syncItems(profiles, toolId, mode);
+  $: showXiassTemplate = Boolean(onSetupXiass) && toolId === "codex" && mode === "config" && !profiles.some(isXiassApiProfile);
+  $: pinnedProfiles = showXiassTemplate ? profiles.filter((profile) => profile.isBuiltin) : [];
+  $: sortableProfiles = showXiassTemplate ? profiles.filter((profile) => !profile.isBuiltin) : profiles;
+  $: syncItems(sortableProfiles, toolId, mode);
   $: dragDisabled = profileDragDisabled({ deletingId, applyingId, editingId, sortableSaving: saving });
 
   function syncItems(nextProfiles: ProfileDraft[], nextToolId: string, nextMode: ProviderApplyMode) {
@@ -74,7 +79,7 @@
     }
     saving = true;
     try {
-      await onReorder(nextIds);
+      await onReorder([...pinnedProfiles.map((profile) => profile.id), ...nextIds]);
       sourceItems = nextItems;
     } catch (error) {
       items = sourceItems;
@@ -97,6 +102,16 @@
 </script>
 
 <section class={profileToolSectionRecipe()}>
+  {#if showXiassTemplate}
+    <div class={profileGridRecipe()}>
+      {#each pinnedProfiles as profile (profile.id)}
+        <ProfileCard {profile} active={activeProfileId === profile.id} {applyingId} {duplicatingId} {deletingId} {editingId}
+          actionKey={cardActionKey(profile)} {onApply} {onUsage} {onEdit} {onDuplicate} {onDelete} />
+      {/each}
+      <ProfileCard profile={createXiassApiTemplate()} template {applyingId} {duplicatingId} {deletingId} {editingId}
+        actionKey="xiass-template" {onApply} {onUsage} onEdit={() => onSetupXiass?.()} {onDuplicate} {onDelete} />
+    </div>
+  {/if}
   <div
     class={profileGridRecipe()}
     role="list"

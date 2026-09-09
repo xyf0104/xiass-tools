@@ -592,8 +592,8 @@ test("desktop client launch buttons always show launch copy", () => {
     claudeRoute.indexOf("</div>", claudeRoute.indexOf("<button class={actionButtonRecipe()}"))
   );
   const codexTopActions = codexRoute.slice(
-    codexRoute.indexOf("<div class={topActionsRecipe()}>"),
-    codexRoute.indexOf("</div>", codexRoute.indexOf("<button class={actionButtonRecipe()}"))
+    codexRoute.indexOf('{:else if activeSection === "launch"}'),
+    codexRoute.indexOf('{#if activeSection === "utilities"}')
   );
 
   assert.match(claudeTopActions, /\$t\("toolLaunch\.actionTitle"/);
