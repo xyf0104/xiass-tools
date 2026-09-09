@@ -184,25 +184,49 @@ body {
   border-top: 1px solid var(--border-subtle);
 }
 
+/* Native macOS controls share the app background. The drag area spans the
+   entire window and is outside the scrolling workspace, not a sidebar card. */
+:root[data-platform="macos"] {
+  --xiass-window-drag-height: 36px;
+}
+
 .xiass-window-drag-region { display: none; }
 
 :root[data-platform="macos"] .xiass-window-drag-region {
   display: block;
   position: fixed;
-  inset: 0 auto auto 0;
-  width: 262px;
-  height: 48px;
+  inset: 0 0 auto 0;
+  height: var(--xiass-window-drag-height);
   z-index: 10;
   background: transparent;
   user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
 }
 
 :root[data-platform="macos"] .cs-app-sidebar {
-  padding-top: 48px;
+  height: 100vh;
+  margin: 0;
+  border: 0;
+  border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+  padding: calc(var(--xiass-window-drag-height) + 18px) 14px 14px;
+  background: var(--sidebar-bg);
+  box-shadow: none;
+}
+
+:root[data-platform="macos"] .cs-app-workspace {
+  /* The scroll viewport itself starts below the hit area, so scrolled
+     buttons, inputs and terminal tabs never end up underneath it. */
+  margin-top: var(--xiass-window-drag-height);
+  height: calc(100vh - var(--xiass-window-drag-height));
 }
 
 @media (max-width: 900px) {
-  :root[data-platform="macos"] .xiass-window-drag-region { width: 86px; }
+  :root[data-platform="macos"] .cs-app-sidebar {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
   .xiass-sidebar-footer-nav {
     grid-template-columns: 1fr;
   }

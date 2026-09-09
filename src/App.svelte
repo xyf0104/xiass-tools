@@ -4,6 +4,7 @@
   import { fade, fly } from "svelte/transition";
   import AppIcon, { type AppIconName } from "./components/AppIcon.svelte";
   import BrandLogo from "./components/BrandLogo.svelte";
+  import WindowDragRegion from "./components/WindowDragRegion.svelte";
   import {
     detectEnvironment,
     ensureAppDirs,
@@ -550,7 +551,7 @@
 </script>
 
 <main class={appShellRecipe()}>
-  <div class="xiass-window-drag-region" data-tauri-drag-region aria-hidden="true"></div>
+  <WindowDragRegion />
   <aside class={appSidebarRecipe()}>
     <div class={appBrandRecipe()}>
       <div class={appBrandMarkRecipe()}>
