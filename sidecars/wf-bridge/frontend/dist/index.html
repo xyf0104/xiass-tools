@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#071c27" />
+    <title>XIASS Tools</title>
+    <script>
+      (function () {
+        var requested = new URLSearchParams(window.location.search).get('theme');
+        var theme = requested === 'light' || requested === 'dark'
+          ? requested
+          : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <style>
+      html, body, #app { margin: 0; width: 100%; height: 100%; background: #071c27; color: #f8fafc; }
+      html[data-theme="light"], html[data-theme="light"] body, html[data-theme="light"] #app {
+        background: #f6f5f2; color: #0f172a;
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-GMrgfuBC.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DA9JHe64.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

@@ -1,6 +1,9 @@
 node_modules/
 styled-system/
 dist/
+!sidecars/wf-bridge/frontend/
+!sidecars/wf-bridge/frontend/dist/
+!sidecars/wf-bridge/frontend/dist/**
 dist-portable/
 dist-updater/
 .tmp-tests/
