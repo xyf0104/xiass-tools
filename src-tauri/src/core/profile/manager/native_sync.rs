@@ -466,6 +466,8 @@ fn upsert_detected_native_profile(
         model,
         web_search: None,
         image_model: None,
+        model_context_window: None,
+        model_auto_compact_token_limit: None,
         review_model,
         model_mappings: Vec::new(),
         base_url,

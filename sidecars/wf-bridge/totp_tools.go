@@ -30,6 +30,21 @@ type TOTPCodeResult struct {
 	Code    totp.Code `json:"code"`
 }
 
+type TOTPPreviewResult struct {
+	OK      bool       `json:"ok"`
+	Message string     `json:"message"`
+	Entry   totp.Entry `json:"entry"`
+	Code    totp.Code  `json:"code"`
+}
+
+func (a *App) PreviewTOTP(input totp.ImportInput) TOTPPreviewResult {
+	entry, code, err := totp.Preview(input, time.Now())
+	if err != nil {
+		return TOTPPreviewResult{Message: "无法生成验证码。请检查 TOTP 链接、Base32 密钥、算法、位数和周期。"}
+	}
+	return TOTPPreviewResult{OK: true, Message: "验证码已生成；尚未保存，离开此页面会清除临时查询。", Entry: entry, Code: code}
+}
+
 const maxTOTPImportFileBytes = 8 * 1024 * 1024
 
 func (a *App) GetTOTPEntries() TOTPStatus {
@@ -115,6 +130,31 @@ func (a *App) ExportTOTPEncrypted(password string) Result {
 	return Result{OK: true, Message: "已导出加密验证器备份。请妥善保管导出密码与文件。"}
 }
 
+// ExportTOTPEncryptedToPath is the embedded-host variant. The Tauri shell owns
+// the native save dialog, then passes only the selected path to the bridge;
+// secrets and encrypted bytes remain inside the Go process.
+func (a *App) ExportTOTPEncryptedToPath(password, destination string) Result {
+	vault, err := a.getTOTPVault()
+	if err != nil {
+		return Result{OK: false, Message: "本机验证器尚未完成初始化。"}
+	}
+	data, err := vault.ExportEncrypted(password)
+	if err != nil {
+		return Result{OK: false, Message: "无法创建加密验证器备份。请确认导出密码与系统凭据库后重试。"}
+	}
+	destination = strings.TrimSpace(destination)
+	if destination == "" {
+		return Result{OK: true, Message: "已取消导出加密验证器备份。"}
+	}
+	if !strings.EqualFold(filepath.Ext(destination), ".json") {
+		destination += ".json"
+	}
+	if err := writeNewSensitiveExport(destination, data); err != nil {
+		return Result{OK: false, Message: "无法保存加密验证器备份。请确认目标位置可写且文件不存在。"}
+	}
+	return Result{OK: true, Message: "已导出加密验证器备份。请妥善保管导出密码与文件。"}
+}
+
 // ImportTOTPEncrypted keeps the selected backup path and its contents inside
 // the native process. The WebView receives only a redacted result and public
 // entry metadata after the system credential vault commit has succeeded.
@@ -138,6 +178,18 @@ func (a *App) ImportTOTPEncrypted(password string) TOTPStatus {
 		}
 		return status
 	}
+	data, err := readSensitiveTOTPImport(source, maxTOTPImportFileBytes)
+	if err != nil {
+		return TOTPStatus{OK: false, Message: "无法安全读取加密验证器备份。请确认文件完整、为普通文件且大小受支持。"}
+	}
+	defer wipeTOTPImportData(data)
+	return a.importTOTPEncryptedData(data, password)
+}
+
+// ImportTOTPEncryptedFromPath keeps the selected file and password in the
+// native bridge, matching the standalone WF helper without requiring a Wails
+// runtime dialog or an iframe host-action round trip.
+func (a *App) ImportTOTPEncryptedFromPath(password, source string) TOTPStatus {
 	data, err := readSensitiveTOTPImport(source, maxTOTPImportFileBytes)
 	if err != nil {
 		return TOTPStatus{OK: false, Message: "无法安全读取加密验证器备份。请确认文件完整、为普通文件且大小受支持。"}

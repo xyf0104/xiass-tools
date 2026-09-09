@@ -1,0 +1,16 @@
+/*
+ * Runtime-only styling for the WF application when it is hosted by XIASS
+ * Tools. The upstream helper remains unchanged for standalone use; the bridge
+ * injects this stylesheet into the served document so the host owns the one
+ * vertical scrollbar.
+ */
+:root[data-embedded="true"] .page {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+:root[data-embedded="true"] .page > * {
+  flex-shrink: 0;
+}

@@ -415,6 +415,10 @@ export interface ProfileDraft {
   provider: string;
   protocol: string;
   model: string;
+  webSearch: "live" | "cached" | "disabled" | null;
+  imageModel: string | null;
+  modelContextWindow: number | null;
+  modelAutoCompactTokenLimit: number | null;
   reviewModel: string | null;
   modelMappings: ProfileModelMapping[];
   baseUrl: string;
@@ -511,6 +515,8 @@ export interface SaveProfileDraftRequest {
   apiKey?: string | null;
   webSearch?: "live" | "cached" | "disabled" | null;
   imageModel?: string | null;
+  modelContextWindow?: number | null;
+  modelAutoCompactTokenLimit?: number | null;
 }
 
 export interface UpdateProfileDraftRequest {
@@ -528,6 +534,8 @@ export interface UpdateProfileDraftRequest {
   apiKey?: string | null;
   webSearch?: "live" | "cached" | "disabled" | null;
   imageModel?: string | null;
+  modelContextWindow?: number | null;
+  modelAutoCompactTokenLimit?: number | null;
 }
 
 export interface DuplicateProfileDraftRequest {
@@ -560,6 +568,8 @@ export interface PreviewProfileWriteRequest {
   apiKey?: string | null;
   webSearch?: "live" | "cached" | "disabled" | null;
   imageModel?: string | null;
+  modelContextWindow?: number | null;
+  modelAutoCompactTokenLimit?: number | null;
 }
 
 export interface ProfileWritePreviewItem {

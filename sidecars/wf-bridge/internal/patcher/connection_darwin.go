@@ -167,11 +167,7 @@ func darwinImageRendererReady(data []byte) bool {
 	// native preview. The current dedupe marker is mandatory: an older v2-v5
 	// renderer must remain pending until it receives the cross-renderer queue and
 	// the 320px constraint for the duplicate artifact component.
-	previewReady := bytes.Contains(data, []byte(imagePreviewPatchMarker)) ||
-		bytes.Contains(data, []byte(imagePreviewNativeCompatibleMarker))
-	return previewReady &&
-		bytes.Contains(data, []byte(imageGenerationUIPatchMarker)) &&
-		bytes.Contains(data, []byte(imageGenerationDedupePatchMarker))
+	return imagePreviewRendererHasCurrentManagedMarkers(data)
 }
 
 func prepareDarwinSafeImageRendererPlan(path string) (*patchPlan, bool, error) {

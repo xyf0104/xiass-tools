@@ -429,11 +429,27 @@ mod tests {
 
     #[test]
     fn accepts_cache_busted_r2_update_urls() {
+        let (filename, url) = if cfg!(target_os = "macos") {
+            let architecture =
+                native_macos_arch_for_runtime(std::env::consts::ARCH, macos_arm64_hardware_available())
+                    .unwrap();
+            let filename = format!("CodeStudio-Lite-1.5.2-macOS-{architecture}.dmg");
+            let url = format!(
+                "https://download.codestudio.build/releases/1.5.2/{filename}?r=123-abc"
+            );
+            (filename, url)
+        } else {
+            let filename = "CodeStudio-Lite-1.5.2-Windows-x64-setup.exe".to_string();
+            let url = format!(
+                "https://download.codestudio.build/releases/1.5.2/{filename}?r=123-abc"
+            );
+            (filename, url)
+        };
         let request = InstallApplicationUpdateRequest {
             version: "1.5.2".to_string(),
-            url: "https://download.codestudio.build/releases/1.5.2/CodeStudio-Lite-1.5.2-Windows-x64-setup.exe?r=123-abc".to_string(),
+            url,
             signature: "signature".to_string(),
-            filename: "CodeStudio-Lite-1.5.2-Windows-x64-setup.exe".to_string(),
+            filename,
         };
         assert!(validate_request(&request).is_ok());
     }

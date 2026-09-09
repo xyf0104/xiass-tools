@@ -26,6 +26,9 @@
   let status: WfBridgeStatus | null = null;
   let loading = true;
   let frameReady = false;
+  let frameHeight = 680;
+  type WfSection = "dashboard" | "models" | "accounts" | "permissions";
+  let activeSection: WfSection = "dashboard";
   let error: string | null = null;
   let theme: "light" | "dark" = "dark";
   let themeObserver: MutationObserver | null = null;
@@ -47,17 +50,77 @@
   const shellClass = css({
     position: "relative",
     minHeight: "620px",
-    height: "calc(100dvh - 132px)",
-    overflow: "hidden",
+    height: "auto",
+    overflow: "visible",
     padding: 0,
     background: "color-mix(in srgb, var(--surface) 96%, #22d3ee 4%)"
   });
   const frameClass = css({
     display: "block",
     width: "100%",
-    height: "100%",
     border: 0,
-    background: "transparent"
+    background: "transparent",
+    overflow: "hidden"
+  });
+  const workflowClass = css({
+    display: "grid",
+    gap: "12px",
+    padding: "18px 20px",
+    color: "var(--text-soft)",
+    "& strong": { color: "var(--text)", fontSize: "13px", fontWeight: 800 },
+    "& p": { margin: 0, color: "var(--text-muted)", fontSize: "12px", lineHeight: 1.55 }
+  });
+  const stepsClass = css({
+    display: "grid",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+    gap: "8px",
+    "@media (max-width: 900px)": { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" },
+    "@media (max-width: 540px)": { gridTemplateColumns: "1fr" }
+  });
+  const stepClass = css({
+    display: "grid",
+    gridTemplateColumns: "28px minmax(0, 1fr)",
+    alignItems: "center",
+    gap: "9px",
+    minHeight: "58px",
+    padding: "9px 10px",
+    border: "1px solid color-mix(in srgb, var(--border) 86%, transparent)",
+    borderRadius: "14px",
+    background: "color-mix(in srgb, var(--surface-raised) 76%, transparent)",
+    "& span": { color: "var(--text)", opacity: 0.9, fontSize: "11px", fontWeight: 700, lineHeight: 1.35 },
+    "& b": {
+      display: "grid", placeItems: "center", width: "28px", height: "28px", borderRadius: "10px",
+      color: "#fff", fontSize: "12px", fontWeight: 900,
+      background: "linear-gradient(135deg, #ff8a3d, #ffb347 38%, #2878ff 78%, #1552c6)",
+      boxShadow: "0 8px 20px color-mix(in srgb, #2878ff 22%, transparent)"
+    }
+  });
+  const sectionNavClass = css({
+    display: "grid",
+    gridTemplateColumns: "minmax(0, .8fr) minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, .8fr)",
+    gap: "8px",
+    alignItems: "center",
+    padding: "10px",
+    "@media (max-width: 1000px)": { gridTemplateColumns: "repeat(2, minmax(0, 1fr))" },
+    "& button": {
+      display: "flex",
+      minHeight: "46px",
+      padding: "10px 12px",
+      lineHeight: 1.3,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "8px"
+    },
+    "& button svg": { display: "block", flexShrink: 0, alignSelf: "center" },
+    "& button[data-active='true']": {
+      borderColor: "color-mix(in srgb, #ff8a3d 68%, #2878ff 32%)",
+      background: "linear-gradient(135deg, rgba(255,138,61,.28), rgba(40,120,255,.28))",
+      color: "#ffffff",
+      boxShadow: "0 10px 24px rgba(40,120,255,.18)"
+    },
+    "& button[data-active='true'] svg": {
+      filter: "brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0,0,0,.28))"
+    }
   });
   const stateClass = css({
     position: "absolute",
@@ -91,6 +154,25 @@
       overflowWrap: "anywhere"
     }
   });
+  const loadingBadgeClass = css({
+    position: "absolute",
+    top: "14px",
+    right: "14px",
+    zIndex: 3,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    padding: "8px 11px",
+    border: "1px solid color-mix(in srgb, #2878ff 28%, var(--border))",
+    borderRadius: "999px",
+    background: "color-mix(in srgb, var(--surface-raised) 82%, transparent)",
+    color: "var(--text-soft)",
+    fontSize: "12px",
+    fontWeight: 800,
+    pointerEvents: "none",
+    boxShadow: "0 10px 24px rgba(40, 120, 255, 0.14)",
+    backdropFilter: "blur(16px) saturate(145%)"
+  });
   const statusClass = css({
     display: "inline-flex",
     alignItems: "center",
@@ -111,19 +193,30 @@
     boxShadow: "0 0 12px rgba(134, 239, 172, 0.72)"
   });
 
-  $: frameUrl = session ? buildFrameUrl(session) : "";
+  // Keep the iframe URL reactive to every visible navigation input. Svelte's
+  // legacy reactive dependency analysis cannot see values that are only read
+  // inside buildFrameUrl(), so passing the section and theme explicitly avoids
+  // stale pages and a perpetual loading state after clicking a WF section.
+  $: frameUrl = session ? buildFrameUrl(session, activeSection, theme) : "";
 
   function resolveTheme() {
     theme = document.documentElement.dataset.theme === "light" ? "light" : "dark";
   }
 
-  function buildFrameUrl(value: WfBridgeSession) {
+  function buildFrameUrl(value: WfBridgeSession, section: WfSection, currentTheme: "light" | "dark") {
     const url = new URL(value.url);
     url.searchParams.set("embedded", "1");
     url.searchParams.set("module", "antigravity");
-    url.searchParams.set("section", "dashboard");
-    url.searchParams.set("theme", theme);
+    url.searchParams.set("section", section);
+    url.searchParams.set("theme", currentTheme);
     return url.toString();
+  }
+
+  function selectSection(section: WfSection) {
+    if (section === activeSection) return;
+    activeSection = section;
+    frameReady = false;
+    frameHeight = 680;
   }
 
   function expectedOrigin() {
@@ -137,6 +230,18 @@
       { type: "xiass-wf-auth", token: session.token },
       origin
     );
+  }
+
+  function handleFrameLoad() {
+    // The embedded WF page can finish rendering even when one optional
+    // bootstrap request fails. Treat the iframe load as the visual readiness
+    // boundary so the complete feature surface remains usable instead of
+    // leaving a blocking "connecting" card over the page forever. The child
+    // runtime still sends its authenticated ready event when bootstrap
+    // finishes, and the token is delivered here as soon as the document is
+    // ready as well.
+    frameReady = true;
+    deliverToken();
   }
 
   function validHostAction(value: unknown): value is WfBridgeHostActionRequest {
@@ -163,6 +268,22 @@
     if (event.data?.type === "xiass-wf-ready") {
       frameReady = true;
       deliverToken();
+      return;
+    }
+    if (event.data?.type === "xiass-wf-content-height") {
+      const nextHeight = Number(event.data.height);
+      if (Number.isFinite(nextHeight)) {
+        frameHeight = Math.max(620, Math.min(32000, Math.ceil(nextHeight)));
+      }
+      return;
+    }
+    if (event.data?.type === "xiass-wf-scroll") {
+      const workspace = document.querySelector<HTMLElement>(".cs-app-workspace");
+      const deltaX = Number(event.data.deltaX) || 0;
+      const deltaY = Number(event.data.deltaY) || 0;
+      if (workspace && (deltaX || deltaY)) {
+        workspace.scrollBy({ left: deltaX, top: deltaY, behavior: "auto" });
+      }
       return;
     }
     if (event.data?.type !== "xiass-wf-host-action" || !validHostAction(event.data.request)) {
@@ -258,24 +379,57 @@
     </div>
   </section>
 
+  <nav class={cx(panelRecipe(), sectionNavClass)} aria-label={$t("wf.sections") }>
+    <button class={actionButtonRecipe({ tone: activeSection === "dashboard" ? "primary" : "secondary" })} type="button" data-active={activeSection === "dashboard"} on:click={() => selectSection("dashboard")}>
+      <AppIcon name="dashboard" tone="cyan" size={17} />{$t("wf.sectionDashboard")}
+    </button>
+    <button class={actionButtonRecipe({ tone: activeSection === "models" ? "primary" : "secondary" })} type="button" data-active={activeSection === "models"} on:click={() => selectSection("models")}>
+      <AppIcon name="stats" tone="violet" size={17} />{$t("wf.sectionModels")}
+    </button>
+    <button class={actionButtonRecipe({ tone: activeSection === "accounts" ? "primary" : "secondary" })} type="button" data-active={activeSection === "accounts"} on:click={() => selectSection("accounts")}>
+      <AppIcon name="user" tone="cyan" size={17} />{$t("wf.sectionAccounts")}
+    </button>
+    <button class={actionButtonRecipe({ tone: activeSection === "permissions" ? "primary" : "secondary" })} type="button" data-active={activeSection === "permissions"} on:click={() => selectSection("permissions")}>
+      <AppIcon name="key" tone="warning" size={17} />{$t("wf.sectionPermissions")}
+    </button>
+  </nav>
+
+  <section class={cx(panelRecipe(), workflowClass)} aria-label={$t("wf.workflowTitle")}>
+    <div>
+      <strong>{$t("wf.workflowTitle")}</strong>
+      <p>{$t("wf.workflowHint")}</p>
+    </div>
+    <div class={stepsClass}>
+      <div class={stepClass}><b>1</b><span>{$t("wf.stepAccount")}</span></div>
+      <div class={stepClass}><b>2</b><span>{$t("wf.stepModels")}</span></div>
+      <div class={stepClass}><b>3</b><span>{$t("wf.stepCapabilities")}</span></div>
+      <div class={stepClass}><b>4</b><span>{$t("wf.stepConnect")}</span></div>
+      <div class={stepClass}><b>5</b><span>{$t("wf.stepLaunch")}</span></div>
+    </div>
+  </section>
+
   <section class={cx(panelRecipe(), shellClass)}>
     {#if frameUrl}
-      <iframe
-        bind:this={frame}
-        class={frameClass}
-        src={frameUrl}
-        title={$t("wf.frameTitle")}
-        on:load={deliverToken}
-        allow="clipboard-read; clipboard-write"
-      ></iframe>
+      {#key frameUrl}
+        <iframe
+          bind:this={frame}
+          class={frameClass}
+          style={`height: ${frameHeight}px`}
+          src={frameUrl}
+          title={$t("wf.frameTitle")}
+          scrolling="no"
+          on:load={handleFrameLoad}
+          allow="clipboard-read; clipboard-write"
+        ></iframe>
+      {/key}
     {/if}
 
-    {#if loading || (session && !frameReady) || error || !session}
+    {#if error || !session}
       <div class={stateClass}>
         <div class={stateCardClass}>
-          <AppIcon name={error ? "error" : loading || session ? "loading" : "rocket"} class={loading || (session && !frameReady) ? spinRecipe() : ""} size={28} />
-          <strong>{error ? $t("wf.startFailed") : session ? $t("wf.connecting") : $t("wf.stopped")}</strong>
-          <p>{error ?? status?.lastError ?? (session ? $t("wf.connectingHint") : $t("wf.stoppedHint"))}</p>
+          <AppIcon name={error ? "error" : "rocket"} size={28} />
+          <strong>{error ? $t("wf.startFailed") : loading ? $t("wf.connecting") : $t("wf.stopped")}</strong>
+          <p>{error ?? (loading ? $t("wf.connectingHint") : status?.lastError ?? $t("wf.stoppedHint"))}</p>
           {#if error || !session}
             <button class={actionButtonRecipe({ tone: "primary" })} type="button" disabled={loading} on:click={start}>
               <AppIcon name="power" size={16} />
@@ -283,6 +437,11 @@
             </button>
           {/if}
         </div>
+      </div>
+    {:else if loading || !frameReady}
+      <div class={loadingBadgeClass} role="status" aria-live="polite">
+        <AppIcon name="loading" class={spinRecipe()} size={15} />
+        {$t("wf.connecting")}
       </div>
     {/if}
   </section>

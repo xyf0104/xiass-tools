@@ -1,4 +1,4 @@
-use codestudio_lite_lib::core::asar_archive;
+use xiass_tools_lib::core::asar_archive;
 use std::env;
 use std::fs;
 

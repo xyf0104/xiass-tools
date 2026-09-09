@@ -9,7 +9,7 @@ use crate::core::types::{
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::BTreeMap;
 
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 
 #[derive(Debug, Clone)]
 pub struct StoredAppConfig {
@@ -96,7 +96,8 @@ fn load_profiles_with_conn(conn: &Connection) -> Result<Vec<ProfileDraft>, Strin
         .prepare(
             "SELECT id, name, icon, remark, app, mode, provider, protocol, model, review_model, model_mappings_json,
                     base_url, auth_ref,
-                    created_at, updated_at, last_test_status, sort_order
+                    created_at, updated_at, last_test_status, sort_order,
+                    web_search, image_model, model_context_window, model_auto_compact_token_limit
              FROM profiles
              ORDER BY app ASC, mode ASC, sort_order ASC, name ASC",
         )
@@ -115,8 +116,10 @@ fn load_profiles_with_conn(conn: &Connection) -> Result<Vec<ProfileDraft>, Strin
                     provider: row.get(6)?,
                     protocol: row.get(7)?,
                     model: row.get(8)?,
-                    web_search: None,
-                    image_model: None,
+                    web_search: row.get(17)?,
+                    image_model: row.get(18)?,
+                    model_context_window: row.get(19)?,
+                    model_auto_compact_token_limit: row.get(20)?,
                     review_model: row.get(9)?,
                     model_mappings: Vec::new(),
                     base_url: row.get(11)?,
@@ -149,11 +152,12 @@ pub fn save_profile(profile: &ProfileDraft) -> Result<(), String> {
 fn save_profile_with_conn(conn: &Connection, profile: &ProfileDraft) -> Result<(), String> {
     let model_mappings_json = serialize_profile_model_mappings(&profile.model_mappings)?;
     conn.execute(
-        "INSERT INTO profiles (
+            "INSERT INTO profiles (
             id, name, icon, remark, app, mode, provider, protocol, model, review_model, model_mappings_json,
             base_url, auth_ref,
-            created_at, updated_at, last_test_status, sort_order
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            created_at, updated_at, last_test_status, sort_order,
+            web_search, image_model, model_context_window, model_auto_compact_token_limit
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
          ON CONFLICT(id) DO UPDATE SET
             name=excluded.name,
             icon=excluded.icon,
@@ -170,7 +174,11 @@ fn save_profile_with_conn(conn: &Connection, profile: &ProfileDraft) -> Result<(
             created_at=excluded.created_at,
             updated_at=excluded.updated_at,
             last_test_status=excluded.last_test_status,
-            sort_order=excluded.sort_order",
+            sort_order=excluded.sort_order,
+            web_search=excluded.web_search,
+            image_model=excluded.image_model,
+            model_context_window=excluded.model_context_window,
+            model_auto_compact_token_limit=excluded.model_auto_compact_token_limit",
         params![
             profile.id,
             profile.name,
@@ -189,6 +197,10 @@ fn save_profile_with_conn(conn: &Connection, profile: &ProfileDraft) -> Result<(
             profile.updated_at,
             profile.last_test_status,
             profile.sort_order,
+            profile.web_search,
+            profile.image_model,
+            profile.model_context_window,
+            profile.model_auto_compact_token_limit,
         ],
     )
     .map_err(|err| err.to_string())?;
@@ -805,7 +817,11 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
           created_at TEXT,
           updated_at TEXT,
           last_test_status TEXT,
-          sort_order INTEGER NOT NULL DEFAULT 0
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          web_search TEXT,
+          image_model TEXT,
+          model_context_window INTEGER,
+          model_auto_compact_token_limit INTEGER
         );
         CREATE TABLE IF NOT EXISTS active_profiles (
           mode TEXT NOT NULL,
@@ -901,6 +917,7 @@ fn initialize_schema(conn: &Connection) -> Result<(), String> {
     ensure_profiles_sort_order_column(conn)?;
     ensure_profiles_review_model_column(conn)?;
     ensure_profiles_model_mappings_column(conn)?;
+    ensure_profiles_capability_columns(conn)?;
     ensure_gateway_request_privacy_columns(conn)?;
     ensure_chatgpt_desktop_state_table(conn)?;
     save_meta(conn, "schema_version", &SCHEMA_VERSION.to_string())?;
@@ -990,6 +1007,27 @@ fn ensure_profiles_review_model_column(conn: &Connection) -> Result<(), String> 
     }
     conn.execute("ALTER TABLE profiles ADD COLUMN review_model TEXT", [])
         .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+fn ensure_profiles_capability_columns(conn: &Connection) -> Result<(), String> {
+    let columns = [
+        ("web_search", "ALTER TABLE profiles ADD COLUMN web_search TEXT"),
+        ("image_model", "ALTER TABLE profiles ADD COLUMN image_model TEXT"),
+        (
+            "model_context_window",
+            "ALTER TABLE profiles ADD COLUMN model_context_window INTEGER",
+        ),
+        (
+            "model_auto_compact_token_limit",
+            "ALTER TABLE profiles ADD COLUMN model_auto_compact_token_limit INTEGER",
+        ),
+    ];
+    for (column, statement) in columns {
+        if !table_has_column(conn, "profiles", column)? {
+            conn.execute(statement, []).map_err(|err| err.to_string())?;
+        }
+    }
     Ok(())
 }
 
@@ -1822,7 +1860,7 @@ mod tests {
 
     #[test]
     fn profiles_schema_and_roundtrip_include_optional_review_model() {
-        assert_eq!(SCHEMA_VERSION, 9);
+        assert_eq!(SCHEMA_VERSION, 10);
         let conn = Connection::open_in_memory().expect("in-memory database should open");
         conn.execute_batch(
             "CREATE TABLE profiles (
@@ -1865,6 +1903,10 @@ mod tests {
             provider: "compatible".to_string(),
             protocol: "openai-responses".to_string(),
             model: "gpt-5.5".to_string(),
+            web_search: None,
+            image_model: None,
+            model_context_window: None,
+            model_auto_compact_token_limit: None,
             review_model: Some("gpt-5.6-review".to_string()),
             model_mappings: Vec::new(),
             base_url: "https://example.test/v1".to_string(),
@@ -1911,6 +1953,10 @@ mod tests {
             provider: "openai".to_string(),
             protocol: "openai-chat-completions".to_string(),
             model: String::new(),
+            web_search: None,
+            image_model: None,
+            model_context_window: None,
+            model_auto_compact_token_limit: None,
             review_model: None,
             model_mappings: Vec::new(),
             base_url: "https://example.test/v1".to_string(),

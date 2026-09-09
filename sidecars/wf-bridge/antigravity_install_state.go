@@ -93,9 +93,16 @@ func (a *App) saveAntigravityInstallState(state antigravityInstallState) error {
 }
 
 func (a *App) recordConnectedAntigravityTargets(action string) error {
+	// A successful apply must be recorded from the authoritative status pass.
+	// The quick scanner intentionally leaves Supported/Patched unset while it
+	// is doing lightweight discovery, which made a restart lose the connected
+	// baseline and show every installation as "待连接" again.
+	return a.recordConnectedAntigravityTargetsFromStatus(action, patcher.GetStatus())
+}
+
+func (a *App) recordConnectedAntigravityTargetsFromStatus(action string, status patcher.Status) error {
 	a.installStateMu.Lock()
 	defer a.installStateMu.Unlock()
-	status := patcher.GetQuickStatus()
 	state := a.loadAntigravityInstallState()
 	selectedKinds := map[string]bool{}
 	switch action {
@@ -113,7 +120,7 @@ func (a *App) recordConnectedAntigravityTargets(action string) error {
 		}
 	}
 	for _, target := range status.Targets {
-		if selectedKinds[target.Kind] {
+		if selectedKinds[target.Kind] && target.Patched && strings.TrimSpace(target.AppPath) != "" {
 			record := antigravityInstallRecordFromTarget(target)
 			record.PatchRevision = antigravityPatchRevision
 			kept = append(kept, record)
@@ -121,6 +128,52 @@ func (a *App) recordConnectedAntigravityTargets(action string) error {
 	}
 	state.Targets = kept
 	return a.saveAntigravityInstallState(state)
+}
+
+// persistedAntigravityInstallRecords returns the last authoritative
+// connection results keyed by target kind and normalized app path. The file
+// contains only non-secret install metadata and is kept behind the same mutex
+// used by all state mutations so a quick dashboard read cannot observe a
+// partially-written record.
+func (a *App) persistedAntigravityInstallRecords() map[string]antigravityInstallRecord {
+	a.installStateMu.Lock()
+	defer a.installStateMu.Unlock()
+	state := a.loadAntigravityInstallState()
+	records := make(map[string]antigravityInstallRecord, len(state.Targets))
+	for _, record := range state.Targets {
+		key := antigravityInstallRecordKey(record.Kind, record.AppPath)
+		if key != "|" {
+			records[key] = record
+		}
+	}
+	return records
+}
+
+// antigravityInstallRecordMatchesTarget validates the cheap, immutable parts
+// of a saved connection before using it for the first-paint status hint. It
+// intentionally does not replace the authoritative patcher scan: endpoint,
+// ASAR and renderer compatibility are still verified by GetPatchStatus or
+// RefreshPatchStatus immediately afterwards.
+func antigravityInstallRecordMatchesTarget(record antigravityInstallRecord, target patcher.TargetStatus) bool {
+	if record.PatchRevision != antigravityPatchRevision ||
+		antigravityInstallRecordKey(record.Kind, record.AppPath) != antigravityInstallRecordKey(target.Kind, target.AppPath) {
+		return false
+	}
+	if strings.TrimSpace(record.Version) != "" && strings.TrimSpace(target.Version) != "" && record.Version != target.Version {
+		return false
+	}
+	if record.ExecutableSize == 0 && record.ExecutableModTime == 0 {
+		return true
+	}
+	executable := strings.TrimSpace(target.ExecutablePath)
+	if executable == "" {
+		return false
+	}
+	info, err := os.Stat(executable)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	return info.Size() == record.ExecutableSize && info.ModTime().UnixNano() == record.ExecutableModTime
 }
 
 func (a *App) antigravityProductRepatchState(status patcher.Status) (bool, string) {

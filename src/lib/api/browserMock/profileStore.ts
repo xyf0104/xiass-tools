@@ -22,7 +22,8 @@ export function createBrowserProfileStore(state: BrowserMockState) {
 
   const builtins = (): ProfileDraft[] => BUILTIN_DEFINITIONS.map(([app, name, protocol]) => ({
     id: builtinId(app), name, icon: null, remark: null, app, isBuiltin: true, mode: "config",
-    provider: "official", protocol, model: "", reviewModel: null, modelMappings: [], baseUrl: "",
+    provider: "official", protocol, model: "", webSearch: null, imageModel: null,
+    modelContextWindow: null, modelAutoCompactTokenLimit: null, reviewModel: null, modelMappings: [], baseUrl: "",
     authRef: null, createdAt: null, updatedAt: null, lastTestStatus: "builtin", usageEnabled: false, sortOrder: 0
   }));
 

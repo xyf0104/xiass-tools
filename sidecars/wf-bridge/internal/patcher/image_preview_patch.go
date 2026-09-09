@@ -1,6 +1,7 @@
 package patcher
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1513,11 +1514,35 @@ func imagePreviewRenderersNeedPatch(paths []string) bool {
 		if err != nil {
 			continue
 		}
+		// A connected IDE already carries the complete, versioned renderer
+		// markers.  Do not run the whole legacy matcher over 10–30 MB of
+		// minified JavaScript on every status refresh; that matcher is intended
+		// for an apply/upgrade transaction, not a steady-state health check.
+		// The marker set is deliberately all-or-nothing so an older partial
+		// patch still falls through to the compatibility matcher below.
+		if imagePreviewRendererHasCurrentManagedMarkers(data) {
+			continue
+		}
 		if _, result := patchImagePreviewRenderer(string(data)); result.Changed {
 			return true
 		}
 	}
 	return false
+}
+
+// imagePreviewRendererHasCurrentManagedMarkers is a cheap, allocation-free
+// steady-state check shared by the Darwin and Windows status paths.  A marker
+// alone is not enough: all three current renderer contracts must be present so
+// a partially-written or legacy renderer remains visible as needing repair.
+func imagePreviewRendererHasCurrentManagedMarkers(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	previewReady := bytes.Contains(data, []byte(imagePreviewPatchMarker)) ||
+		bytes.Contains(data, []byte(imagePreviewNativeCompatibleMarker))
+	return previewReady &&
+		bytes.Contains(data, []byte(imageGenerationUIPatchMarker)) &&
+		bytes.Contains(data, []byte(imageGenerationDedupePatchMarker))
 }
 
 func imagePreviewASARRendererEntries(archive *asarArchive) []string {

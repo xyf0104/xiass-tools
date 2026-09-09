@@ -93,6 +93,8 @@ pub(in crate::core::profile) fn builtin_official_profiles() -> Vec<ProfileDraft>
             model: String::new(),
             web_search: None,
             image_model: None,
+            model_context_window: None,
+            model_auto_compact_token_limit: None,
             review_model: None,
             model_mappings: Vec::new(),
             base_url: String::new(),

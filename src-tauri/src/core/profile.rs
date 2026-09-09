@@ -153,6 +153,55 @@ const PROTOCOL_ANTHROPIC_MESSAGES: &str = "anthropic-messages";
 const PROTOCOL_GOOGLE_GEMINI: &str = "google-gemini";
 const GATEWAY_FALLBACK_MODEL: &str = "default";
 const CLAUDE_VSCODE_PLUGIN_PRIMARY_API_KEY: &str = "any";
+
+// Keep these values aligned with the first-party XIASS Codex helper. They are
+// persisted as profile metadata so the UI can offer the same 235K/372K/512K/1M
+// presets while the native adapter writes the two supported Codex TOML keys.
+pub(in crate::core::profile) const CODEX_DEFAULT_CONTEXT_WINDOW: u64 = 372_000;
+pub(in crate::core::profile) const CODEX_DEFAULT_AUTO_COMPACT_TOKEN_LIMIT: u64 = 334_800;
+pub(in crate::core::profile) const CODEX_MIN_CONTEXT_WINDOW: u64 = 64_000;
+pub(in crate::core::profile) const CODEX_MAX_CONTEXT_WINDOW: u64 = 1_050_000;
+pub(in crate::core::profile) const CODEX_MIN_AUTO_COMPACT_TOKEN_LIMIT: u64 = 16_000;
+
+pub(in crate::core::profile) fn normalize_codex_context_settings(
+    app: &str,
+    context_window: Option<u64>,
+    auto_compact_token_limit: Option<u64>,
+) -> Result<(Option<u64>, Option<u64>), String> {
+    if !is_codex_family_app(app) {
+        return Ok((None, None));
+    }
+    let window = context_window.unwrap_or(CODEX_DEFAULT_CONTEXT_WINDOW);
+    if !(CODEX_MIN_CONTEXT_WINDOW..=CODEX_MAX_CONTEXT_WINDOW).contains(&window) {
+        return Err(format!(
+            "Codex context window must be between {} and {} tokens.",
+            CODEX_MIN_CONTEXT_WINDOW, CODEX_MAX_CONTEXT_WINDOW
+        ));
+    }
+    let compact = auto_compact_token_limit
+        .unwrap_or_else(|| window.saturating_mul(9) / 10);
+    if compact < CODEX_MIN_AUTO_COMPACT_TOKEN_LIMIT || compact >= window {
+        return Err(format!(
+            "Codex automatic compaction threshold must be between {} and less than the context window.",
+            CODEX_MIN_AUTO_COMPACT_TOKEN_LIMIT
+        ));
+    }
+    Ok((Some(window), Some(compact)))
+}
+
+pub(in crate::core::profile) fn normalize_codex_web_search(
+    app: &str,
+    value: Option<&str>,
+) -> Result<Option<String>, String> {
+    if !is_codex_family_app(app) {
+        return Ok(None);
+    }
+    let normalized = value.map(str::trim).filter(|item| !item.is_empty()).unwrap_or("live");
+    match normalized {
+        "live" | "cached" | "disabled" => Ok(Some(normalized.to_string())),
+        _ => Err("Codex Web Search must be live, cached, or disabled.".to_string()),
+    }
+}
 use native::claude_desktop::{
     build_apply_plan as build_claude_desktop_apply_plan,
     build_developer_settings_plans as build_claude_desktop_developer_settings_plans,
@@ -1144,6 +1193,10 @@ fn profile_sql_preview_content(
             "provider": profile.provider,
             "protocol": profile.protocol,
             "model": profile.model,
+            "web_search": profile.web_search,
+            "image_model": profile.image_model,
+            "model_context_window": profile.model_context_window,
+            "model_auto_compact_token_limit": profile.model_auto_compact_token_limit,
             "review_model": profile.review_model,
             "model_mappings": profile.model_mappings,
             "base_url": profile.base_url,

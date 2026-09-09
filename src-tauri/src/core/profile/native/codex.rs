@@ -7,6 +7,64 @@ pub(in crate::core::profile) const CODEX_ACTOR_AUTHORIZATION_VALUE: &str = "code
 pub(in crate::core::profile) const CODEX_ACTOR_AUTHORIZATION_INLINE_TOML: &str =
     r#"{ "x-openai-actor-authorization" = "codestudio-lite" }"#;
 
+fn codex_web_search(profile: &ProfileDraft) -> &str {
+    match profile.web_search.as_deref() {
+        Some("cached") => "cached",
+        Some("disabled") => "disabled",
+        _ => "live",
+    }
+}
+
+fn codex_context_settings(profile: &ProfileDraft) -> (u64, u64) {
+    let window = profile
+        .model_context_window
+        .unwrap_or(CODEX_DEFAULT_CONTEXT_WINDOW);
+    let compact = profile
+        .model_auto_compact_token_limit
+        .unwrap_or_else(|| {
+            if profile.model_context_window.is_none() {
+                CODEX_DEFAULT_AUTO_COMPACT_TOKEN_LIMIT
+            } else {
+                window.saturating_mul(9) / 10
+            }
+        });
+    (window, compact)
+}
+
+fn toml_integer(value: &toml::Value, key: &str) -> Option<u64> {
+    value
+        .get(key)
+        .and_then(|item| item.as_integer())
+        .and_then(|item| u64::try_from(item).ok())
+}
+
+fn codex_top_level_settings_match(
+    value: &toml::Value,
+    profile: &ProfileDraft,
+    allow_unspecified: bool,
+) -> bool {
+    let web_search_matches = profile.web_search.as_deref().map_or(allow_unspecified, |expected| {
+        read_toml_string(value, "web_search").as_deref() == Some(expected)
+    });
+    let context_matches = if profile.model_context_window.is_none()
+        && profile.model_auto_compact_token_limit.is_none()
+    {
+        allow_unspecified
+    } else {
+        let (window, compact) = codex_context_settings(profile);
+        toml_integer(value, "model_context_window") == Some(window)
+            && toml_integer(value, "model_auto_compact_token_limit") == Some(compact)
+    };
+    web_search_matches && context_matches
+}
+
+fn set_codex_top_level_settings(document: &mut toml_edit::DocumentMut, profile: &ProfileDraft) {
+    document["web_search"] = toml_edit::value(codex_web_search(profile));
+    let (window, compact) = codex_context_settings(profile);
+    document["model_context_window"] = toml_edit::value(window as i64);
+    document["model_auto_compact_token_limit"] = toml_edit::value(compact as i64);
+}
+
 pub(in crate::core::profile) fn auth_json_has_chatgpt_markers(value: &serde_json::Value) -> bool {
     let mut keys = Vec::new();
     collect_json_key_paths(value, String::new(), &mut keys);
@@ -251,6 +309,28 @@ fn preview_config(
         ));
     }
     changes.extend(codex_preserved_auth_repair_diff_lines(&value));
+    let web_search = codex_web_search(profile);
+    changes.push(diff_line(
+        &value,
+        "web_search",
+        web_search,
+        "Sets Codex Web Search behavior for this profile.",
+    ));
+    let (context_window, auto_compact_limit) = codex_context_settings(profile);
+    let context_window_text = context_window.to_string();
+    let auto_compact_limit_text = auto_compact_limit.to_string();
+    changes.push(diff_line(
+        &value,
+        "model_context_window",
+        &context_window_text,
+        "Sets the Codex context window limit.",
+    ));
+    changes.push(diff_line(
+        &value,
+        "model_auto_compact_token_limit",
+        &auto_compact_limit_text,
+        "Sets the Codex automatic compaction threshold.",
+    ));
     let review_model = effective_profile_review_model(
         &profile.app,
         profile.review_model.as_deref(),
@@ -474,6 +554,7 @@ pub(in crate::core::profile) fn config_matches_profile_with_auth(
     read_toml_string(value, "model_provider").as_deref() == Some(provider_id.as_str())
         && model_matches
         && review_model_matches_profile(value, profile, false)
+        && codex_top_level_settings_match(value, profile, true)
         && token_matches
         && toml_lookup(value, &format!("model_providers.{provider_id}.base_url"))
             .and_then(|item| item.as_str())
@@ -499,6 +580,7 @@ pub(in crate::core::profile) fn official_config_matches_profile(
     provider_matches
         && model_matches
         && review_model_matches_profile(value, profile, true)
+        && codex_top_level_settings_match(value, profile, true)
         && toml_lookup(value, "model_providers.openai").is_none()
 }
 
@@ -616,6 +698,7 @@ pub(in crate::core::profile) fn verify_config(
                     == Some(provider_id.as_str())
                 && read_toml_string(&value, "model").as_deref() == Some(model)
                 && review_model_matches_profile(&value, profile, false)
+                && codex_top_level_settings_match(&value, profile, true)
                 && toml_lookup(&value, &format!("model_providers.{provider_id}.base_url"))
                     .and_then(|item| item.as_str())
                     == Some(client.base_url.as_str())
@@ -636,6 +719,7 @@ pub(in crate::core::profile) fn verify_config(
                 && read_toml_string(&value, "model_provider").as_deref() == Some("openai")
                 && model_matches
                 && review_model_matches_profile(&value, profile, false)
+                && codex_top_level_settings_match(&value, profile, true)
                 && toml_lookup(&value, "model_providers.openai").is_none(),
         );
     }
@@ -651,6 +735,7 @@ pub(in crate::core::profile) fn verify_config(
             && read_toml_string(&value, "model_provider").as_deref() == Some(provider_id.as_str())
             && model_matches
             && review_model_matches_profile(&value, profile, false)
+            && codex_top_level_settings_match(&value, profile, true)
             && toml_lookup(&value, &format!("model_providers.{provider_id}.wire_api"))
                 .and_then(|item| item.as_str())
                 == Some(wire_api)
@@ -679,7 +764,7 @@ pub(in crate::core::profile) fn codex_gateway_config_content(
     let model = gateway_config_model_for_profile(profile);
     document["cli_auth_credentials_store"] = toml_edit::value("file");
     document["model_provider"] = toml_edit::value(provider_id.clone());
-    document["web_search"] = toml_edit::value(profile.web_search.as_deref().unwrap_or("live"));
+    set_codex_top_level_settings(&mut document, profile);
     document["model"] = toml_edit::value(model);
     set_review_model(&mut document, profile, model);
     remove_provider_entry(&mut document, &provider_id);
@@ -709,7 +794,7 @@ pub(in crate::core::profile) fn codex_direct_config_content(
     let model = profile.model.trim();
     document["cli_auth_credentials_store"] = toml_edit::value("file");
     document["model_provider"] = toml_edit::value(provider_id.clone());
-    document["web_search"] = toml_edit::value(profile.web_search.as_deref().unwrap_or("live"));
+    set_codex_top_level_settings(&mut document, profile);
     if model.is_empty() {
         document.as_table_mut().remove("model");
     } else {
@@ -741,6 +826,7 @@ pub(in crate::core::profile) fn codex_official_config_content(
     remove_provider_entry(&mut document, provider_id);
     document["cli_auth_credentials_store"] = toml_edit::value("file");
     document["model_provider"] = toml_edit::value(provider_id);
+    set_codex_top_level_settings(&mut document, profile);
     if profile.model.trim().is_empty() {
         document.remove("model");
     } else {

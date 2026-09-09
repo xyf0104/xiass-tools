@@ -60,6 +60,13 @@ pub fn save_profile_draft(request: SaveProfileDraftRequest) -> Result<ProfileDra
     let model_mappings =
         normalize_profile_model_mappings(&plan.app, request.model_mappings.as_deref())?;
     let review_model = normalize_profile_review_model(&plan.app, request.review_model.as_deref());
+    let (model_context_window, model_auto_compact_token_limit) =
+        normalize_codex_context_settings(
+            &plan.app,
+            request.model_context_window,
+            request.model_auto_compact_token_limit,
+        )?;
+    let web_search = normalize_codex_web_search(&plan.app, request.web_search.as_deref())?;
     ensure_profile_tool_installed(&plan.app)?;
     let now = Utc::now().to_rfc3339();
     let sort_order = storage::next_profile_sort_order(&plan.app, &plan.mode)?;
@@ -74,8 +81,10 @@ pub fn save_profile_draft(request: SaveProfileDraftRequest) -> Result<ProfileDra
         provider: plan.provider,
         protocol: plan.protocol,
         model: plan.model,
-        web_search: request.web_search.clone(),
+        web_search,
         image_model: request.image_model.clone(),
+        model_context_window,
+        model_auto_compact_token_limit,
         review_model,
         model_mappings,
         base_url: plan.base_url,
@@ -134,6 +143,17 @@ pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<Profil
     ensure_profile_protocol_supported_for_mode(&app, mode, &provider, &protocol)?;
     let model = request.model.trim().to_string();
     let review_model = normalize_profile_review_model(&app, request.review_model.as_deref());
+    let (model_context_window, model_auto_compact_token_limit) =
+        normalize_codex_context_settings(
+            &app,
+            request
+                .model_context_window
+                .or(existing.model_context_window),
+            request
+                .model_auto_compact_token_limit
+                .or(existing.model_auto_compact_token_limit),
+        )?;
+    let web_search = normalize_codex_web_search(&app, request.web_search.as_deref().or(existing.web_search.as_deref()))?;
     let model_mappings = normalize_profile_model_mappings(
         &app,
         Some(
@@ -177,8 +197,10 @@ pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<Profil
         provider,
         protocol,
         model,
-        web_search: request.web_search.clone().or(existing.web_search.clone()),
+        web_search,
         image_model: request.image_model.clone().or(existing.image_model.clone()),
+        model_context_window,
+        model_auto_compact_token_limit,
         review_model,
         model_mappings,
         base_url,
@@ -264,6 +286,8 @@ pub fn duplicate_profile_draft(
         model: source.model.clone(),
         web_search: source.web_search.clone(),
         image_model: source.image_model.clone(),
+        model_context_window: source.model_context_window,
+        model_auto_compact_token_limit: source.model_auto_compact_token_limit,
         review_model: source.review_model.clone(),
         model_mappings: source.model_mappings.clone(),
         base_url: source.base_url.clone(),
@@ -405,6 +429,13 @@ pub fn preview_profile_write(
     }
     let now = Utc::now().to_rfc3339();
     let database_path = display_path(&paths.database_file);
+    let (model_context_window, model_auto_compact_token_limit) =
+        normalize_codex_context_settings(
+            &plan.app,
+            request.model_context_window,
+            request.model_auto_compact_token_limit,
+        )?;
+    let web_search = normalize_codex_web_search(&plan.app, request.web_search.as_deref())?;
     let preview_profile = ProfileDraft {
         id: plan.id.clone(),
         name: plan.name.clone(),
@@ -416,8 +447,10 @@ pub fn preview_profile_write(
         provider: plan.provider.clone(),
         protocol: plan.protocol.clone(),
         model: plan.model.clone(),
-        web_search: request.web_search.clone(),
+        web_search,
         image_model: request.image_model.clone(),
+        model_context_window,
+        model_auto_compact_token_limit,
         review_model: normalize_profile_review_model(&plan.app, request.review_model.as_deref()),
         model_mappings: normalize_profile_model_mappings(
             &plan.app,

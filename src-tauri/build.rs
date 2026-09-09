@@ -46,7 +46,7 @@ fn emit_rerun_inputs(path: &Path) {
     }
     let tracked = matches!(
         path.file_name().and_then(|name| name.to_str()),
-        Some("go.mod") | Some("go.sum")
+        Some("go.mod") | Some("go.sum") | Some("wf-embedded-overrides.css")
     ) || path.extension().and_then(|extension| extension.to_str()) == Some("go")
         || path
             .components()

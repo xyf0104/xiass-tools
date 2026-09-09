@@ -94,6 +94,14 @@ func selectDarwinInstallations(candidates []string, explicit map[string]bool, is
 			continue
 		}
 		seen[canonical] = true
+		// The published XIASS Tools app itself is an Electron bundle whose
+		// name contains "Antigravity" for branding.  It must never become an
+		// Antigravity IDE/Agent patch candidate when Spotlight or /Applications
+		// discovery is enabled.  Keep the exclusion bundle-ID based so a
+		// renamed helper copy cannot re-enter through a different filename.
+		if darwinBundleIdentifierIsXIASSHelper(candidate) {
+			continue
+		}
 		if !explicit[candidate] && !isTrusted(candidate) {
 			deferredCustomLocations = append(deferredCustomLocations, candidate)
 			continue
@@ -144,6 +152,9 @@ func selectDarwinInstallationsQuick(candidates []string, explicit map[string]boo
 			continue
 		}
 		seen[canonical] = true
+		if darwinBundleIdentifierIsXIASSHelper(candidate) {
+			continue
+		}
 		trusted := isTrusted(candidate)
 		if !explicit[candidate] {
 			if trusted {
@@ -298,7 +309,24 @@ func darwinAppNameLooksLikeAntigravity(name string) bool {
 }
 
 func darwinBundleIdentifierIsAntigravity(path string) bool {
-	return strings.Contains(strings.ToLower(darwinBundleValue(path, "CFBundleIdentifier")), "antigravity")
+	identifier := strings.ToLower(strings.TrimSpace(darwinBundleValue(path, "CFBundleIdentifier")))
+	if identifier == "" || identifier == strings.ToLower(xiassToolsBundleIdentifier) {
+		return false
+	}
+	// Google has used both the IDE and Agent bundle IDs.  Keep a narrow
+	// vendor-prefix allowlist (plus the test/fork suffixes used by supported
+	// recovery builds) instead of accepting any app whose identifier merely
+	// contains the word "antigravity".
+	return strings.HasPrefix(identifier, "com.google.antigravity") ||
+		identifier == "test.antigravity" ||
+		strings.HasSuffix(identifier, ".antigravity")
+}
+
+const xiassToolsBundleIdentifier = "com.wufeng.antigravity-wf-assistant"
+
+func darwinBundleIdentifierIsXIASSHelper(path string) bool {
+	identifier := strings.ToLower(strings.TrimSpace(darwinBundleValue(path, "CFBundleIdentifier")))
+	return identifier == strings.ToLower(xiassToolsBundleIdentifier)
 }
 
 func darwinTrustedCandidateHasExpectedIdentity(path string) bool {

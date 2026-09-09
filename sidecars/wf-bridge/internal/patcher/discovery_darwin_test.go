@@ -82,6 +82,18 @@ func TestSelectDarwinInstallationsHonorsExplicitRecoveryPath(t *testing.T) {
 	}
 }
 
+func TestDarwinDiscoverySkipsXIASSHelperBundle(t *testing.T) {
+	app := filepath.Join(t.TempDir(), "Antigravity WF助手.app")
+	writeDarwinUnpackedDiscoveryFixture(t, app, xiassToolsBundleIdentifier)
+	normalized := normalizeAppBundlePath(app)
+	if targets := selectDarwinInstallations([]string{normalized}, nil, func(string) bool { return true }); len(targets) != 0 {
+		t.Fatalf("XIASS helper bundle was exposed as an Antigravity target: %+v", targets)
+	}
+	if targets := selectDarwinInstallationsQuick([]string{normalized}, nil, func(string) bool { return true }); len(targets) != 0 {
+		t.Fatalf("XIASS helper bundle was exposed by quick discovery: %+v", targets)
+	}
+}
+
 func TestInspectDarwinUnpackedIDEFindsLanguageServerWithoutExtensionEntry(t *testing.T) {
 	app := filepath.Join(t.TempDir(), "Antigravity IDE.app")
 	main := filepath.Join(app, "Contents", "Resources", "app", "out", "main.js")

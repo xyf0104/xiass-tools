@@ -1,14 +1,11 @@
 :root {
   --icon-info: #78bdff;
+  --icon-action: #77c7ff;
   --icon-success: #6ce3ae;
   --icon-warning: #ffc56a;
   --icon-danger: #ff827d;
   --icon-violet: #c0a5ff;
   --icon-cyan: #68dce7;
-  --icon-action-orange: #ff9b51;
-  --icon-action-gold: #ffd08a;
-  --icon-action-blue: #80caff;
-  --icon-action-deep: #479cff;
   color-scheme: dark;
   font-family:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
@@ -87,15 +84,12 @@
 
 :root[data-theme="light"] {
   --icon-info: #1868b3;
+  --icon-action: #1b70bd;
   --icon-success: #18774d;
   --icon-warning: #9b5b0b;
   --icon-danger: #bf3935;
   --icon-violet: #7951bd;
   --icon-cyan: #087888;
-  --icon-action-orange: #b64c13;
-  --icon-action-gold: #a86618;
-  --icon-action-blue: #237bb9;
-  --icon-action-deep: #285aca;
   color-scheme: light;
   --bg: #dfeaf0;
   --surface: rgba(248, 253, 255, 0.7);
@@ -180,6 +174,40 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The utility pair is a deliberate bottom group: 2FA stays immediately above
+   Settings while the primary navigation consumes the flexible middle space. */
+.xiass-sidebar-footer-nav {
+  display: grid;
+  gap: 9px;
+  flex: 0 0 auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.xiass-window-drag-region { display: none; }
+
+:root[data-platform="macos"] .xiass-window-drag-region {
+  display: block;
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 262px;
+  height: 48px;
+  z-index: 10;
+  background: transparent;
+  user-select: none;
+}
+
+:root[data-platform="macos"] .cs-app-sidebar {
+  padding-top: 48px;
+}
+
+@media (max-width: 900px) {
+  :root[data-platform="macos"] .xiass-window-drag-region { width: 86px; }
+  .xiass-sidebar-footer-nav {
+    grid-template-columns: 1fr;
+  }
+}
+
 :root[data-theme="light"] body {
   background-image:
     radial-gradient(circle at 14% 10%, rgba(10, 132, 255, 0.13), transparent 34%),
@@ -235,6 +263,44 @@ body {
   button:disabled {
     cursor: not-allowed;
     opacity: 0.48;
+  }
+
+  /* Preserve readable labels on gradient action buttons. Disabled state is
+     communicated by reduced saturation/shadow, not by washing the text out. */
+  button.cs-action-button:is(:disabled, [disabled], [data-disabled], [aria-disabled="true"]) {
+    opacity: 0.86;
+    color: var(--text-soft);
+    border-color: var(--border-subtle);
+    background:
+      linear-gradient(145deg, color-mix(in srgb, var(--glass-highlight) 58%, transparent), transparent 38%),
+      color-mix(in srgb, var(--glass-control-bg) 78%, var(--surface) 22%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--glass-highlight) 62%, transparent);
+  }
+
+  button.cs-action-button:is(:disabled, [disabled], [data-disabled], [aria-disabled="true"]) .xiass-icon:not(.xiass-icon--action) {
+    opacity: 0.92;
+  }
+
+  button.cs-action-button--tone_primary:is(:disabled, [disabled], [data-disabled], [aria-disabled="true"]) {
+    opacity: 0.9;
+    color: #ffffff !important;
+    background: linear-gradient(118deg, #b85f36 0%, #c99b58 31%, #3e78bd 74%, #214c92 100%);
+    filter: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.42);
+  }
+
+  button.cs-action-button--tone_primary:is(:disabled, [disabled], [data-disabled], [aria-disabled="true"]) .xiass-icon--action,
+  button.cs-action-button--tone_primary .xiass-icon--action {
+    color: #ffffff !important;
+    filter: brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.32));
+  }
+
+  /* The primary gradient is the surface. Every foreground node stays white
+     so icons and labels do not lose contrast against the orange stop. */
+  button.cs-action-button--tone_primary,
+  button.cs-action-button--tone_primary :where(*) {
+    color: #ffffff !important;
   }
 
   button:hover:not(:disabled) {
@@ -366,6 +432,27 @@ input[type="checkbox"] {
   background: transparent;
 }
 
+.cs-app-workspace {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  overscroll-behavior: contain;
+}
+
+.cs-app-workspace::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cs-app-workspace::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cs-app-workspace::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
 .cs-app-sidebar,
 .cs-top-strip,
 .cs-panel,
@@ -451,6 +538,7 @@ input[type="checkbox"] {
 }
 
 .xiass-icon--action {
+  color: var(--icon-action);
   filter: drop-shadow(0 0 3px rgb(82 166 255 / 28%));
 }
 

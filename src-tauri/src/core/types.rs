@@ -559,6 +559,10 @@ pub struct ProfileDraft {
     #[serde(default)]
     pub image_model: Option<String>,
     #[serde(default)]
+    pub model_context_window: Option<u64>,
+    #[serde(default)]
+    pub model_auto_compact_token_limit: Option<u64>,
+    #[serde(default)]
     pub review_model: Option<String>,
     #[serde(default)]
     pub model_mappings: Vec<ProfileModelMapping>,
@@ -709,6 +713,10 @@ pub struct SaveProfileDraftRequest {
     pub web_search: Option<String>,
     #[serde(default)]
     pub image_model: Option<String>,
+    #[serde(default)]
+    pub model_context_window: Option<u64>,
+    #[serde(default)]
+    pub model_auto_compact_token_limit: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -735,6 +743,8 @@ pub struct UpdateProfileDraftRequest {
     pub api_key: Option<String>,
     #[serde(default)] pub web_search: Option<String>,
     #[serde(default)] pub image_model: Option<String>,
+    #[serde(default)] pub model_context_window: Option<u64>,
+    #[serde(default)] pub model_auto_compact_token_limit: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -782,6 +792,8 @@ pub struct PreviewProfileWriteRequest {
     pub api_key: Option<String>,
     #[serde(default)] pub web_search: Option<String>,
     #[serde(default)] pub image_model: Option<String>,
+    #[serde(default)] pub model_context_window: Option<u64>,
+    #[serde(default)] pub model_auto_compact_token_limit: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -54,3 +54,13 @@ pub async fn wf_bridge_get_helper_diagnostics() -> Result<WfHelperDiagnosticSnap
         .await
         .map_err(|error| format!("收集 WF 诊断任务失败：{error}"))?
 }
+
+#[tauri::command]
+pub async fn wf_bridge_call(
+    method: String,
+    args: Vec<serde_json::Value>,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || wf_bridge::call_method(&method, args))
+        .await
+        .map_err(|error| format!("调用 WF 原生方法失败：{error}"))?
+}

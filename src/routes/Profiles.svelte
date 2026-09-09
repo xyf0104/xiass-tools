@@ -116,6 +116,10 @@
     provider: string;
     protocol: string;
     model: string;
+    webSearch: "live" | "cached" | "disabled" | null;
+    imageModel: string;
+    modelContextWindow: number;
+    modelAutoCompactTokenLimit: number;
     reviewModel: string;
     modelMappings: ProfileModelMappingForm[];
     baseUrl: string;
@@ -272,6 +276,21 @@
     fontSize: "13px",
     fontWeight: 800
   });
+  const codexCapabilityPanelClass = css({
+    display: "grid",
+    gap: "12px",
+    gridColumn: "1 / -1",
+    padding: "14px",
+    border: "1px solid color-mix(in srgb, var(--accent) 24%, var(--border))",
+    borderRadius: "16px",
+    background: "linear-gradient(135deg, color-mix(in srgb, #ff9b51 8%, var(--surface-muted)), color-mix(in srgb, #2f8df4 10%, var(--surface-muted)))",
+    "& > strong": { color: "var(--text)", fontSize: "13px", fontWeight: 850 },
+    "& small": { color: "var(--text-muted)", lineHeight: 1.45 },
+    "& .codex-capability-grid": {
+      display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px",
+      "@media (max-width: 760px)": { gridTemplateColumns: "1fr" }
+    }
+  });
 
   const toolLabels = PROFILE_TOOL_LABELS;
   const officialProfileNameKeys = OFFICIAL_PROFILE_NAME_KEYS as Record<string, TranslationKey>;
@@ -315,6 +334,10 @@
   $: editSupportsReviewModel = Boolean(pendingEdit) && canonicalProfileToolId(pendingEdit?.app ?? "") === "codex";
   $: editModelMappingsValid =
     !editSupportsModelMappings || profileModelMappingsAreValid(editForm.modelMappings);
+  $: editCodexContextValid = !editSupportsReviewModel
+    || (Number.isInteger(editForm.modelContextWindow) && editForm.modelContextWindow >= 64000 && editForm.modelContextWindow <= 1050000
+      && Number.isInteger(editForm.modelAutoCompactTokenLimit) && editForm.modelAutoCompactTokenLimit >= 16000
+      && editForm.modelAutoCompactTokenLimit < editForm.modelContextWindow);
   $: editModelListId = pendingEdit
     ? `edit-model-options-${domSafeId(pendingEdit.id)}`
     : "edit-model-options";
@@ -344,6 +367,7 @@
     (!providerNeedsBaseUrl(editForm.provider) || editBaseUrlErrorKey === null) &&
     (!providerRequiresApiKey(editForm.provider) || Boolean(pendingEdit?.authRef) || editForm.apiKey.trim().length > 0) &&
     editModelMappingsValid &&
+    editCodexContextValid &&
     !pendingEdit?.isBuiltin &&
     editingId === null;
   $: canFetchEditModels =
@@ -398,6 +422,10 @@
       provider: "",
       protocol: "openai-chat-completions",
       model: "",
+      webSearch: null,
+      imageModel: "",
+      modelContextWindow: 372000,
+      modelAutoCompactTokenLimit: 334800,
       reviewModel: "",
       modelMappings: [],
       baseUrl: "",
@@ -451,6 +479,10 @@
       provider: profile.provider,
       protocol: profile.protocol,
       model: profile.model,
+      webSearch: profile.webSearch ?? "live",
+      imageModel: profile.imageModel ?? "",
+      modelContextWindow: profile.modelContextWindow ?? 372000,
+      modelAutoCompactTokenLimit: profile.modelAutoCompactTokenLimit ?? 334800,
       reviewModel: profile.reviewModel ?? "",
       modelMappings: modelMappingFormsFromProfile(profile),
       baseUrl: profile.baseUrl,
@@ -470,6 +502,24 @@
     editError = null;
     resetEditModels();
     editForm = emptyEditForm();
+  }
+
+  function updateEditContextWindow(value: string) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    editForm = {
+      ...editForm,
+      modelContextWindow: Math.round(parsed),
+      modelAutoCompactTokenLimit: editForm.modelAutoCompactTokenLimit >= parsed
+        ? Math.floor(parsed * 0.9)
+        : editForm.modelAutoCompactTokenLimit
+    };
+  }
+
+  function updateEditAutoCompactLimit(value: string) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    editForm = { ...editForm, modelAutoCompactTokenLimit: Math.round(parsed) };
   }
 
   function resetEditModels() {
@@ -539,6 +589,10 @@
         provider: editForm.provider,
         protocol: editForm.protocol,
         model: editForm.model,
+        webSearch: editSupportsReviewModel ? editForm.webSearch : null,
+        imageModel: editSupportsReviewModel ? editForm.imageModel.trim() || null : null,
+        modelContextWindow: editSupportsReviewModel ? editForm.modelContextWindow : null,
+        modelAutoCompactTokenLimit: editSupportsReviewModel ? editForm.modelAutoCompactTokenLimit : null,
         reviewModel: editSupportsReviewModel ? editForm.reviewModel.trim() || null : null,
         modelMappings: modelMappingsForRequest(pendingEdit.app, editForm.modelMappings),
         baseUrl: normalizeBaseUrl(editForm.baseUrl),
@@ -1515,6 +1569,52 @@
                 disabled={editingId !== null}
               />
             </div>
+            <section class={codexCapabilityPanelClass} aria-label={$t("wizard.contextWindow")}>
+              <strong>{$t("wizard.contextWindow")} &amp; model capabilities</strong>
+              <div class="codex-capability-grid">
+                <label>
+                  {$t("wizard.webSearch")}
+                  <select bind:value={editForm.webSearch} disabled={editingId !== null}>
+                    <option value="live">{$t("wizard.webSearchLive")}</option>
+                    <option value="cached">{$t("wizard.webSearchCached")}</option>
+                    <option value="disabled">{$t("wizard.webSearchDisabled")}</option>
+                  </select>
+                </label>
+                <label>
+                  {$t("wizard.imageModel")}
+                  <input bind:value={editForm.imageModel} disabled={editingId !== null} placeholder="例如 gpt-image-1 / imagen-4" />
+                  <small>{$t("wizard.imageModelHint")}</small>
+                </label>
+                <label>
+                  {$t("wizard.contextWindow")}
+                  <select
+                    value={String([235000, 372000, 512000, 1000000].includes(editForm.modelContextWindow) ? editForm.modelContextWindow : "custom")}
+                    disabled={editingId !== null}
+                    on:change={(event) => {
+                      const value = event.currentTarget.value;
+                      if (value !== "custom") {
+                        const next = Number(value);
+                        editForm = { ...editForm, modelContextWindow: next, modelAutoCompactTokenLimit: Math.floor(next * 0.9) };
+                      }
+                    }}
+                  >
+                    <option value="235000">235K</option>
+                    <option value="372000">372K</option>
+                    <option value="512000">512K</option>
+                    <option value="1000000">1M</option>
+                    <option value="custom">{$t("wizard.contextCustom")}</option>
+                  </select>
+                  {#if ![235000, 372000, 512000, 1000000].includes(editForm.modelContextWindow)}
+                    <input type="number" min="64000" max="1050000" step="1000" value={editForm.modelContextWindow} disabled={editingId !== null} on:input={(event) => updateEditContextWindow(event.currentTarget.value)} />
+                  {/if}
+                </label>
+                <label>
+                  {$t("wizard.contextAutoCompact")}
+                  <input type="number" min="16000" max="1049000" step="1000" value={editForm.modelAutoCompactTokenLimit} disabled={editingId !== null} on:input={(event) => updateEditAutoCompactLimit(event.currentTarget.value)} />
+                  <small>{$t("wizard.contextAutoCompactLinked")}: {Math.floor(editForm.modelContextWindow * 0.9).toLocaleString()}</small>
+                </label>
+              </div>
+            </section>
           {/if}
           {#if editSupportsModelMappings}
             <section class={modelMappingPanelClass}>

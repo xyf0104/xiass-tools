@@ -376,6 +376,27 @@ func TestWFBridgeRuntimeDoesNotEmbedCredential(t *testing.T) {
 	}
 }
 
+func TestWFBridgeRootInjectsEmbeddedScrollOverride(t *testing.T) {
+	bridge := &wfBridgeServer{assets: http.FileServer(http.FS(wfBridgeAssets))}
+	request := httptest.NewRequest(http.MethodGet, "/?embedded=1", nil)
+	response := httptest.NewRecorder()
+	bridge.handleAssets(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("embedded root returned %d", response.Code)
+	}
+	body := response.Body.String()
+	for _, marker := range []string{
+		`id="xiass-wf-embedded-overrides"`,
+		`:root[data-embedded="true"] .page`,
+		`overflow: visible !important`,
+		`/wf-runtime.js`,
+	} {
+		if !strings.Contains(body, marker) {
+			t.Fatalf("embedded root is missing %q: %s", marker, body)
+		}
+	}
+}
+
 func waitForWFBridgeHostAction(t *testing.T, hub *wfBridgeEventHub) nativeActionRequest {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)

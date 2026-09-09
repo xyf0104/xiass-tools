@@ -355,16 +355,19 @@ func buildDarwinStatus(targets []darwinTargets) Status {
 	ideMainPatched := true
 	for _, target := range targets {
 		supported, mode, reason := darwinTargetConnectionSupport(target)
-		mainPatched, _, _, patched := darwinTargetPatchState(target)
-		// IDE connection now uses the vendor-supported user setting instead of
-		// modifying the Electron main process, extension, or Language Server.
-		// Keep the legacy inspection helper for migration/restore fixtures, but
-		// make the live status reflect the production connection contract.
+		mainPatched, patched := false, false
 		if target.kind == "ide" {
+			// IDE connections are owned by the user-level jetski.cloudCodeUrl
+			// setting and the two optional image renderers.  Do not inspect the
+			// 130 MB Language Server or legacy main-process byte patches here:
+			// neither file participates in the current status contract, and the
+			// old matcher made every dashboard refresh scan tens of megabytes.
 			patched = supported &&
 				darwinCloudCodeSettingIsConfigured(darwinSettingsPathForStatus(target), currentPatchProxyEndpoint().Base) &&
 				!darwinImagePreviewNeedsPatch(target)
 			mainPatched = patched
+		} else {
+			mainPatched, _, _, patched = darwinTargetPatchState(target)
 		}
 		entry := TargetStatus{
 			Name: target.name, Kind: target.kind, Version: target.version, AppPath: target.app,
@@ -449,7 +452,14 @@ func darwinImagePreviewNeedsPatch(target darwinTargets) bool {
 	if target.kind == "agent" {
 		return imagePreviewASARNeedsPatch(target.asar)
 	}
-	return imagePreviewRenderersNeedPatch(darwinImagePreviewRendererPaths(target))
+	// The live macOS IDE connection path is the vendor user setting plus the
+	// two chat renderers owned by the safe image-generation transaction.  The
+	// legacy generic renderer list also contains out/main.js; that is the
+	// Electron main process and is intentionally not modified by the current
+	// user-setting strategy.  Including it here made a correctly connected IDE
+	// report `patched=false` after restart forever when that unrelated file still
+	// matched the historical preview expression.
+	return imagePreviewRenderersNeedPatch(darwinImageGenerationUIRendererPaths(target))
 }
 
 func darwinASARUnpackedImagePreviewRendererPaths(target darwinTargets) []string {

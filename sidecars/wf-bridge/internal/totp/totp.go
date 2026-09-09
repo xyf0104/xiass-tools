@@ -17,6 +17,18 @@ import (
 	"time"
 )
 
+// Preview computes a code without creating a vault entry or writing a secret.
+// The caller owns the short-lived input; only public metadata and the current
+// code may cross back into the UI. It uses exactly the saved-entry algorithm.
+func Preview(input ImportInput, at time.Time) (Entry, Code, error) {
+	entry, secret, err := normalizeImport(input, at)
+	if err != nil {
+		return Entry{}, Code{}, err
+	}
+	code, err := generate(entry, secret, at)
+	return entry, code, err
+}
+
 func normalizeImport(input ImportInput, now time.Time) (Entry, string, error) {
 	entry := Entry{
 		Label:     strings.TrimSpace(input.Label),

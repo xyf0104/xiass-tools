@@ -38,6 +38,9 @@ import (
 //go:embed all:frontend/dist
 var wfBridgeAssets embed.FS
 
+//go:embed wf-embedded-overrides.css
+var wfEmbeddedOverrides []byte
+
 type wfBridgeRPCRequest struct {
 	Method string            `json:"method"`
 	Args   []json.RawMessage `json:"args"`
@@ -524,7 +527,7 @@ func (s *wfBridgeServer) handleAssets(response http.ResponseWriter, request *htt
 			http.Error(response, "WF interface unavailable", http.StatusInternalServerError)
 			return
 		}
-		html := strings.Replace(string(index), "</head>", `<script src="/wf-runtime.js"></script></head>`, 1)
+		html := strings.Replace(string(index), "</head>", `<style id="xiass-wf-embedded-overrides">`+string(wfEmbeddedOverrides)+`</style><script src="/wf-runtime.js"></script></head>`, 1)
 		response.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = io.WriteString(response, html)
 		return

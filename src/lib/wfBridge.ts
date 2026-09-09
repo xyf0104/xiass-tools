@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 export interface WfBridgeSession {
   url: string;
@@ -71,4 +71,9 @@ export async function restoreWfHelperTransfer(bundle: unknown): Promise<{
 
 export async function getWfHelperDiagnostics(): Promise<unknown> {
   return invoke<unknown>("wf_bridge_get_helper_diagnostics");
+}
+
+export async function callWfMethod<T = unknown>(method: string, args: unknown[] = []): Promise<T> {
+  if (!isTauri()) throw new Error("浏览器预览不会访问本机验证器；请在 XIASS Tools 应用中使用查询与保存功能。");
+  return invoke<T>("wf_bridge_call", { method, args });
 }

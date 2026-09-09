@@ -44,8 +44,7 @@ export default defineConfig({
             overflow: "hidden",
             background: "transparent",
             "@media (max-width: 900px)": {
-              gridTemplateColumns: "1fr",
-              gridTemplateRows: "auto minmax(0, 1fr)"
+              gridTemplateColumns: "86px minmax(0, 1fr)"
             }
           }
         },
@@ -61,7 +60,7 @@ export default defineConfig({
             margin: "14px 0 14px 14px",
             border: "1px solid var(--border)",
             borderRadius: "26px",
-            padding: "18px 12px 12px",
+            padding: "12px",
             background:
               "linear-gradient(145deg, var(--glass-highlight), transparent 27%), var(--sidebar-bg)",
             color: "var(--text)",
@@ -70,11 +69,7 @@ export default defineConfig({
             "@media (max-width: 900px)": {
               position: "relative",
               zIndex: 2,
-              height: "auto",
-              maxHeight: "none",
-              margin: "10px 10px 0",
-              border: "1px solid var(--border)",
-              padding: "10px 10px 8px"
+              padding: "10px 6px"
             }
           }
         },
@@ -99,7 +94,10 @@ export default defineConfig({
               whiteSpace: "nowrap"
             },
             "@media (max-width: 900px)": {
-              paddingBottom: "10px"
+              gridTemplateColumns: "1fr",
+              justifyItems: "center",
+              padding: "0 0 14px",
+              "& > div:last-child": { display: "none" }
             }
           }
         },
@@ -128,14 +126,16 @@ export default defineConfig({
           className: "cs-app-nav",
           description: "Application sidebar navigation list.",
           base: {
-            display: "grid",
+            display: "flex",
+            flexDirection: "column",
+            flex: "1 1 0%",
             gap: "9px",
             minHeight: 0,
             overflow: "auto",
-            padding: "6px 0",
+            padding: "0 0 12px",
+            "& > button": { flexShrink: 0 },
             "@media (max-width: 900px)": {
-              gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-              overflow: "visible"
+              gap: "9px"
             }
           }
         },
@@ -156,6 +156,7 @@ export default defineConfig({
               "linear-gradient(145deg, var(--glass-highlight), transparent 34%), var(--glass-control-bg)",
             color: "var(--nav-icon)",
             textAlign: "left",
+            "& svg": { display: "block", flexShrink: 0 },
             boxShadow: "var(--glass-control-shadow)",
             transition:
               "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), box-shadow var(--motion-smooth), transform var(--motion-spring)",
@@ -250,10 +251,9 @@ export default defineConfig({
             overflow: "auto",
             borderLeft: 0,
             background: "transparent",
-            padding: "14px 18px 28px",
+            padding: "14px 14px 28px",
             "@media (max-width: 900px)": {
-              height: "auto",
-              padding: "14px"
+              padding: "14px 14px 28px"
             }
           }
         },
@@ -613,25 +613,45 @@ export default defineConfig({
               "background var(--motion-quick), border-color var(--motion-quick), color var(--motion-quick), opacity var(--motion-quick), transform var(--motion-smooth), box-shadow var(--motion-smooth)",
             _disabled: {
               cursor: "not-allowed",
-              opacity: 0.48
+              opacity: 0.86,
+              color: "var(--text-soft)",
+              borderColor: "var(--border-subtle)",
+              background:
+                "linear-gradient(145deg, color-mix(in srgb, var(--glass-highlight) 58%, transparent), transparent 38%), color-mix(in srgb, var(--glass-control-bg) 78%, var(--surface) 22%)",
+              boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--glass-highlight) 62%, transparent)"
             }
           },
           variants: {
             tone: {
               primary: {
-                borderColor: "color-mix(in srgb, var(--accent-strong) 66%, transparent)",
+                borderColor: "color-mix(in srgb, #ff9b51 62%, #2f8df4 38%)",
                 background:
-                  "linear-gradient(145deg, var(--glass-highlight), transparent 42%), var(--glass-control-active)",
-                color: "var(--text)",
+                  "linear-gradient(118deg, #ff7a3d 0%, #ffb454 31%, #2f8df4 74%, #1856c8 100%)",
+                color: "#ffffff",
+                "& .xiass-icon--action": {
+                  filter: "brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0,0,0,.28))"
+                },
                 boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.24), var(--accent-glow)",
-                _hover: {
-                  borderColor: "color-mix(in srgb, var(--accent-strong) 78%, transparent)",
+                  "inset 0 1px 0 rgba(255,255,255,0.34), 0 12px 30px rgba(47,141,244,.3), 0 4px 18px rgba(255,122,61,.2)",
+                _disabled: {
+                  opacity: 1,
+                  color: "#ffffff",
                   background:
-                    "linear-gradient(145deg, var(--glass-highlight), transparent 42%), var(--glass-control-hover)",
+                    "linear-gradient(118deg, #b85f36 0%, #c99b58 31%, #3e78bd 74%, #214c92 100%)",
+                  filter: "none",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,.2)",
+                  textShadow: "0 1px 2px rgba(0,0,0,.42)",
+                  "& .xiass-icon--action": {
+                    filter: "brightness(0) invert(1) drop-shadow(0 1px 3px rgba(0,0,0,.34))"
+                  }
+                },
+                _hover: {
+                  borderColor: "color-mix(in srgb, #ffb454 76%, #2f8df4 24%)",
+                  background:
+                    "linear-gradient(118deg, #ff8a45 0%, #ffc36e 31%, #4b9dff 74%, #2166db 100%)",
                   transform: "translateY(-2px)",
                   boxShadow:
-                    "inset 0 1px 0 rgba(255,255,255,0.28), 0 16px 34px color-mix(in srgb, var(--accent) 38%, transparent)"
+                    "inset 0 1px 0 rgba(255,255,255,0.42), 0 16px 36px rgba(47,141,244,.42), 0 6px 22px rgba(255,122,61,.26)"
                 }
               },
               secondary: {

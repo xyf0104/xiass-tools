@@ -426,6 +426,35 @@ pub fn get_helper_diagnostics() -> Result<WfHelperDiagnosticSnapshot, String> {
     Ok(snapshot)
 }
 
+/// Call a narrowly allow-listed WF method from a native XIASS page. This is
+/// intentionally not exposed as an arbitrary reflection endpoint: the
+/// renderer can only reach the credential-safe TOTP methods and the two
+/// path-based backup operations below. File paths are selected by the Tauri
+/// dialog plugin and sensitive file contents never enter the WebView.
+pub fn call_method(method: &str, args: Vec<serde_json::Value>) -> Result<serde_json::Value, String> {
+    let expected = match method {
+        "GetTOTPEntries" => 0,
+        "PreviewTOTP" | "AddTOTPEntry" | "GenerateTOTPCode" | "DeleteTOTPEntry" => 1,
+        "ExportTOTPEncryptedToPath" | "ImportTOTPEncryptedFromPath" => 2,
+        _ => return Err("WF 方法未获准由 XIASS Tools 原生页面调用".to_string()),
+    };
+    if args.len() != expected {
+        return Err("WF 方法参数数量无效".to_string());
+    }
+    if serde_json::to_vec(&args).map_or(true, |bytes| bytes.len() > 32 << 10) {
+        return Err("WF 方法参数超过大小限制".to_string());
+    }
+    let session = get_or_start_session()?;
+    let request = serde_json::json!({ "method": method.trim(), "args": args });
+    let bytes = authenticated_request(&session, reqwest::Method::POST, "/rpc", Some(&request))?;
+    let envelope = serde_json::from_slice::<WfBridgeResponseEnvelope>(&bytes)
+        .map_err(|_| "WF 方法响应格式无效".to_string())?;
+    if !envelope.ok {
+        return Err(envelope.error.unwrap_or_else(|| "WF 方法调用失败".to_string()));
+    }
+    Ok(envelope.result.unwrap_or(serde_json::Value::Null))
+}
+
 fn valid_host_action_id(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }

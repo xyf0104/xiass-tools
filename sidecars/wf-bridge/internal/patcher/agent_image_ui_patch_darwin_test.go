@@ -237,7 +237,11 @@ func writeDarwinAgentLanguageServerUIFixture(t *testing.T, path string) {
 		"jetbox.css":            `.artifact-image{object-fit:contain}`,
 	}
 	for _, name := range []string{"index.html", "main.js", "compiled_tailwind.css", "jetbox.css"} {
-		entry, createErr := writer.Create(name)
+		header := &zip.FileHeader{Name: name, Method: zip.Deflate}
+		if name == "main.js" {
+			header.Comment = strings.Repeat(" ", 4096)
+		}
+		entry, createErr := writer.CreateHeader(header)
 		if createErr != nil {
 			t.Fatal(createErr)
 		}

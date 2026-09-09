@@ -38,6 +38,7 @@
   import Gateway from "./routes/Gateway.svelte";
   import Profiles from "./routes/Profiles.svelte";
   import SettingsRoute from "./routes/Settings.svelte";
+  import TwoFactor from "./routes/TwoFactor.svelte";
   import TerminalPanel from "./routes/TerminalPanel.svelte";
   import SetupWizard from "./routes/SetupWizard.svelte";
   import WfAssistant from "./routes/WfAssistant.svelte";
@@ -53,7 +54,7 @@
     WizardPrefill
   } from "./types";
 
-  type Route = "dashboard" | "chatgptDesktop" | "claudeDesktop" | "wizard" | "profiles" | "gateway" | "wfAssistant" | "settings" | "terminal";
+  type Route = "dashboard" | "chatgptDesktop" | "claudeDesktop" | "wizard" | "profiles" | "gateway" | "wfAssistant" | "twoFactor" | "settings" | "terminal";
 
   let route: Route = "dashboard";
   let dashboardLoading = true;
@@ -86,7 +87,10 @@
     { id: "claudeDesktop", labelKey: "app.nav.claudeDesktop", icon: "claudeDesktop" },
     { id: "profiles", labelKey: "app.nav.profiles", icon: "profiles" },
     { id: "gateway", labelKey: "app.nav.gateway", icon: "gateway" },
-    { id: "wfAssistant", labelKey: "app.nav.wfAssistant", icon: "rocket" },
+    { id: "wfAssistant", labelKey: "app.nav.wfAssistant", icon: "rocket" }
+  ];
+  const utilityNavItems: Array<{ id: Route; labelKey: Parameters<typeof $t>[0]; icon: AppIconName }> = [
+    { id: "twoFactor", labelKey: "app.nav.twoFactor", icon: "shield" },
     { id: "settings", labelKey: "app.nav.settings", icon: "settings" }
   ];
   const routeEnterTransition = { y: 22, duration: 320, opacity: 0, easing: cubicOut };
@@ -546,6 +550,7 @@
 </script>
 
 <main class={appShellRecipe()}>
+  <div class="xiass-window-drag-region" data-tauri-drag-region aria-hidden="true"></div>
   <aside class={appSidebarRecipe()}>
     <div class={appBrandRecipe()}>
       <div class={appBrandMarkRecipe()}>
@@ -558,7 +563,15 @@
 
     <nav class={appNavRecipe()} aria-label="Primary">
       {#each visibleNavItems as item}
-        <button class={appNavButtonRecipe()} data-active={route === item.id} title={$t(item.labelKey)} on:click={() => selectRoute(item.id)}>
+        <button class={appNavButtonRecipe()} data-active={route === item.id} aria-current={route === item.id ? "page" : undefined} aria-label={$t(item.labelKey)} title={$t(item.labelKey)} on:click={() => selectRoute(item.id)}>
+          <AppIcon name={item.icon} size={18} />
+          <span class={appNavLabelRecipe()}>{$t(item.labelKey)}</span>
+        </button>
+      {/each}
+    </nav>
+    <nav class="xiass-sidebar-footer-nav" aria-label="Utilities">
+      {#each utilityNavItems as item}
+        <button class={appNavButtonRecipe()} data-active={route === item.id} aria-current={route === item.id ? "page" : undefined} aria-label={$t(item.labelKey)} title={$t(item.labelKey)} on:click={() => selectRoute(item.id)}>
           <AppIcon name={item.icon} size={18} />
           <span class={appNavLabelRecipe()}>{$t(item.labelKey)}</span>
           {#if item.id === "settings" && $appUpdateState.updateAvailable}
@@ -617,6 +630,8 @@
           />
         {:else if route === "wfAssistant"}
           <WfAssistant />
+        {:else if route === "twoFactor"}
+          <TwoFactor />
         {:else if route === "terminal"}
           <TerminalPanel onBack={() => { route = "dashboard"; }} />
         {:else}

@@ -106,6 +106,7 @@ pub fn run() {
             commands::wf_bridge::wf_bridge_export_helper_transfer,
             commands::wf_bridge::wf_bridge_restore_helper_transfer,
             commands::wf_bridge::wf_bridge_get_helper_diagnostics,
+            commands::wf_bridge::wf_bridge_call,
             commands::wf_bridge::wf_bridge_stop,
         ])
         .setup(|app| {

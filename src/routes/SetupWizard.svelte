@@ -152,6 +152,24 @@
     fontSize: "13px",
     fontWeight: 800
   });
+  const codexCapabilityPanelClass = css({
+    display: "grid",
+    gap: "12px",
+    gridColumn: "1 / -1",
+    padding: "14px",
+    border: "1px solid color-mix(in srgb, var(--accent) 24%, var(--border))",
+    borderRadius: "16px",
+    background: "linear-gradient(135deg, color-mix(in srgb, #ff9b51 8%, var(--surface-muted)), color-mix(in srgb, #2f8df4 10%, var(--surface-muted)))",
+    "& > strong": { color: "var(--text)", fontSize: "13px", fontWeight: 850 },
+    "& small": { color: "var(--text-muted)", lineHeight: 1.45 },
+    "& .codex-capability-grid": {
+      display: "grid",
+      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+      gap: "10px",
+      "@media (max-width: 760px)": { gridTemplateColumns: "1fr" }
+    },
+    "& label": { minWidth: 0 }
+  });
 
   export let onProfileSaved: (profile: ProfileDraft) => void | Promise<void> = () => {};
   export let prefill: WizardPrefill | null = null;
@@ -198,6 +216,9 @@
   let reviewModel = "";
   let webSearch: "live" | "cached" | "disabled" = "live";
   let imageModel = "";
+  let modelContextWindow = 372000;
+  let modelAutoCompactTokenLimit = 334800;
+  let contextMode: "235000" | "372000" | "512000" | "1000000" | "custom" = "372000";
   let modelMappings: ProfileModelMappingForm[] = [];
   let modelOptions: ProfileModelOption[] = [];
   let modelLoading = false;
@@ -244,6 +265,10 @@
   $: activeModelMappings = codexOAuthConfig ? [] : modelMappingsForRequest(selectedTool, modelMappings);
   $: activeBaseUrl = codexOAuthConfig ? "" : baseUrl;
   $: activeApiKey = codexOAuthConfig ? "" : apiKey;
+  $: codexContextValid = canonicalProfileToolId(selectedTool) !== "codex"
+    || (Number.isInteger(modelContextWindow) && modelContextWindow >= 64000 && modelContextWindow <= 1050000
+      && Number.isInteger(modelAutoCompactTokenLimit) && modelAutoCompactTokenLimit >= 16000
+      && modelAutoCompactTokenLimit < modelContextWindow);
   $: activeSecretProvided = !codexOAuthConfig && apiKey.trim().length > 0;
   $: codexOAuthAuthorized = codexAuthIsOAuth(localCodexAuth);
   $: availableProtocolOptions = protocolOptionsFor(selectedTool, profileMode);
@@ -286,6 +311,8 @@
     activeSecretProvided ? "secret" : "no-secret",
     webSearch,
     imageModel.trim(),
+    String(modelContextWindow),
+    String(modelAutoCompactTokenLimit),
     codexOAuthConfig ? "codex-oauth" : "api"
   ].join("|");
   $: baseUrlErrorKey = providerNeedsBaseUrl(activeProvider) ? baseUrlValidationErrorKey(activeBaseUrl) : null;
@@ -303,6 +330,7 @@
     (!providerNeedsBaseUrl(activeProvider) || baseUrlErrorKey === null) &&
     (!providerRequiresApiKey(activeProvider) || activeSecretProvided) &&
     modelMappingsValid &&
+    codexContextValid &&
     (!codexOAuthConfig || codexOAuthAuthorized) &&
     !saving;
   $: canFetchModels =
@@ -331,6 +359,7 @@
           (!providerNeedsBaseUrl(activeProvider) || baseUrlErrorKey === null) &&
           (!providerRequiresApiKey(activeProvider) || activeSecretProvided) &&
           modelMappingsValid &&
+          codexContextValid &&
           (!codexOAuthConfig || codexOAuthAuthorized)
         : true;
 
@@ -375,6 +404,11 @@
     baseUrl = defaults?.baseUrl ?? "";
     model = defaults?.model ?? "";
     reviewModel = "";
+    webSearch = "live";
+    imageModel = "";
+    modelContextWindow = 372000;
+    modelAutoCompactTokenLimit = 334800;
+    contextMode = "372000";
     modelMappings = [];
     codexOAuthConfig = false;
     codexAuthError = null;
@@ -399,6 +433,34 @@
     previewError = null;
     saveError = null;
     resetModelOptions();
+  }
+
+  function applyContextPreset(value: string) {
+    contextMode = ["235000", "372000", "512000", "1000000"].includes(value)
+      ? value as typeof contextMode
+      : "custom";
+    if (contextMode !== "custom") {
+      modelContextWindow = Number(contextMode);
+      modelAutoCompactTokenLimit = Math.floor(modelContextWindow * 0.9);
+    }
+  }
+
+  function updateContextWindow(value: string) {
+    contextMode = "custom";
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      modelContextWindow = Math.round(parsed);
+      if (modelAutoCompactTokenLimit >= modelContextWindow) {
+        modelAutoCompactTokenLimit = Math.floor(modelContextWindow * 0.9);
+      }
+    }
+  }
+
+  function updateAutoCompactLimit(value: string) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      modelAutoCompactTokenLimit = Math.round(parsed);
+    }
   }
 
   function selectedToolLabel(toolId: string) {
@@ -513,7 +575,9 @@
       secretProvided: activeSecretProvided,
       apiKey: activeApiKey,
       webSearch: canonicalProfileToolId(selectedTool) === "codex" ? webSearch : null,
-      imageModel: canonicalProfileToolId(selectedTool) === "codex" ? imageModel.trim() || null : null
+      imageModel: canonicalProfileToolId(selectedTool) === "codex" ? imageModel.trim() || null : null,
+      modelContextWindow: canonicalProfileToolId(selectedTool) === "codex" ? modelContextWindow : null,
+      modelAutoCompactTokenLimit: canonicalProfileToolId(selectedTool) === "codex" ? modelAutoCompactTokenLimit : null
     };
   }
 
@@ -1149,6 +1213,45 @@
               placeholder={$t("profiles.reviewModelPlaceholder")}
             />
           </div>
+        {/if}
+        {#if canonicalProfileToolId(selectedTool) === "codex"}
+          <section class={codexCapabilityPanelClass} aria-label={$t("wizard.contextWindow")}>
+            <strong>{$t("wizard.contextWindow")} &amp; model capabilities</strong>
+            <small>{$t("wizard.contextWindowHint")}</small>
+            <div class="codex-capability-grid">
+              <label>
+                {$t("wizard.webSearch")}
+                <select bind:value={webSearch}>
+                  <option value="live">{$t("wizard.webSearchLive")}</option>
+                  <option value="cached">{$t("wizard.webSearchCached")}</option>
+                  <option value="disabled">{$t("wizard.webSearchDisabled")}</option>
+                </select>
+              </label>
+              <label>
+                {$t("wizard.imageModel")}
+                <input bind:value={imageModel} placeholder="例如 gpt-image-1 / imagen-4" />
+                <small>{$t("wizard.imageModelHint")}</small>
+              </label>
+              <label>
+                {$t("wizard.contextWindow")}
+                <select bind:value={contextMode} on:change={(event) => applyContextPreset(event.currentTarget.value)}>
+                  <option value="235000">235K</option>
+                  <option value="372000">372K</option>
+                  <option value="512000">512K</option>
+                  <option value="1000000">1M</option>
+                  <option value="custom">{$t("wizard.contextCustom")}</option>
+                </select>
+                {#if contextMode === "custom"}
+                  <input type="number" min="64000" max="1050000" step="1000" value={modelContextWindow} on:input={(event) => updateContextWindow(event.currentTarget.value)} />
+                {/if}
+              </label>
+              <label>
+                {$t("wizard.contextAutoCompact")}
+                <input type="number" min="16000" max="1049000" step="1000" value={modelAutoCompactTokenLimit} on:input={(event) => updateAutoCompactLimit(event.currentTarget.value)} />
+                <small>{$t("wizard.contextAutoCompactLinked")}: {Math.floor(modelContextWindow * 0.9).toLocaleString()}</small>
+              </label>
+            </div>
+          </section>
         {/if}
       </div>
       {#if codexOAuthConfig}

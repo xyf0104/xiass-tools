@@ -93,3 +93,57 @@ func TestDarwinAntigravityProductRepatchStateKeepsIDEAndAgentIndependent(t *test
 		t.Fatalf("Agent-only pending revision was not reported independently: required=%t message=%q", required, message)
 	}
 }
+
+func TestQuickPatchStatusRestoresAValidPersistedConnectionHint(t *testing.T) {
+	dir := t.TempDir()
+	executable := writeDarwinInstallStateExecutable(t, dir, "Antigravity", "same-build")
+	appPath := filepath.Dir(filepath.Dir(filepath.Dir(executable)))
+	target := patcher.TargetStatus{
+		Name: "Antigravity IDE", Kind: "ide", AppPath: appPath, Version: "2.5.5",
+		ExecutablePath: executable,
+	}
+	record := antigravityInstallRecordFromTarget(target)
+	record.PatchRevision = antigravityPatchRevision
+	app := &App{storageDir: dir}
+	if err := app.saveAntigravityInstallState(antigravityInstallState{Schema: 1, Targets: []antigravityInstallRecord{record}}); err != nil {
+		t.Fatal(err)
+	}
+
+	status := app.patchStatusFrom(patcher.Status{Targets: []patcher.TargetStatus{target}}, true)
+	if len(status.Targets) != 1 || !status.Targets[0].Supported || !status.Targets[0].Patched {
+		t.Fatalf("quick status did not restore the persisted connection: %+v", status)
+	}
+	if status.Targets[0].ConnectionMode != "persisted" || !strings.Contains(status.Targets[0].Reason, "正在核验") {
+		t.Fatalf("quick status did not expose its verification hint: %+v", status.Targets[0])
+	}
+	if !status.IDEPatched {
+		t.Fatal("quick aggregate IDE status was not restored")
+	}
+	if !status.AgentPatched {
+		t.Fatal("quick aggregate Agent status was not mirrored for an IDE-only installation")
+	}
+}
+
+func TestQuickPatchStatusRejectsChangedPersistedExecutable(t *testing.T) {
+	dir := t.TempDir()
+	executable := writeDarwinInstallStateExecutable(t, dir, "Antigravity", "first-build")
+	appPath := filepath.Dir(filepath.Dir(filepath.Dir(executable)))
+	target := patcher.TargetStatus{
+		Name: "Antigravity IDE", Kind: "ide", AppPath: appPath, Version: "2.5.5",
+		ExecutablePath: executable,
+	}
+	record := antigravityInstallRecordFromTarget(target)
+	record.PatchRevision = antigravityPatchRevision
+	app := &App{storageDir: dir}
+	if err := app.saveAntigravityInstallState(antigravityInstallState{Schema: 1, Targets: []antigravityInstallRecord{record}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(executable, []byte("second-build"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	status := app.patchStatusFrom(patcher.Status{Targets: []patcher.TargetStatus{target}}, true)
+	if len(status.Targets) != 1 || status.Targets[0].Patched {
+		t.Fatalf("quick status trusted a changed executable: %+v", status.Targets[0])
+	}
+}

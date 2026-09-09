@@ -20,10 +20,13 @@
   import info from "@iconify-icons/ph/info";
   import key from "@iconify-icons/ph/key";
   import magicWand from "@iconify-icons/ph/magic-wand";
+  import magnifyingGlass from "@iconify-icons/ph/magnifying-glass";
+  import floppyDisk from "@iconify-icons/ph/floppy-disk";
   import pencilSimple from "@iconify-icons/ph/pencil-simple";
   import playCircle from "@iconify-icons/ph/play-circle";
   import power from "@iconify-icons/ph/power";
   import rocketLaunch from "@iconify-icons/ph/rocket-launch";
+  import shield from "@iconify-icons/ph/shield";
   import arrowClockwise from "@iconify-icons/ph/arrow-clockwise";
   import arrowCounterClockwise from "@iconify-icons/ph/arrow-counter-clockwise";
   import arrowsClockwise from "@iconify-icons/ph/arrows-clockwise";
@@ -68,6 +71,8 @@
     install: downloadSimple,
     key,
     language: translate,
+    search: magnifyingGlass,
+    save: floppyDisk,
     loading: arrowClockwise,
     play: playCircle,
     power,
@@ -77,6 +82,7 @@
     restart: arrowCounterClockwise,
     rocket: rocketLaunch,
     settings: gearSix,
+    shield,
     stats: chartBar,
     stop: stopCircle,
     system: terminalWindow,
@@ -91,13 +97,11 @@
   } satisfies Record<string, UiIcon>;
 
   export type AppIconName = keyof typeof appIcons;
-  let nextGradientId = 0;
-
   const actionIcons = new Set(["arrowRight", "play", "power", "rocket", "install", "download", "update", "restart", "apply", "wizard", "add"]);
   const iconTones: Partial<Record<AppIconName, string>> = {
     check: "success", warning: "warning", error: "danger", delete: "danger", stop: "danger",
     key: "warning", folder: "warning", clock: "warning", repair: "warning",
-    profiles: "violet", settings: "violet", edit: "violet", language: "violet",
+    profiles: "violet", settings: "violet", edit: "violet", language: "violet", shield: "violet",
     gateway: "cyan", user: "cyan", copy: "cyan", stats: "success", theme: "warning"
   };
 </script>
@@ -113,14 +117,12 @@
   let className = "";
   export { className as class };
 
-  const gradientId = `xiass-action-${++nextGradientId}`;
   $: resolvedTone = tone !== "auto" ? tone : actionIcons.has(name) ? "action" : iconTones[name as AppIconName] ?? "info";
   $: sourceIcon = appIcons[name as AppIconName] ?? appIcons.info;
-  // Only bundled icon bodies enter this markup; never interpolate user content.
-  $: icon = resolvedTone === "action" ? {
-    ...sourceIcon,
-    body: `<defs><linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--icon-action-orange)"/><stop offset="38%" stop-color="var(--icon-action-gold)"/><stop offset="72%" stop-color="var(--icon-action-blue)"/><stop offset="100%" stop-color="var(--icon-action-deep)"/></linearGradient></defs>${sourceIcon.body.replaceAll("currentColor", `url(#${gradientId})`)}`
-  } : sourceIcon;
+  // Keep the action glyph solid and high-contrast. The orange-to-blue gradient
+  // belongs to the action surface (button/card background), not the foreground
+  // icon, so labels remain readable on every theme and disabled state.
+  $: icon = sourceIcon;
 </script>
 
 <Icon

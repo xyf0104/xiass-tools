@@ -932,6 +932,17 @@ func assertImagePreviewJavaScriptSyntax(t *testing.T, renderer string) {
 	}
 }
 
+func TestImagePreviewRendererCurrentMarkersSkipLegacyMatcher(t *testing.T) {
+	current := []byte("prefix " + imagePreviewNativeCompatibleMarker + " " + imageGenerationUIPatchMarker + " " + imageGenerationDedupePatchMarker + " suffix")
+	if !imagePreviewRendererHasCurrentManagedMarkers(current) {
+		t.Fatal("complete current renderer marker set was not recognized")
+	}
+	partial := []byte("prefix " + imagePreviewNativeCompatibleMarker + " " + imageGenerationUIPatchMarker + " suffix")
+	if imagePreviewRendererHasCurrentManagedMarkers(partial) {
+		t.Fatal("partial renderer marker set was incorrectly treated as current")
+	}
+}
+
 // TestOfficialIDEImageRendererWhenFixturePresent validates the exact renderer
 // bytes from an official IDE application without modifying the installation.
 // The app root must be the directory that directly contains out/ and

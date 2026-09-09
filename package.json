@@ -1,7 +1,7 @@
 {
   "name": "xiass-tools",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.8.1",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -38,11 +38,14 @@
     "@iconify-icons/ph": "^1.2.5",
     "@iconify/svelte": "^5.2.2",
     "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-opener": "^2.5.4",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
+    "jsqr": "^1.4.0",
+    "protobufjs": "^8.8.0",
     "svelte": "^5.0.0",
     "svelte-dnd-action": "^0.9.70"
   },

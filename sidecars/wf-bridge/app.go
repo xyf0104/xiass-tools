@@ -1663,42 +1663,90 @@ func (a *App) DeleteModel(name string) Result {
 // ─── Patch ────────────────────────────────────────────────────────────────────
 
 func (a *App) GetPatchStatus() PatchStatus {
-	return a.patchStatusFrom(patcher.GetStatus())
+	return a.patchStatusFrom(patcher.GetStatus(), false)
 }
 
-// GetQuickPatchStatus keeps the first dashboard paint responsive. It uses
-// only standard paths, saved successful paths and a metadata-valid cache;
-// RefreshPatchStatus performs the full compatibility verification.
+// GetQuickPatchStatus is retained for the first dashboard paint. It keeps the
+// lightweight discovery path responsive, then restores a previously verified
+// connection from the private install-state record while the authoritative
+// compatibility scan runs in the background. The persisted result is only a
+// display hint: Apply and Refresh still require the full structural checks.
 func (a *App) GetQuickPatchStatus() PatchStatus {
-	return a.patchStatusFrom(patcher.GetQuickStatus())
+	return a.patchStatusFrom(patcher.GetQuickStatus(), true)
 }
 
 // RefreshPatchStatus explicitly re-runs bundle discovery and compatibility
 // verification when the user refreshes the dashboard.
 func (a *App) RefreshPatchStatus() PatchStatus {
-	return a.patchStatusFrom(patcher.RefreshStatus())
+	return a.patchStatusFrom(patcher.RefreshStatus(), false)
 }
 
-func (a *App) patchStatusFrom(s patcher.Status) PatchStatus {
+func (a *App) patchStatusFrom(s patcher.Status, allowPersistedConnection bool) PatchStatus {
 	diagnostics := proxy.GetDiagnostics()
 	agentPatched := s.AgentPatched != nil && *s.AgentPatched
 	idePatched := s.IDEPatched != nil && *s.IDEPatched
 	proxyRepatchRequired := currentProxyRepatchRequired()
 	productRepatchRequired, productRepatchMessage := a.antigravityProductRepatchState(s)
+	// A quick scan deliberately leaves Supported/Patched unset. A saved
+	// successful target may be shown as connected only when its path, version,
+	// executable fingerprint and patch revision still match. Never restore the
+	// hint while either endpoint or product re-patching is pending.
+	persistedRecords := map[string]antigravityInstallRecord{}
+	if allowPersistedConnection && !proxyRepatchRequired && !productRepatchRequired {
+		persistedRecords = a.persistedAntigravityInstallRecords()
+	}
 	targets := make([]PatchTargetStatus, 0, len(s.Targets))
+	agentSeen, ideSeen := false, false
+	agentAllPatched, ideAllPatched := true, true
 	for _, target := range s.Targets {
 		running := false
 		if launcher.Supported() {
 			running, _ = launcher.IsRunning(target.AppPath)
+		}
+		supported, connectionMode, reason, patched := target.Supported, target.ConnectionMode, target.Reason, target.Patched
+		if !patched && len(persistedRecords) > 0 {
+			key := antigravityInstallRecordKey(target.Kind, target.AppPath)
+			if record, ok := persistedRecords[key]; ok && antigravityInstallRecordMatchesTarget(record, target) {
+				supported = true
+				patched = true
+				if strings.TrimSpace(connectionMode) == "" {
+					connectionMode = "persisted"
+				}
+				reason = "已恢复上次连接，正在核验安装结构"
+			}
+		}
+		switch target.Kind {
+		case "agent":
+			agentSeen = true
+			agentAllPatched = agentAllPatched && patched
+		case "ide":
+			ideSeen = true
+			ideAllPatched = ideAllPatched && patched
 		}
 		targets = append(targets, PatchTargetStatus{
 			Name: target.Name, Kind: target.Kind, Version: target.Version,
 			AppPath: target.AppPath, MainPath: target.MainPath, ASARPath: target.ASARPath,
 			ExecutablePath: target.ExecutablePath,
 			ExtensionPath:  target.ExtensionPath, LanguageServerPath: target.LanguageServerPath,
-			Supported: target.Supported, ConnectionMode: target.ConnectionMode, Reason: target.Reason,
-			Patched: target.Patched, Running: running, Launchable: launcher.Supported(),
+			Supported: supported, ConnectionMode: connectionMode, Reason: reason,
+			Patched: patched, Running: running, Launchable: launcher.Supported(),
 		})
+	}
+	if agentSeen {
+		agentPatched = agentAllPatched
+	}
+	if ideSeen {
+		idePatched = ideAllPatched
+	}
+	// macOS may expose only one Antigravity product on a machine. Keep the
+	// legacy aggregate flags internally consistent with the authoritative
+	// target list so older embedded pages cannot turn an IDE-only (or
+	// Agent-only) connected installation back into a false "待连接" state.
+	if !agentSeen && ideSeen {
+		agentPatched = idePatched
+	}
+	if !ideSeen && agentSeen {
+		idePatched = agentPatched
 	}
 	return PatchStatus{
 		AgentPatched:             agentPatched,

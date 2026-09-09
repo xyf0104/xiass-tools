@@ -404,7 +404,20 @@ func patchAgentEmbeddedUIArchive(data []byte) ([]byte, agentImageUIPatchResult, 
 	// ZIP comments. Reclaim only that application-owned padding during a v1
 	// migration; otherwise the old padding and the larger v2 renderer are both
 	// counted and a valid forward upgrade appears to exceed the slot.
-	legacyPadding := bytes.Contains(mainData, []byte(agentImageGenerationDedupePatchV1Marker)) ||
+	mainEntryHasPadding := false
+	for _, entry := range archive.reader.File {
+		if entry.Name == "main.js" && strings.TrimRight(entry.Comment, " ") != entry.Comment {
+			mainEntryHasPadding = true
+			break
+		}
+	}
+	// A trailing-space ZIP comment is the fixed-slot padding used by some
+	// shipped Agent builds. Treat it as application-owned slack even when the
+	// active renderer has not yet acquired a WF migration marker; otherwise a
+	// valid clean install can be rejected merely because the vendor changed
+	// which revision created the reserved space.
+	legacyPadding := mainEntryHasPadding || strings.TrimRight(archive.reader.Comment, " ") != archive.reader.Comment ||
+		bytes.Contains(mainData, []byte(agentImageGenerationDedupePatchV1Marker)) ||
 		bytes.Contains(mainData, []byte(agentImageGenerationDedupePatchV3Marker)) ||
 		bytes.Contains(mainData, []byte(agentImageGenerationDedupePatchV2Marker))
 	baseArchiveComment := archive.reader.Comment
