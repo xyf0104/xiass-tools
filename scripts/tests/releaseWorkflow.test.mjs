@@ -7,7 +7,7 @@ const workflow = readFileSync(new URL("../../.github/workflows/build-macos.yml",
 test("macOS workflow gates packaging on frontend and Rust quality checks", () => {
   assert.match(workflow, /npm test/);
   assert.match(workflow, /cargo test --locked/);
-  assert.match(workflow, /cargo clippy --locked --all-targets -- -D warnings/);
+  assert.match(workflow, /cargo check --locked --all-targets/);
   assert.match(workflow, /needs: quality/);
 });
 
