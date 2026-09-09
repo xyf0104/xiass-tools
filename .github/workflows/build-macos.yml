@@ -26,6 +26,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sidecars/wf-bridge/go.mod
+
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -72,6 +77,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: sidecars/wf-bridge/go.mod
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2

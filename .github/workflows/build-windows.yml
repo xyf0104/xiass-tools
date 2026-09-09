@@ -19,6 +19,9 @@ jobs:
           node-version: 24
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sidecars/wf-bridge/go.mod
       - run: npm ci
       - run: npm test
       - working-directory: src-tauri
@@ -34,6 +37,9 @@ jobs:
           node-version: 24
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sidecars/wf-bridge/go.mod
       - run: npm ci
       - name: Build Windows installers
         run: npm run tauri:build:windows

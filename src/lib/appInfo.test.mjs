@@ -27,7 +27,7 @@ test("release manifests share the global application version", () => {
   const cargoLockVersion = cargoLock.match(/\[\[package\]\]\s+name = "xiass-tools"\s+version = "([^"]+)"/)?.[1];
 
   assert.equal(packageJson.name, "xiass-tools");
-  assert.equal(packageJson.version, "1.8.1");
+  assert.equal(packageJson.version, "1.8.2");
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages[""].version, packageJson.version);
   assert.equal(tauriConfig.version, packageJson.version);
