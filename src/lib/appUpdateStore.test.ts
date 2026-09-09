@@ -16,15 +16,15 @@ vi.mock("./githubAppUpdate", () => ({
 
 let updates: typeof import("./appUpdateStore");
 const release: GitHubApplicationRelease = {
-  version: "1.8.8", name: "XIASS Tools v1.8.8", publishedAt: null,
+  version: "1.8.9", name: "XIASS Tools v1.8.9", publishedAt: null,
   url: "https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest",
-  installer: { filename: "XIASS.Tools_1.8.8_aarch64.dmg", url: "https://github.com/fixture", size: 100, sha256: "a".repeat(64) }
+  installer: { filename: "XIASS.Tools_1.8.9_aarch64.dmg", url: "https://github.com/fixture", size: 100, sha256: "a".repeat(64) }
 };
 
 beforeEach(async () => {
   vi.resetModules(); vi.clearAllMocks();
   backend.load.mockResolvedValue(release);
-  backend.download.mockResolvedValue("/cache/XIASS.Tools_1.8.8_aarch64.dmg");
+  backend.download.mockResolvedValue("/cache/XIASS.Tools_1.8.9_aarch64.dmg");
   backend.open.mockResolvedValue(undefined);
   backend.listen.mockResolvedValue(backend.unlisten);
   updates = await import("./appUpdateStore");
@@ -33,7 +33,7 @@ beforeEach(async () => {
 describe("GitHub release check and online download state", () => {
   it("offers a newer GitHub release as downloadable, never as a signed silent install", async () => {
     const result = await updates.checkForAppUpdate();
-    expect(result).toMatchObject({ status: "available", latestVersion: "1.8.8", downloadable: true, installable: false });
+    expect(result).toMatchObject({ status: "available", latestVersion: "1.8.9", downloadable: true, installable: false });
     expect(backend.signedCheck).not.toHaveBeenCalled();
   });
 
@@ -85,7 +85,7 @@ describe("GitHub release check and online download state", () => {
     });
     expect(await updates.downloadAppUpdate()).toMatchObject({ status: "downloaded", downloadedPath: "/cache/installer.dmg", downloadedBytes: 100 });
     expect(backend.listen).toHaveBeenCalledWith("github-app-update-progress", expect.any(Function));
-    expect(backend.download).toHaveBeenCalledWith("1.8.8");
+    expect(backend.download).toHaveBeenCalledWith("1.8.9");
     expect(backend.unlisten).toHaveBeenCalledOnce();
     expect(backend.open).not.toHaveBeenCalled();
     await updates.openDownloadedAppUpdate(); expect(backend.open).toHaveBeenCalledOnce();

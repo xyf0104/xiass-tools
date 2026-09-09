@@ -133,12 +133,111 @@ fn validate_asset(asset: &AssetResponse, version: &str) -> Result<GitHubInstalle
 }
 
 fn load_release(endpoint: &str) -> Result<GitHubApplicationRelease, String> {
-    let json = download_http::fetch_text(
-        &format!("https://api.github.com/repos/{REPOSITORY}/releases/{endpoint}"),
-        Duration::from_secs(10),
+    let target = app_updater::application_update_target()?;
+    let api_url = format!("https://api.github.com/repos/{REPOSITORY}/releases/{endpoint}");
+    match download_http::fetch_text(&api_url, Duration::from_secs(10), 1) {
+        // Invalid metadata or a missing checksum is an error, never a reason
+        // to weaken verification. Only transport/API failures use the page.
+        Ok(json) => release_from_json(&json, target),
+        Err(api_error) => load_page_release(endpoint, target).map_err(|page_error| {
+            format!("GitHub release lookup failed: {api_error}; page fallback failed: {page_error}")
+        }),
+    }
+}
+
+fn release_page_url(endpoint: &str) -> Result<String, String> {
+    if endpoint == "latest" {
+        return Ok(format!("https://github.com/{REPOSITORY}/releases/latest"));
+    }
+    let version = endpoint
+        .strip_prefix("tags/v")
+        .filter(|version| valid_version(version))
+        .ok_or("Invalid GitHub release endpoint.")?;
+    // The API uses /releases/tags/vN; the website uses /releases/tag/vN.
+    Ok(format!(
+        "https://github.com/{REPOSITORY}/releases/tag/v{version}"
+    ))
+}
+
+fn page_release_version(html: &str) -> Result<String, String> {
+    let pattern = format!(
+        r#"<include-fragment\b[^>]*\bsrc=["']https://github\.com/{}/releases/expanded_assets/v([0-9.]+)["']"#,
+        regex::escape(REPOSITORY)
+    );
+    let captures = regex::Regex::new(&pattern)
+        .map_err(|err| err.to_string())?
+        .captures(html)
+        .ok_or("GitHub release page did not expose its asset list.")?;
+    let version = captures.get(1).unwrap().as_str();
+    if !valid_version(version) || html.contains(">Pre-release</span>") {
+        return Err("GitHub release page did not expose a stable version.".into());
+    }
+    Ok(version.into())
+}
+
+fn load_page_release(endpoint: &str, target: &str) -> Result<GitHubApplicationRelease, String> {
+    let html = download_http::fetch_text(&release_page_url(endpoint)?, Duration::from_secs(15), 1)?;
+    let version = page_release_version(&html)?;
+    if endpoint != "latest" && endpoint != format!("tags/v{version}") {
+        return Err("GitHub returned a different release page.".into());
+    }
+    let assets = download_http::fetch_text(
+        &format!("https://github.com/{REPOSITORY}/releases/expanded_assets/v{version}"),
+        Duration::from_secs(15),
         1,
     )?;
-    release_from_json(&json, app_updater::application_update_target()?)
+    Ok(GitHubApplicationRelease {
+        name: Some(format!("XIASS Tools v{version}")),
+        url: format!("https://github.com/{REPOSITORY}/releases/latest"),
+        published_at: None,
+        installer: installer_from_assets_page(&assets, &version, target)?,
+        version,
+    })
+}
+
+fn installer_from_assets_page(
+    html: &str,
+    version: &str,
+    target: &str,
+) -> Result<Option<GitHubInstaller>, String> {
+    let suffix = match target {
+        "darwin-aarch64" => "aarch64.dmg",
+        "darwin-x86_64" => "x64.dmg",
+        "windows-x86_64" => "x64-setup.exe",
+        _ => return Ok(None),
+    };
+    let filename = format!("XIASS.Tools_{version}_{suffix}");
+    let relative_url = format!("/{REPOSITORY}/releases/download/v{version}/{filename}");
+    let link = regex::Regex::new(&format!(
+        r#"<a\b[^>]*\bhref=["']{}["']"#,
+        regex::escape(&relative_url)
+    ))
+    .map_err(|err| err.to_string())?;
+    let digest =
+        regex::Regex::new(r#"<clipboard-copy\b[^>]*\bvalue=["']sha256:([0-9a-fA-F]{64})["']"#)
+            .map_err(|err| err.to_string())?;
+    let mut installer = None;
+    for row in html.split("</li>") {
+        if !link.is_match(row) {
+            continue;
+        }
+        if installer.is_some() {
+            return Err("GitHub returned duplicate installers for this platform.".into());
+        }
+        let checksum = digest
+            .captures(row)
+            .and_then(|caps| caps.get(1))
+            .ok_or("The GitHub asset list has no valid SHA-256 checksum. Please retry later.")?;
+        installer = Some(GitHubInstaller {
+            filename: filename.clone(),
+            url: format!("https://github.com{relative_url}"),
+            // GitHub renders a rounded size in HTML. Use HTTP Content-Length
+            // for progress, but require GitHub's full digest for verification.
+            size: 0,
+            sha256: checksum.as_str().to_ascii_lowercase(),
+        });
+    }
+    Ok(installer)
 }
 
 pub fn check_update() -> Result<GitHubApplicationRelease, String> {
@@ -146,9 +245,16 @@ pub fn check_update() -> Result<GitHubApplicationRelease, String> {
 }
 
 fn verify_file(path: &Path, asset: &GitHubInstaller) -> Result<(), String> {
+    if asset.sha256.len() != 64 || !asset.sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("The installer has no authoritative SHA-256 checksum.".into());
+    }
+    let metadata = fs::symlink_metadata(path).map_err(|err| err.to_string())?;
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > 2 * 1024 * 1024 * 1024 {
+        return Err("The downloaded installer is not a valid regular file.".into());
+    }
     let mut file =
         File::open(path).map_err(|err| format!("Cannot open the update installer: {err}"))?;
-    if file.metadata().map_err(|err| err.to_string())?.len() != asset.size {
+    if asset.size > 0 && file.metadata().map_err(|err| err.to_string())?.len() != asset.size {
         return Err("Installer size verification failed. Please download the update again.".into());
     }
     let mut hasher = Sha256::new();
@@ -184,7 +290,7 @@ where
     if release.version != version {
         return Err("GitHub returned a different release. Please check for updates again.".into());
     }
-    let asset = release
+    let mut asset = release
         .installer
         .ok_or("No installer is available for this platform yet.")?;
     let directory = app_paths::app_paths()
@@ -200,22 +306,30 @@ where
         total_bytes,
     };
     if verify_file(&path, &asset).is_err() {
-        on_progress(progress("downloading", 0, Some(asset.size)));
+        on_progress(progress(
+            "downloading",
+            0,
+            (asset.size > 0).then_some(asset.size),
+        ));
         download_http::download_to_file(
             &asset.url,
             &path,
             &directory.join(format!("{}.part", asset.filename)),
-            Some(asset.size),
+            (asset.size > 0).then_some(asset.size),
             Duration::from_secs(600),
             3,
             |downloaded, total| on_progress(progress("downloading", downloaded, total)),
         )?;
     }
-    on_progress(progress("verifying", asset.size, Some(asset.size)));
+    let actual_size = fs::metadata(&path)
+        .map_err(|err| format!("Cannot inspect the downloaded installer: {err}"))?
+        .len();
+    on_progress(progress("verifying", actual_size, Some(actual_size)));
     if let Err(err) = verify_file(&path, &asset) {
         let _ = fs::remove_file(&path);
         return Err(err);
     }
+    asset.size = actual_size;
     *DOWNLOADED_INSTALLER
         .lock()
         .map_err(|_| "Update state is unavailable.")? = Some(VerifiedInstaller {

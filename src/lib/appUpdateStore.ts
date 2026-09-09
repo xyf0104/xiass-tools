@@ -201,8 +201,16 @@ async function performGitHubDownload(): Promise<AppUpdateState> {
       }));
     });
     const path = await downloadGitHubApplicationUpdate(release.version);
-    appUpdateState.update((state) => ({ ...state, status: "downloaded", downloadedPath: path,
-      downloadedBytes: release.installer!.size, totalBytes: release.installer!.size }));
+    appUpdateState.update((state) => ({
+      ...state,
+      status: "downloaded",
+      downloadedPath: path,
+      // The HTML fallback cannot know the asset length until the transfer
+      // starts; preserve the observed progress when GitHub API metadata was
+      // unavailable instead of resetting the completed download to 0 bytes.
+      downloadedBytes: release.installer!.size || state.downloadedBytes,
+      totalBytes: release.installer!.size || state.totalBytes
+    }));
   } catch (err) {
     appUpdateState.update((state) => ({ ...state, status: "error",
       error: err instanceof Error ? err.message : String(err) }));

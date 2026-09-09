@@ -33,6 +33,31 @@ fn matches_all_three_supported_platform_installers() {
 }
 
 #[test]
+fn page_fallback_discovers_the_latest_version_and_platform_asset_without_api_metadata() {
+    let page = r#"<include-fragment src="https://github.com/xyf0104/Antigravity-WF-Assistant/releases/expanded_assets/v1.8.7"></include-fragment>"#;
+    let assets = r#"<li><a href="/xyf0104/Antigravity-WF-Assistant/releases/download/v1.8.7/XIASS.Tools_1.8.7_aarch64.dmg">XIASS.Tools_1.8.7_aarch64.dmg</a>
+      <clipboard-copy value="sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"></clipboard-copy></li>"#;
+    let version = page_release_version(page).unwrap();
+    let asset = installer_from_assets_page(assets, &version, "darwin-aarch64")
+        .unwrap()
+        .unwrap();
+    assert_eq!(version, "1.8.7");
+    assert_eq!(asset.size, 0);
+    assert_eq!(asset.sha256, "a".repeat(64));
+    assert_eq!(asset.url, format!("https://github.com/{REPOSITORY}/releases/download/v1.8.7/XIASS.Tools_1.8.7_aarch64.dmg"));
+}
+
+#[test]
+fn page_fallback_reports_a_missing_platform_asset_without_guessing_a_filename() {
+    let assets = r#"<li><a href="/xyf0104/Antigravity-WF-Assistant/releases/download/v1.8.7/XIASS.Tools_1.8.7_x64.dmg">XIASS.Tools_1.8.7_x64.dmg</a></li>"#;
+    assert!(
+        installer_from_assets_page(assets, "1.8.7", "darwin-aarch64")
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
 fn missing_or_unsupported_platform_is_never_guessed() {
     let mut value = fixture();
     value["assets"] = json!([]);
@@ -176,23 +201,17 @@ fn accepts_only_bounded_numeric_versions() {
 #[ignore = "Downloads the real public GitHub installer; run explicitly for release smoke testing."]
 fn live_github_installer_download_and_checksum() {
     let release = check_update().unwrap();
-    let asset = release.installer.unwrap();
-    let root = std::env::temp_dir().join(format!("xiass-live-update-{}", uuid::Uuid::new_v4()));
-    let path = root.join(&asset.filename);
-    download_http::download_to_file(
-        &asset.url,
-        &path,
-        &root.join("download.part"),
-        Some(asset.size),
-        Duration::from_secs(600),
-        3,
-        |_, _| {},
-    )
-    .unwrap();
-    verify_file(&path, &asset).unwrap();
+    assert!(release.installer.is_some());
+    let path = download_update(&release.version, |_| {}).unwrap();
+    let installer = DOWNLOADED_INSTALLER
+        .lock()
+        .unwrap()
+        .clone()
+        .expect("downloaded installer state");
+    verify_file(Path::new(&path), &installer.asset).unwrap();
     println!(
         "Verified GitHub v{} installer: {} ({} bytes)",
-        release.version, asset.filename, asset.size
+        release.version, installer.asset.filename, installer.asset.size
     );
-    fs::remove_dir_all(&root).unwrap();
+    let _ = fs::remove_file(&installer.path);
 }
