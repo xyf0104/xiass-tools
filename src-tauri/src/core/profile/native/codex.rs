@@ -77,12 +77,17 @@ pub(in crate::core::profile) fn auth_json_has_chatgpt_markers(value: &serde_json
     })
 }
 
-fn auth_api_key_from_value(value: &serde_json::Value) -> Option<String> {
+pub(in crate::core::profile) fn auth_api_key_from_value(
+    value: &serde_json::Value,
+) -> Option<String> {
     [
-        "experimental_bearer_token",
         "OPENAI_API_KEY",
         "openai_api_key",
         "api_key",
+        // Kept as a read-only migration fallback for files produced by older
+        // XIASS Tools builds. New writes must never use this field: Codex's
+        // API-key login cache uses the uppercase OPENAI_API_KEY field.
+        "experimental_bearer_token",
     ]
     .into_iter()
     .find_map(|key| {
@@ -93,6 +98,17 @@ fn auth_api_key_from_value(value: &serde_json::Value) -> Option<String> {
             .filter(|item| !item.is_empty())
             .map(ToString::to_string)
     })
+}
+
+pub(in crate::core::profile) fn auth_json_has_canonical_api_key(
+    value: &serde_json::Value,
+) -> bool {
+    value
+        .get("OPENAI_API_KEY")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .map(|key| !key.is_empty())
+        .unwrap_or(false)
 }
 
 fn wire_api_for_protocol(protocol: &str) -> Result<&'static str, String> {
@@ -436,12 +452,14 @@ pub(in crate::core::profile) fn auth_json_content_with_api_key(
         serde_json::Value::String("apikey".to_string()),
     );
     object.insert(
-        "experimental_bearer_token".to_string(),
+        "OPENAI_API_KEY".to_string(),
         serde_json::Value::String(api_key.to_string()),
     );
-    object.remove("OPENAI_API_KEY");
     object.remove("openai_api_key");
     object.remove("api_key");
+    // Remove the pre-1.8 XIASS field so stale credentials cannot shadow the
+    // canonical Codex API-key field after an upgrade.
+    object.remove("experimental_bearer_token");
     render_auth_json(&value)
 }
 
@@ -473,7 +491,39 @@ pub(in crate::core::profile) fn verify_auth_json_write(
     path: &Path,
     expected: &str,
 ) -> Result<bool, String> {
-    Ok(fs::read_to_string(path).map_err(|err| err.to_string())? == expected)
+    let actual = fs::read_to_string(path).map_err(|err| err.to_string())?;
+    if actual != expected {
+        return Ok(false);
+    }
+
+    // A byte-for-byte match is not enough: older builds wrote
+    // experimental_bearer_token, which is not consumed by the installed Codex
+    // API-key login flow. Validate the same canonical shape emitted by
+    // `codex login --with-api-key` before reporting success.
+    let value: serde_json::Value = serde_json::from_str(&actual)
+        .map_err(|err| format!("Codex auth.json is not valid JSON after write: {err}"))?;
+    let is_api_key_cache = value
+        .get("auth_mode")
+        .and_then(serde_json::Value::as_str)
+        .map(|mode| mode.eq_ignore_ascii_case("apikey") || mode.eq_ignore_ascii_case("api_key"))
+        .unwrap_or(false);
+    if is_api_key_cache {
+        let has_canonical_key = value
+            .get("OPENAI_API_KEY")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .map(|key| !key.is_empty())
+            .unwrap_or(false);
+        let has_legacy_key = value
+            .get("experimental_bearer_token")
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .map(|key| !key.is_empty())
+            .unwrap_or(false);
+        return Ok(has_canonical_key && !has_legacy_key);
+    }
+
+    Ok(true)
 }
 
 pub(in crate::core::profile) fn detect_native_profile_with_auth(

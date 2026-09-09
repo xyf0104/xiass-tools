@@ -2121,6 +2121,29 @@ fn codex_auth_status_infers_api_key_cache_without_exposing_values() {
     assert!(bearer_status.available);
     assert!(matches!(bearer_status.method, CodexAuthMethod::ApiKey));
     assert!(!bearer_status.detail.contains("sk-secret"));
+
+    let missing_key_status = codex_auth_status_from_file_content(
+        auth_path,
+        "file",
+        r#"{
+  "auth_mode": "apikey"
+}"#,
+    );
+
+    assert!(!missing_key_status.available);
+    assert!(matches!(missing_key_status.method, CodexAuthMethod::None));
+
+    let legacy_only_status = codex_auth_status_from_file_content(
+        auth_path,
+        "file",
+        r#"{
+  "auth_mode": "apikey",
+  "experimental_bearer_token": "sk-legacy-only"
+}"#,
+    );
+
+    assert!(!legacy_only_status.available);
+    assert!(matches!(legacy_only_status.method, CodexAuthMethod::None));
 }
 
 #[test]
@@ -2150,6 +2173,7 @@ fn codex_auth_json_api_key_content_matches_cli_format_and_preserves_oauth_tokens
   "OPENAI_API_KEY": "stale-uppercase-key",
   "openai_api_key": "stale-lowercase-key",
   "api_key": "stale-legacy-key",
+  "experimental_bearer_token": "stale-xiass-key",
   "tokens": {
     "access_token": "oauth-access",
     "refresh_token": "oauth-refresh"
@@ -2167,11 +2191,11 @@ fn codex_auth_json_api_key_content_matches_cli_format_and_preserves_oauth_tokens
     );
     assert_eq!(
         value
-            .get("experimental_bearer_token")
+            .get("OPENAI_API_KEY")
             .and_then(serde_json::Value::as_str),
         Some("sk-current")
     );
-    assert!(value.get("OPENAI_API_KEY").is_none());
+    assert!(value.get("experimental_bearer_token").is_none());
     assert!(value.get("openai_api_key").is_none());
     assert!(value.get("api_key").is_none());
     assert_eq!(
@@ -2184,6 +2208,37 @@ fn codex_auth_json_api_key_content_matches_cli_format_and_preserves_oauth_tokens
         value.get("other").and_then(serde_json::Value::as_str),
         Some("keep")
     );
+}
+
+#[test]
+fn codex_auth_json_verification_rejects_legacy_bearer_only_writes() {
+    let path = std::env::temp_dir().join(format!(
+        "xiass-codex-auth-verify-{}-{}.json",
+        std::process::id(),
+        Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    ));
+    let legacy = r#"{
+  "auth_mode": "apikey",
+  "experimental_bearer_token": "sk-legacy"
+}
+"#;
+    fs::write(&path, legacy).expect("legacy auth fixture should be written");
+    assert!(
+        !native::codex::verify_auth_json_write(&path, legacy)
+            .expect("legacy auth verification should complete")
+    );
+
+    let canonical = r#"{
+  "auth_mode": "apikey",
+  "OPENAI_API_KEY": "sk-canonical"
+}
+"#;
+    fs::write(&path, canonical).expect("canonical auth fixture should be written");
+    assert!(
+        native::codex::verify_auth_json_write(&path, canonical)
+            .expect("canonical auth verification should complete")
+    );
+    let _ = fs::remove_file(path);
 }
 
 #[test]
@@ -2910,11 +2965,11 @@ fn codex_direct_apply_plan_writes_auth_json_before_config() {
         Some("apikey")
     );
     assert_eq!(
-        auth.get("experimental_bearer_token")
+        auth.get("OPENAI_API_KEY")
             .and_then(serde_json::Value::as_str),
         Some("sk-direct-profile")
     );
-    assert!(auth.get("OPENAI_API_KEY").is_none());
+    assert!(auth.get("experimental_bearer_token").is_none());
     assert_eq!(
         auth.pointer("/tokens/refresh_token")
             .and_then(serde_json::Value::as_str),
@@ -3000,11 +3055,11 @@ fn codex_gateway_apply_plan_writes_local_token_to_auth_json_before_config() {
         Some("apikey")
     );
     assert_eq!(
-        auth.get("experimental_bearer_token")
+        auth.get("OPENAI_API_KEY")
             .and_then(serde_json::Value::as_str),
         Some(client.token.as_str())
     );
-    assert!(auth.get("OPENAI_API_KEY").is_none());
+    assert!(auth.get("experimental_bearer_token").is_none());
     assert_eq!(
         auth.pointer("/tokens/access_token")
             .and_then(serde_json::Value::as_str),

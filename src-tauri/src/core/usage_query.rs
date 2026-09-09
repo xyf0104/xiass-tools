@@ -417,7 +417,10 @@ fn codex_oauth_usage_auth_from_value(value: &Value) -> Result<CodexOAuthUsageAut
     let has_api_key = string_at(value, &["openai_api_key"]).is_some()
         || string_at(value, &["OPENAI_API_KEY"]).is_some()
         || string_at(value, &["api_key"]).is_some();
-    if auth_mode == "api_key" || (has_api_key && !has_chatgpt_oauth_markers(value)) {
+    if auth_mode == "api_key"
+        || auth_mode == "apikey"
+        || (has_api_key && !has_chatgpt_oauth_markers(value))
+    {
         return Err(
             "Codex official OAuth usage query requires ChatGPT/OAuth login, not API-key login."
                 .to_string(),
@@ -1405,6 +1408,19 @@ mod tests {
         .expect("auth json should parse");
 
         assert!(codex_oauth_usage_auth_from_value(&api_key_only).is_err());
+
+        let api_key_with_preserved_oauth_tokens: Value = serde_json::from_str(
+            r#"{
+              "auth_mode": "apikey",
+              "OPENAI_API_KEY": "sk-secret",
+              "tokens": {
+                "access_token": "stale-oauth-token"
+              }
+            }"#,
+        )
+        .expect("auth json should parse");
+
+        assert!(codex_oauth_usage_auth_from_value(&api_key_with_preserved_oauth_tokens).is_err());
     }
 
     #[test]

@@ -9,6 +9,13 @@ vi.mock("@tauri-apps/api/core", () => ({ isTauri: () => true }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: backend.listen }));
 vi.mock("@tauri-apps/plugin-updater", () => ({ check: backend.signedCheck }));
 vi.mock("./api", () => ({ applicationUpdateTarget: vi.fn(), installApplicationUpdate: vi.fn() }));
+// Keep the installed-version fixture independent of release version bumps.
+// Manifest/version injection consistency is covered by appInfo.test.mjs.
+vi.mock("./appInfo", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./appInfo")>(),
+  APP_VERSION: "1.8.7",
+  APP_UPDATER_ENABLED: false
+}));
 vi.mock("./githubAppUpdate", () => ({
   loadGitHubApplicationRelease: backend.load, downloadGitHubApplicationUpdate: backend.download,
   openGitHubApplicationUpdate: backend.open

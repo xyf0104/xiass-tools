@@ -1064,7 +1064,15 @@ fn infer_codex_auth_method(value: &serde_json::Value) -> CodexAuthMethod {
         .map(str::trim)
         .unwrap_or_default();
     if auth_mode.eq_ignore_ascii_case("apikey") || auth_mode.eq_ignore_ascii_case("api_key") {
-        return CodexAuthMethod::ApiKey;
+        // `auth_mode` alone is not proof of a usable login. In particular,
+        // older XIASS builds could leave auth_mode=apikey while writing the
+        // unsupported experimental_bearer_token field. Treat that state as
+        // unauthenticated so the UI does not claim the cache is ready.
+        return if native::codex::auth_json_has_canonical_api_key(value) {
+            CodexAuthMethod::ApiKey
+        } else {
+            CodexAuthMethod::None
+        };
     }
     if auth_mode.eq_ignore_ascii_case("chatgpt") {
         return CodexAuthMethod::ChatGpt;
