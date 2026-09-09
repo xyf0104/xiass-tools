@@ -4,13 +4,22 @@ import "@tauri-apps/plugin-process";
 import { check, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import { get, writable } from "svelte/store";
 import { applicationUpdateTarget, installApplicationUpdate } from "./api";
-import { APP_UPDATER_ENABLED, APP_VERSION } from "./appInfo";
+import { APP_LATEST_RELEASE_URL, APP_UPDATER_ENABLED, APP_VERSION } from "./appInfo";
+import {
+  downloadGitHubApplicationUpdate,
+  loadGitHubApplicationRelease,
+  openGitHubApplicationUpdate,
+  type GitHubApplicationRelease
+} from "./githubAppUpdate";
 
 type UpdateStatus =
   | "idle"
   | "checking"
   | "available"
   | "downloading"
+  | "verifying"
+  | "downloaded"
+  | "opening"
   | "installing"
   | "upToDate"
   | "unconfigured"
@@ -20,6 +29,8 @@ export interface AppUpdateState {
   status: UpdateStatus;
   updateAvailable: boolean;
   installable: boolean;
+  downloadable: boolean;
+  downloadedPath: string | null;
   currentVersion: string;
   latestVersion: string | null;
   releaseName: string | null;
@@ -37,6 +48,7 @@ interface ReleaseInfo {
   url: string | null;
   publishedAt: string | null;
   installable: boolean;
+  downloadable?: boolean;
 }
 
 interface ReleaseLookup {
@@ -60,10 +72,12 @@ const initialState: AppUpdateState = {
   status: "idle",
   updateAvailable: false,
   installable: false,
+  downloadable: false,
+  downloadedPath: null,
   currentVersion: APP_VERSION,
   latestVersion: null,
   releaseName: null,
-  releaseUrl: null,
+  releaseUrl: APP_LATEST_RELEASE_URL,
   publishedAt: null,
   checkedAt: null,
   downloadedBytes: 0,
@@ -77,22 +91,15 @@ let inFlight: Promise<AppUpdateState> | null = null;
 let installInFlight: Promise<AppUpdateState> | null = null;
 let pendingUpdate: Update | null = null;
 let pendingUpdateTarget: string | null = null;
+let pendingGitHubRelease: GitHubApplicationRelease | null = null;
 
 export async function checkForAppUpdate(force = false): Promise<AppUpdateState> {
   const current = get(appUpdateState);
-  if (!isTauri() || !APP_UPDATER_ENABLED) {
-    pendingUpdate = null;
-    pendingUpdateTarget = null;
-    const unconfiguredState: AppUpdateState = {
-      ...initialState,
-      status: "unconfigured",
-      checkedAt: new Date().toISOString()
-    };
-    appUpdateState.set(unconfiguredState);
-    return unconfiguredState;
-  }
-  if (!force && current.status === "checking" && inFlight) {
-    return inFlight;
+  if (installInFlight) return installInFlight;
+  if (inFlight) return inFlight;
+  if (!force && current.checkedAt && current.status !== "error" &&
+      Date.now() - Date.parse(current.checkedAt) < 5 * 60 * 1000) {
+    return current;
   }
 
   appUpdateState.set({
@@ -103,7 +110,7 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateState> 
     error: null
   });
 
-  inFlight = fetchTauriRelease()
+  inFlight = (isTauri() && APP_UPDATER_ENABLED ? fetchTauriRelease() : fetchGitHubRelease())
     .then(({ release, emptyStatus }) => {
       const checkedAt = new Date().toISOString();
       if (!release) {
@@ -118,10 +125,13 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateState> 
 
       const latestVersion = normalizeVersionLabel(release.version);
       const updateAvailable = compareVersions(latestVersion, APP_VERSION) > 0;
+      const downloadedPath = current.latestVersion === latestVersion ? current.downloadedPath : null;
       const nextState: AppUpdateState = {
-        status: updateAvailable ? "available" : "upToDate",
+        status: updateAvailable ? (downloadedPath ? "downloaded" : "available") : "upToDate",
         updateAvailable,
         installable: updateAvailable && release.installable,
+        downloadable: updateAvailable && Boolean(release.downloadable),
+        downloadedPath,
         currentVersion: APP_VERSION,
         latestVersion,
         releaseName: release.name ?? latestVersion,
@@ -138,6 +148,7 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateState> 
     .catch((err) => {
       pendingUpdate = null;
       pendingUpdateTarget = null;
+      pendingGitHubRelease = null;
       const nextState: AppUpdateState = {
         ...initialState,
         status: "error",
@@ -152,6 +163,69 @@ export async function checkForAppUpdate(force = false): Promise<AppUpdateState> 
     });
 
   return inFlight;
+}
+
+async function fetchGitHubRelease(): Promise<ReleaseLookup> {
+  pendingUpdate = null;
+  pendingUpdateTarget = null;
+  pendingGitHubRelease = await loadGitHubApplicationRelease();
+  return {
+    emptyStatus: "upToDate",
+    release: {
+      ...pendingGitHubRelease,
+      installable: false,
+      downloadable: Boolean(pendingGitHubRelease.installer)
+    }
+  };
+}
+
+export function downloadAppUpdate(): Promise<AppUpdateState> {
+  if (installInFlight) return installInFlight;
+  installInFlight = performGitHubDownload().finally(() => { installInFlight = null; });
+  return installInFlight;
+}
+
+async function performGitHubDownload(): Promise<AppUpdateState> {
+  const current = get(appUpdateState);
+  const release = pendingGitHubRelease;
+  if (inFlight || !current.updateAvailable || !current.downloadable || !release?.installer) return current;
+  appUpdateState.set({ ...current, status: "downloading", downloadedBytes: 0,
+    totalBytes: release.installer.size, downloadedPath: null, error: null });
+  let unlisten: (() => void) | undefined;
+  try {
+    unlisten = await listen<AppUpdateProgress>("github-app-update-progress", ({ payload }) => {
+      appUpdateState.update((state) => ({ ...state,
+        status: payload.phase === "verifying" ? "verifying" : "downloading",
+        downloadedBytes: payload.downloadedBytes,
+        totalBytes: payload.totalBytes
+      }));
+    });
+    const path = await downloadGitHubApplicationUpdate(release.version);
+    appUpdateState.update((state) => ({ ...state, status: "downloaded", downloadedPath: path,
+      downloadedBytes: release.installer!.size, totalBytes: release.installer!.size }));
+  } catch (err) {
+    appUpdateState.update((state) => ({ ...state, status: "error",
+      error: err instanceof Error ? err.message : String(err) }));
+  } finally {
+    unlisten?.();
+  }
+  return get(appUpdateState);
+}
+
+export function openDownloadedAppUpdate(): Promise<AppUpdateState> {
+  if (installInFlight) return installInFlight;
+  const current = get(appUpdateState);
+  if (!current.downloadedPath) return Promise.resolve(current);
+  appUpdateState.set({ ...current, status: "opening", error: null });
+  installInFlight = openGitHubApplicationUpdate().then(() => {
+    appUpdateState.update((state) => ({ ...state, status: "downloaded" }));
+    return get(appUpdateState);
+  }).catch((err) => {
+    appUpdateState.update((state) => ({ ...state, status: "error", downloadedPath: null,
+      error: err instanceof Error ? err.message : String(err) }));
+    return get(appUpdateState);
+  }).finally(() => { installInFlight = null; });
+  return installInFlight;
 }
 
 export function installAppUpdate(): Promise<AppUpdateState> {
@@ -281,6 +355,7 @@ export function installerArtifactForTarget(
 }
 
 async function fetchTauriRelease(): Promise<ReleaseLookup> {
+  pendingGitHubRelease = null;
   const target = await applicationUpdateTarget();
   const cacheBuster = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   pendingUpdate = await check({

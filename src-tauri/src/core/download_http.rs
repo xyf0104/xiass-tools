@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 pub(crate) const DOWNLOAD_HTTP_MAX_ATTEMPTS: usize = 4;
 const DOWNLOAD_HTTP_RETRY_DELAY_MS: u64 = 500;
-const DOWNLOAD_HTTP_USER_AGENT: &str = "CodeStudio Lite";
+const DOWNLOAD_HTTP_USER_AGENT: &str = "XIASS Tools";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DownloadHttpTransport {

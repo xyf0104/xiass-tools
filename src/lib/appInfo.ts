@@ -4,3 +4,6 @@ export const APP_VERSION_LABEL = `v${APP_VERSION}`;
 export const APP_UPDATER_ENABLED = __APP_UPDATER_ENABLED__;
 export const AUTHOR_NAME = "XIASS";
 export const AUTHOR_GITHUB_URL = "https://github.com/xyf0104";
+export const APP_GITHUB_REPOSITORY = "xyf0104/Antigravity-WF-Assistant";
+export const APP_LATEST_RELEASE_URL = `https://github.com/${APP_GITHUB_REPOSITORY}/releases/latest`;
+export const APP_LATEST_RELEASE_API_URL = `https://api.github.com/repos/${APP_GITHUB_REPOSITORY}/releases/latest`;

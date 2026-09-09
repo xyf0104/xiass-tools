@@ -1,11 +1,11 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 import packageJson from "./package.json" with { type: "json" };
-import updaterConfig from "./updater.config.json" with { type: "json" };
+import tauriConfig from "./src-tauri/tauri.conf.json" with { type: "json" };
 
 const updaterEnabled = Boolean(
-  (process.env.CODESTUDIO_UPDATE_BASE_URL?.trim() || updaterConfig.baseUrl.trim()) &&
-    (process.env.TAURI_UPDATER_PUBKEY?.trim() || updaterConfig.pubkey.trim())
+  (process.env.CODESTUDIO_UPDATE_BASE_URL?.trim() && process.env.TAURI_UPDATER_PUBKEY?.trim()) ||
+    (tauriConfig.plugins.updater.endpoints.length && tauriConfig.plugins.updater.pubkey.trim())
 );
 
 function manualChunks(id: string): string | undefined {

@@ -5,11 +5,13 @@
   import DismissibleNotice from "../components/DismissibleNotice.svelte";
   import {
     APP_NAME,
+    APP_LATEST_RELEASE_URL,
+    APP_UPDATER_ENABLED,
     APP_VERSION_LABEL,
     AUTHOR_GITHUB_URL,
     AUTHOR_NAME
   } from "../lib/appInfo";
-  import { appUpdateState, checkForAppUpdate, installAppUpdate } from "../lib/appUpdateStore";
+  import { appUpdateState, checkForAppUpdate, downloadAppUpdate, installAppUpdate, openDownloadedAppUpdate } from "../lib/appUpdateStore";
   import {
     cleanupMacosUserApplication,
     loadAppSettings,
@@ -169,6 +171,9 @@
     if ($appUpdateState.status === "installing") {
       return $t("settings.installingUpdate");
     }
+    if ($appUpdateState.status === "verifying") return $t("settings.verifyingUpdate");
+    if ($appUpdateState.status === "downloaded") return $t("settings.updateDownloaded");
+    if ($appUpdateState.status === "opening") return $t("settings.openingInstaller");
     if ($appUpdateState.status === "available" && $appUpdateState.latestVersion) {
       return $t("settings.updateAvailable", { version: $appUpdateState.latestVersion });
     }
@@ -184,17 +189,14 @@
     return $t("settings.updateNotChecked");
   })();
 
-  $: updateStatusTone = $appUpdateState.updateAvailable
-    ? "warn"
-    : $appUpdateState.status === "error"
-      ? "bad"
-    : $appUpdateState.status === "idle"
-        ? "info"
-        : "good";
+  $: updateStatusTone = $appUpdateState.status === "error" ? "bad"
+    : ["checking", "downloading", "verifying", "opening", "idle"].includes($appUpdateState.status) ? "info"
+    : $appUpdateState.status === "downloaded" ? "good"
+    : $appUpdateState.updateAvailable ? "warn" : "good";
   $: updateProgressPercent = $appUpdateState.totalBytes
     ? Math.min(100, Math.round(($appUpdateState.downloadedBytes / $appUpdateState.totalBytes) * 100))
     : 0;
-  $: updateBusy = ["checking", "downloading", "installing"].includes($appUpdateState.status);
+  $: updateBusy = ["checking", "downloading", "verifying", "opening", "installing"].includes($appUpdateState.status);
 
 </script>
 
@@ -256,7 +258,18 @@
           <span>{APP_VERSION_LABEL}</span>
         </div>
         <div class={settingsAboutUpdateRecipe()}>
-          <span class={settingsUpdatePillRecipe({ tone: updateStatusTone })}>{updateStatusLabel}</span>
+          <span class={settingsUpdatePillRecipe({ tone: updateStatusTone })} role="status" aria-live="polite">{updateStatusLabel}</span>
+          {#if $appUpdateState.downloadedPath}
+            <button class={actionButtonRecipe({ tone: "primary" })} type="button" disabled={updateBusy} on:click={() => openDownloadedAppUpdate()}>
+              <AppIcon name="externalLink" size={15} />
+              {$t("settings.openInstaller")}
+            </button>
+          {:else if $appUpdateState.updateAvailable && $appUpdateState.downloadable}
+            <button class={actionButtonRecipe({ tone: "primary" })} type="button" disabled={updateBusy} on:click={() => downloadAppUpdate()}>
+              <AppIcon name="download" size={15} />
+              {$t("settings.downloadUpdate")}
+            </button>
+          {/if}
           {#if $appUpdateState.updateAvailable && $appUpdateState.installable}
             <button
               class={actionButtonRecipe({ tone: "primary" })}
@@ -275,6 +288,26 @@
           </button>
         </div>
       </div>
+
+      {#if $appUpdateState.status === "downloading" || $appUpdateState.status === "verifying"}
+        <progress class="xiass-update-progress" aria-label={$t("settings.downloadProgress")} max="100" value={updateProgressPercent}></progress>
+      {/if}
+      {#if $appUpdateState.downloadedPath}
+        <p class="xiass-update-detail">{$t("settings.updateSavedTo", { path: $appUpdateState.downloadedPath })}</p>
+      {/if}
+      {#if !APP_UPDATER_ENABLED}
+        <div class="xiass-update-source">
+          <p>{$t("settings.githubUpdateHint")}</p>
+          <a class={actionButtonRecipe()} href={APP_LATEST_RELEASE_URL} target="_blank" rel="noreferrer"
+            on:click|preventDefault={() => openExternalUrl(APP_LATEST_RELEASE_URL)}>
+            {$t("settings.releaseNotes")}
+            <AppIcon name="externalLink" size={15} />
+          </a>
+        </div>
+        {#if $appUpdateState.updateAvailable && !$appUpdateState.downloadable}
+          <p class="xiass-update-detail">{$t("settings.installerUnavailable")}</p>
+        {/if}
+      {/if}
 
       {#if codestudioScope?.duplicateUserInstall || codestudioCleanupSuccess || codestudioCleanupError}
         <div
@@ -322,3 +355,11 @@
     </div>
   </section>
 </div>
+
+<style>
+  .xiass-update-source { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .xiass-update-source p, .xiass-update-detail { margin: 0; color: var(--text-muted); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+  .xiass-update-progress { width: 100%; height: 8px; border: 0; border-radius: 8px; overflow: hidden; accent-color: var(--accent); }
+  .xiass-update-progress::-webkit-progress-bar { background: var(--surface-strong); }
+  .xiass-update-progress::-webkit-progress-value { background: var(--accent); border-radius: 8px; }
+</style>

@@ -12,6 +12,7 @@ import { enUS } from "./locales/en-US";
 import { zhCN } from "./locales/zh-CN";
 import { zhTW } from "./locales/zh-TW";
 import { setLocale } from "./i18n";
+import { appUpdateState, downloadAppUpdate, openDownloadedAppUpdate } from "./appUpdateStore";
 
 const apiMocks = vi.hoisted(() => ({
   cleanupMacosUserApplication: vi.fn(),
@@ -45,6 +46,8 @@ vi.mock("./appUpdateStore", async () => {
       status: "idle",
       updateAvailable: false,
       installable: false,
+      downloadable: false,
+      downloadedPath: null,
       currentVersion: "1.5.2",
       latestVersion: null,
       releaseName: null,
@@ -56,6 +59,8 @@ vi.mock("./appUpdateStore", async () => {
       error: null
     }),
     checkForAppUpdate: vi.fn(),
+    downloadAppUpdate: vi.fn(),
+    openDownloadedAppUpdate: vi.fn(),
     installAppUpdate: vi.fn()
   };
 });
@@ -151,6 +156,8 @@ function cleanupResult(appId: MacosManagedAppId): MacosApplicationCleanupResult 
 }
 
 beforeEach(() => {
+  appUpdateState.update((state) => ({ ...state, status: "idle", updateAvailable: false,
+    installable: false, downloadable: false, downloadedPath: null, error: null }));
   setLocale("en-US");
   apiMocks.loadAppSettings.mockResolvedValue({ language: "en-US", theme: "system" });
   apiMocks.updateAppSettings.mockImplementation(async (request) => ({
@@ -289,4 +296,36 @@ it("all supported locales explicitly say /Applications is used", () => {
     expect(dictionary["applicationScope.cleanupError"]).toContain("{message}");
     expect(dictionary["applicationScope.selfCleanupFailure"]).toContain("{message}");
   }
+});
+
+it("Settings downloads updates inside the app instead of opening a web page", async () => {
+  appUpdateState.update((state) => ({ ...state, status: "available", updateAvailable: true,
+    downloadable: true, latestVersion: "1.8.8" }));
+  render(Settings);
+  await fireEvent.click(screen.getByRole("button", { name: "Download update" }));
+  expect(downloadAppUpdate).toHaveBeenCalledOnce();
+  expect(apiMocks.openExternalUrl).not.toHaveBeenCalled();
+  expect(screen.queryByRole("button", { name: "Open installer" })).toBeNull();
+  expect(screen.getByRole("link", { name: "Release notes" }).getAttribute("href"))
+    .toBe("https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest");
+});
+
+it("Settings shows real download progress and disables duplicate actions", () => {
+  appUpdateState.update((state) => ({ ...state, status: "downloading", updateAvailable: true,
+    downloadable: true, downloadedBytes: 40, totalBytes: 100 }));
+  render(Settings);
+  expect((screen.getByRole("progressbar") as HTMLProgressElement).value).toBe(40);
+  expect((screen.getByRole("button", { name: "Download update" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Check for updates" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+it("Settings offers Open only after download verification and shows the saved location", async () => {
+  appUpdateState.update((state) => ({ ...state, status: "downloaded", updateAvailable: true,
+    downloadable: true, downloadedPath: "/cache/XIASS.Tools_1.8.8_aarch64.dmg" }));
+  render(Settings);
+  expect(screen.getByText("Downloaded and verified")).toBeTruthy();
+  expect(screen.getByText(/Installer saved:.*XIASS/)).toBeTruthy();
+  await fireEvent.click(screen.getByRole("button", { name: "Open installer" }));
+  expect(openDownloadedAppUpdate).toHaveBeenCalledOnce();
+  expect(apiMocks.openExternalUrl).not.toHaveBeenCalled();
 });

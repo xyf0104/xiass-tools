@@ -16,6 +16,7 @@ pub mod download_http;
 pub mod env_health;
 pub mod gateway;
 pub mod gateway_request_log;
+pub mod github_app_updater;
 pub mod macos_app_scope;
 pub mod node_engine;
 pub mod npm_global;

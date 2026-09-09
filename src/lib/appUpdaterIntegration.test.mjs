@@ -78,12 +78,12 @@ test("R2 updater release commands do not depend on GitHub workflows", () => {
   assert.doesNotMatch(documentation, /codestudio-lite-updates/);
 });
 
-test("README directs releases from 1.5.0 to the official website", () => {
+test("XIASS README directs installers and online updates to its own GitHub releases", () => {
   const readme = read("README.md");
 
-  assert.match(readme, /https:\/\/www\.codestudio\.build/);
-  assert.match(readme, /从 1\.5\.0 版本起，安装包不再通过 GitHub Releases 提供/);
-  assert.match(readme, /Starting with version 1\.5\.0, installers are no longer distributed through GitHub Releases/);
+  assert.match(readme, /github\.com\/xyf0104\/Antigravity-WF-Assistant\/releases\/latest/);
+  assert.match(readme, /下载更新/);
+  assert.doesNotMatch(readme, /安装包不再通过 GitHub Releases 提供|installers are no longer distributed through GitHub Releases/);
 });
 
 test("updater signing key storage is locally protected and portably exportable", () => {
@@ -141,11 +141,11 @@ test("settings hands signed installer updates to Burn or DMG", () => {
 
   assert.match(store, /@tauri-apps\/plugin-updater/);
   assert.match(store, /@tauri-apps\/plugin-process/);
-  assert.match(store, /!isTauri\(\) \|\| !APP_UPDATER_ENABLED/);
+  assert.match(store, /isTauri\(\) && APP_UPDATER_ENABLED \? fetchTauriRelease\(\) : fetchGitHubRelease\(\)/);
   assert.match(store, /installInFlight/);
-  assert.match(store, /status:\s*"unconfigured"/);
-  assert.doesNotMatch(store, /api\.github\.com|fetchGitHubRelease|GITHUB_RELEASES_API_URL/);
-  assert.doesNotMatch(appInfo, /GITHUB_RELEASES_API_URL|api\.github\.com/);
+  assert.match(store, /loadGitHubApplicationRelease/);
+  assert.match(appInfo, /xyf0104\/Antigravity-WF-Assistant/);
+  assert.match(appInfo, /api\.github\.com/);
   assert.match(store, /pendingUpdate\.rawJson/);
   assert.match(store, /installerArtifactForTarget/);
   assert.match(store, /searchParams\.set\(\s*["']r["']/);
@@ -195,6 +195,8 @@ test("settings hands signed installer updates to Burn or DMG", () => {
   assert.ok(updatePillIndex < installUpdateIndex);
   assert.ok(installUpdateIndex < checkUpdatesIndex);
   assert.match(settings, /settings\.updateNow/);
+  assert.match(settings, /settings\.downloadUpdate/);
+  assert.match(settings, /settings\.openInstaller/);
   assert.match(settings, /downloadedBytes/);
   for (const locale of locales) {
     assert.match(locale, /"settings\.updateNow"/);

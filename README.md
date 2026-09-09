@@ -1,14 +1,16 @@
-# CodeStudio Lite
+# XIASS Tools
+
+XIASS Tools 基于 CodeStudio Lite（MIT）开发，保留上游许可与来源说明，并集成 XIASS / Antigravity WF 功能。下方工具技术文档沿用上游描述。
 
 CodeStudio Lite 是面向本机 AI 编程工具的桌面控制台。它把本地 Provider Profile、localhost 网关、工具检测、安装更新、配置写入、用量查询和桌面端补丁流程放在同一个 Tauri 应用里，目标是让 Codex、Claude、Gemini、OpenCode、OpenClaw、Hermes、Grok、Pi Agent 等工具可以在不同供应商和模型之间切换，而不需要反复手动编辑配置文件。
 
 > English documentation starts at [English](#english).
 
-## 官网与下载
+## XIASS 下载与在线更新
 
-官网：[https://www.codestudio.build](https://www.codestudio.build)
+最新版：[GitHub Releases / Latest](https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest)
 
-从 1.5.0 版本起，安装包不再通过 GitHub Releases 提供，请前往官网获取适用于 Windows、macOS 和 Linux 的最新版本。
+仅提供 macOS Apple 芯片、macOS Intel 和 Windows x64 安装包。在 XIASS Tools 中打开「设置 → 检查更新 → 下载更新」，即可直接在线下载匹配本机的安装包，查看进度并校验 SHA-256。下载完成后点击「打开安装包」完成系统安装步骤；不会静默替换正在运行的程序。
 
 ## 核心能力
 
@@ -209,9 +211,9 @@ CodeStudio Lite is a desktop control center for local AI coding tools. It brings
 
 ## Website and Downloads
 
-Official website: [https://www.codestudio.build](https://www.codestudio.build)
+XIASS Tools releases: [GitHub Latest](https://github.com/xyf0104/Antigravity-WF-Assistant/releases/latest)
 
-Starting with version 1.5.0, installers are no longer distributed through GitHub Releases. Download the latest Windows, macOS, and Linux packages from the official website.
+Use Settings → Check for updates → Download update to download the matching macOS or Windows installer inside XIASS Tools. Downloads show progress and are verified against the GitHub asset's SHA-256 before you choose Open installer. XIASS Tools is derived from CodeStudio Lite under the MIT license; the upstream technical documentation is retained below.
 
 ## Core Features
 

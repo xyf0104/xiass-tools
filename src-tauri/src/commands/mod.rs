@@ -1,5 +1,6 @@
 pub mod activity_log;
 pub mod app_updater;
+pub mod github_app_updater;
 pub mod backup;
 pub mod chatgpt_desktop;
 pub mod claude_desktop;
