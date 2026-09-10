@@ -104,6 +104,17 @@ pub fn run() {
             commands::wf_bridge::wf_bridge_stop,
         ])
         .setup(|app| {
+            // Windows uses the same integrated, glass title area as macOS.
+            // Apply this before the first webview frame so the stock caption
+            // bar cannot flash in front of the XIASS controls while the
+            // frontend is mounting.
+            #[cfg(target_os = "windows")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_decorations(false);
+                }
+            }
             // A successful Windows update relaunches before Burn has fully
             // exited, so remove captured updater artifacts with lock retries.
             crate::core::app_updater::schedule_stale_update_cleanup();
@@ -120,12 +131,16 @@ pub fn run() {
             // Intercept the main window close: hide to the tray instead of
             // quitting. The app keeps running with its tray icon; the gateway
             // is only shut down on an explicit Quit from the tray menu.
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = window.set_skip_taskbar(true);
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    // Keep the process' shell/taskbar identity intact while
+                    // hiding the window. On Windows, removing the taskbar
+                    // entry here makes clicking the pinned app icon start a
+                    // second process without a visible restore affordance;
+                    // the single-instance callback can only restore reliably
+                    // when the original identity remains discoverable.
+                    let _ = window.hide();
                 }
             }
         })

@@ -1,5 +1,6 @@
 use std::io;
 use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct AppPaths {
@@ -22,6 +23,17 @@ pub fn app_paths() -> io::Result<AppPaths> {
         downloads_dir,
         database_file,
     })
+}
+
+/// Resolve the Codex home directory exactly as Codex does: CODEX_HOME wins
+/// when set, otherwise the per-user `.codex` directory is used. Keeping this
+/// in one place prevents Windows and macOS from silently writing different
+/// config/auth locations.
+pub fn codex_home_dir(home_dir: &Path) -> PathBuf {
+    std::env::var_os("CODEX_HOME")
+        .map(PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| home_dir.join(".codex"))
 }
 
 pub fn ensure_dirs(paths: &AppPaths) -> io::Result<()> {

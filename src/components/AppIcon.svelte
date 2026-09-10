@@ -43,6 +43,9 @@
   import warning from "@iconify-icons/ph/warning";
   import warningCircle from "@iconify-icons/ph/warning-circle";
   import wrench from "@iconify-icons/ph/wrench";
+  import minus from "@iconify-icons/ph/minus";
+  import square from "@iconify-icons/ph/square";
+  import copySimple from "@iconify-icons/ph/copy-simple";
 
   type UiIcon = typeof info;
 
@@ -93,7 +96,10 @@
     warning,
     wizard: magicWand,
     eye,
-    eyeOff: eyeSlash
+    eyeOff: eyeSlash,
+    windowMinimize: minus,
+    windowMaximize: square,
+    windowRestore: copySimple
   } satisfies Record<string, UiIcon>;
 
   export type AppIconName = keyof typeof appIcons;

@@ -137,13 +137,17 @@ fn current_labels(_app: &AppHandle) -> TrayLabels {
 
 pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
         #[cfg(target_os = "windows")]
         {
+            // Restore the taskbar entry before showing the window. Doing this
+            // after `show()` can leave a hidden/minimized Windows window
+            // without an activation task in the shell, making a second click
+            // appear to do nothing.
             let _ = window.set_skip_taskbar(false);
         }
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
     }
 }
 

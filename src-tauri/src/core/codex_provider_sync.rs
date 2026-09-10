@@ -264,7 +264,7 @@ fn run_provider_sync_locked(
 
 fn codex_home_dir() -> Result<PathBuf, String> {
     dirs::home_dir()
-        .map(|home| home.join(".codex"))
+        .map(|home| crate::core::app_paths::codex_home_dir(&home))
         .ok_or_else(|| "Could not locate the user home directory.".to_string())
 }
 

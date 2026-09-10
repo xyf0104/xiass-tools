@@ -134,7 +134,7 @@ pub(in crate::core::profile) struct CodexAdapter;
 
 impl NativeProfileAdapter for CodexAdapter {
     fn target(&self, paths: &crate::core::app_paths::AppPaths) -> PathBuf {
-        paths.home_dir.join(".codex").join("config.toml")
+        crate::core::app_paths::codex_home_dir(&paths.home_dir).join("config.toml")
     }
     fn render(
         &self,
@@ -399,7 +399,7 @@ fn codex_preserved_auth_repair_diff_lines(root: &toml::Value) -> Vec<NativeConfi
 pub(in crate::core::profile) fn auth_json_path(
     paths: &crate::core::app_paths::AppPaths,
 ) -> PathBuf {
-    paths.home_dir.join(".codex").join("auth.json")
+    crate::core::app_paths::codex_home_dir(&paths.home_dir).join("auth.json")
 }
 
 pub(in crate::core::profile) fn read_auth_json(

@@ -5,7 +5,11 @@ import WindowDragRegion from "../components/WindowDragRegion.svelte";
 const native = vi.hoisted(() => ({
   isTauri: vi.fn(() => true),
   startDragging: vi.fn(() => Promise.resolve()),
-  toggleMaximize: vi.fn(() => Promise.resolve())
+  toggleMaximize: vi.fn(() => Promise.resolve()),
+  isMaximized: vi.fn(() => Promise.resolve(false)),
+  setDecorations: vi.fn(() => Promise.resolve()),
+  minimize: vi.fn(() => Promise.resolve()),
+  close: vi.fn(() => Promise.resolve())
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: native.isTauri }));
@@ -45,10 +49,32 @@ describe("macOS integrated window dragging", () => {
     expect(native.startDragging).not.toHaveBeenCalled();
   });
 
-  it("leaves Windows and other native title bars alone", async () => {
+  it("leaves unknown native title bars alone", async () => {
     document.documentElement.dataset.platform = "other";
     await fireEvent.mouseDown(region(), { button: 0, detail: 1 });
     expect(native.startDragging).not.toHaveBeenCalled();
+  });
+
+  it("uses the integrated title area on Windows", async () => {
+    document.documentElement.dataset.platform = "windows";
+    const ui = render(WindowDragRegion);
+    const target = ui.container.querySelector(".xiass-window-drag-region")!;
+    await fireEvent.mouseDown(target, { button: 0, detail: 1, clientX: 550, clientY: 20 });
+    expect(native.startDragging).toHaveBeenCalledOnce();
+    expect(native.setDecorations).toHaveBeenCalledWith(false);
+    expect(ui.container.querySelectorAll(".xiass-window-control")).toHaveLength(3);
+  });
+
+  it("routes Windows window controls to native operations", async () => {
+    document.documentElement.dataset.platform = "windows";
+    const ui = render(WindowDragRegion);
+    const controls = ui.container.querySelectorAll<HTMLButtonElement>(".xiass-window-control");
+    await fireEvent.click(controls[0]);
+    await fireEvent.click(controls[1]);
+    await fireEvent.click(controls[2]);
+    expect(native.minimize).toHaveBeenCalledOnce();
+    expect(native.toggleMaximize).toHaveBeenCalledOnce();
+    expect(native.close).toHaveBeenCalledOnce();
   });
 
   it("toggles maximize only on the stationary second release", async () => {

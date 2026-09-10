@@ -1,5 +1,5 @@
 use crate::core::activity_log;
-use crate::core::app_paths::{app_paths, display_path, ensure_dirs};
+use crate::core::app_paths::{app_paths, codex_home_dir, display_path, ensure_dirs};
 use crate::core::backup;
 use crate::core::chatgpt_desktop;
 use crate::core::credentials;
@@ -838,7 +838,7 @@ fn settings_from_config(config: &AppConfig) -> AppSettings {
 
 fn detect_codex_auth_status() -> Result<CodexAuthStatus, String> {
     let paths = app_paths().map_err(|err| err.to_string())?;
-    let codex_dir = paths.home_dir.join(".codex");
+    let codex_dir = codex_home_dir(&paths.home_dir);
     let config_path = codex_dir.join("config.toml");
     let auth_path = codex_dir.join("auth.json");
     let configured_store = read_codex_credentials_store(&config_path);
@@ -1415,7 +1415,7 @@ fn native_config_path_for_profile(
         return Ok(adapter.target(paths));
     }
     match app.as_str() {
-        "codex" => Ok(paths.home_dir.join(".codex").join("config.toml")),
+        "codex" => Ok(codex_home_dir(&paths.home_dir).join("config.toml")),
         "claude-desktop" => Ok(claude_desktop_paths(paths)?.profile_path),
         _ => Err(format!(
             "Native writes are not implemented for tool '{}'.",

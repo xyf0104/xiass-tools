@@ -7,8 +7,8 @@ pub(in crate::core::profile) fn sync_active_profiles_from_native_configs(
 ) -> Result<bool, String> {
     let mut changed = false;
 
-    let codex_config =
-        fs::read_to_string(paths.home_dir.join(".codex").join("config.toml")).unwrap_or_default();
+    let codex_home = crate::core::app_paths::codex_home_dir(&paths.home_dir);
+    let codex_config = fs::read_to_string(codex_home.join("config.toml")).unwrap_or_default();
     if let Ok(codex_config) = parse_toml_or_empty(&codex_config, "Codex config") {
         let codex_auth = native::codex::read_auth_json(paths).ok();
         changed |= sync_or_import_native_config_profile(

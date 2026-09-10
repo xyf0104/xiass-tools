@@ -1,7 +1,7 @@
 mod enhancement;
 
 use crate::core::activity_log;
-use crate::core::app_paths::{app_paths, display_path, ensure_dirs};
+use crate::core::app_paths::{app_paths, codex_home_dir as resolve_codex_home_dir, display_path, ensure_dirs};
 use crate::core::codex_plugin_marketplace;
 use crate::core::codex_provider_sync;
 use crate::core::computer_use_guard;
@@ -1052,10 +1052,10 @@ pub fn open_path(kind: String) -> Result<(), String> {
             .map(|installed| PathBuf::from(installed.path))
             .unwrap_or(effective_install_root(&settings)?),
         "staging" => staging_dir()?,
-        "config" => app_paths()
-            .map_err(|err| err.to_string())?
-            .home_dir
-            .join(".codex"),
+        "config" => {
+            let paths = app_paths().map_err(|err| err.to_string())?;
+            resolve_codex_home_dir(&paths.home_dir)
+        }
         _ => return Err("Unknown path type.".to_string()),
     };
     open_folder(&target)
@@ -1090,7 +1090,7 @@ fn tool_status_with_detection(
         .map(|item| item.generation)
         .unwrap_or_default();
     let product_name = chatgpt_desktop_product_name(generation);
-    let config_path = app_paths().ok().map(|paths| paths.home_dir.join(".codex"));
+    let config_path = app_paths().ok().map(|paths| resolve_codex_home_dir(&paths.home_dir));
     let status = ToolStatus {
         id: "chatgpt-desktop".to_string(),
         name: product_name.to_string(),
@@ -2914,7 +2914,7 @@ fn start_computer_use_guard_watchdog_if_enabled(settings: &ChatGptDesktopSetting
 
 fn codex_home_dir() -> Result<PathBuf, String> {
     app_paths()
-        .map(|paths| paths.home_dir.join(".codex"))
+        .map(|paths| resolve_codex_home_dir(&paths.home_dir))
         .map_err(|err| format!("Could not locate the Codex home directory: {err}"))
 }
 
@@ -3005,7 +3005,7 @@ fn portable_registration<'a>(
 fn purge_user_data() -> Result<bool, String> {
     let home =
         dirs::home_dir().ok_or_else(|| "Could not locate the user home directory.".to_string())?;
-    let path = home.join(".codex");
+    let path = resolve_codex_home_dir(&home);
     if !path.exists() {
         return Ok(false);
     }

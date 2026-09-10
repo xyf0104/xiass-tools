@@ -490,7 +490,9 @@ test("Claude Desktop uses generic desktop-client copy and the Codex CLI boundary
   assert.match(api, /codexAuth:/);
   assert.match(toolLaunch, /canonical_tool_id as canonical_profile_app/);
   assert.match(toolCatalog, /"codex" \| "codex-cli"/);
-  assert.match(core, /home_dir\.join\("\.codex"\)/);
+  // Codex_HOME may be overridden by the user; the runtime resolver falls
+  // back to home_dir/.codex when it is not set.
+  assert.match(core, /resolve_codex_home_dir/);
   assert.match(core, /CODEX_EXE_NAME: &str = "Codex\.exe"/);
   assert.match(core, /PACKAGE_IDENTITY: &str = "OpenAI\.Codex"/);
 });

@@ -186,13 +186,15 @@ body {
 
 /* Native macOS controls share the app background. The drag area spans the
    entire window and is outside the scrolling workspace, not a sidebar card. */
-:root[data-platform="macos"] {
+:root[data-platform="macos"],
+:root[data-platform="windows"] {
   --xiass-window-drag-height: 36px;
 }
 
 .xiass-window-drag-region { display: none; }
 
-:root[data-platform="macos"] .xiass-window-drag-region {
+:root[data-platform="macos"] .xiass-window-drag-region,
+:root[data-platform="windows"] .xiass-window-drag-region {
   display: block;
   position: fixed;
   inset: 0 0 auto 0;
@@ -204,7 +206,52 @@ body {
   cursor: default;
 }
 
-:root[data-platform="macos"] .cs-app-sidebar {
+:root[data-platform="windows"] .xiass-window-drag-region {
+  z-index: 20;
+}
+
+.xiass-window-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  height: var(--xiass-window-drag-height);
+  align-items: stretch;
+  gap: 2px;
+  padding: 5px 7px 5px 4px;
+  pointer-events: auto;
+}
+
+.xiass-window-control {
+  display: grid;
+  width: 34px;
+  min-width: 34px;
+  height: 26px;
+  min-height: 26px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.xiass-window-control:hover {
+  border-color: var(--glass-control-border);
+  background: var(--glass-control-hover);
+  color: var(--text);
+}
+
+.xiass-window-control--close:hover {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.16);
+  color: var(--danger);
+}
+
+:root[data-platform="macos"] .cs-app-sidebar,
+:root[data-platform="windows"] .cs-app-sidebar {
   height: 100vh;
   margin: 0;
   border: 0;
@@ -215,7 +262,8 @@ body {
   box-shadow: none;
 }
 
-:root[data-platform="macos"] .cs-app-workspace {
+:root[data-platform="macos"] .cs-app-workspace,
+:root[data-platform="windows"] .cs-app-workspace {
   /* The scroll viewport itself starts below the hit area, so scrolled
      buttons, inputs and terminal tabs never end up underneath it. */
   margin-top: var(--xiass-window-drag-height);
@@ -223,7 +271,8 @@ body {
 }
 
 @media (max-width: 900px) {
-  :root[data-platform="macos"] .cs-app-sidebar {
+  :root[data-platform="macos"] .cs-app-sidebar,
+  :root[data-platform="windows"] .cs-app-sidebar {
     padding-left: 8px;
     padding-right: 8px;
   }
