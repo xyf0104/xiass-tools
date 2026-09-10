@@ -15,6 +15,7 @@ pub fn switch_active_profile(
     request: SwitchActiveProfileRequest,
 ) -> Result<ProfileSummary, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let profile_id = normalize_token("Profile ID", &request.profile_id)?;
     let profiles = load_profiles()?;
@@ -30,6 +31,9 @@ pub fn switch_active_profile(
         );
     }
 
+    if is_codex_family_app(&profile.app) {
+        checkpoint_active_codex_account(&app_paths().map_err(|err| err.to_string())?)?;
+    }
     let mut config = read_app_config()?;
     activate_profile_for_tool(&mut config, profile, &profiles);
     write_app_config(&config)?;
@@ -68,6 +72,7 @@ pub fn save_profile_draft(request: SaveProfileDraftRequest) -> Result<ProfileDra
         )?;
     let web_search = normalize_codex_web_search(&plan.app, request.web_search.as_deref())?;
     ensure_profile_tool_installed(&plan.app)?;
+    let _guard = profile_write_lock()?;
     let now = Utc::now().to_rfc3339();
     let sort_order = storage::next_profile_sort_order(&plan.app, &plan.mode)?;
     let draft = ProfileDraft {
@@ -96,7 +101,7 @@ pub fn save_profile_draft(request: SaveProfileDraftRequest) -> Result<ProfileDra
         sort_order,
     };
 
-    capture_codex_oauth_profile_if_needed(&draft)?;
+    capture_codex_oauth_profile_if_needed(&draft, request.codex_account.as_ref())?;
     storage::save_profile(&draft)?;
     if let (Some(auth_ref), Some(api_key)) = (draft.auth_ref.as_deref(), request.api_key.as_deref())
     {
@@ -125,6 +130,7 @@ pub fn save_profile_draft(request: SaveProfileDraftRequest) -> Result<ProfileDra
 
 pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<ProfileDraft, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let profile_id = normalize_token("Profile ID", &request.profile_id)?;
     if is_builtin_profile_id(&profile_id) {
@@ -212,6 +218,21 @@ pub fn update_profile_draft(request: UpdateProfileDraftRequest) -> Result<Profil
         sort_order: existing.sort_order,
     };
 
+    if is_codex_family_app(&existing.app) {
+        checkpoint_active_codex_account(&app_paths().map_err(|err| err.to_string())?)?;
+    }
+    if is_custom_codex_oauth_profile(&existing) && !is_custom_codex_oauth_profile(&updated) {
+        // Do not retain an OAuth snapshot after a profile is changed to an
+        // API-key or gateway profile. It must not silently return if the user
+        // later edits the profile back to official mode.
+        delete_codex_oauth_profile_cache_if_needed(&existing)?;
+    }
+    // A regular edit preserves this profile's own credentials. Only an
+    // explicitly selected replacement can change the saved account.
+    if request.codex_account.is_some() || (is_custom_codex_oauth_profile(&updated)
+        && storage::load_codex_oauth_profile(&updated.id)?.is_none()) {
+        capture_codex_oauth_profile_if_needed(&updated, request.codex_account.as_ref())?;
+    }
     storage::save_profile(&updated)?;
     if let (Some(auth_ref), Some(api_key)) = (updated.auth_ref.as_deref(), api_key) {
         credentials::store_keychain_secret(auth_ref, api_key)?;
@@ -242,6 +263,7 @@ pub fn duplicate_profile_draft(
     request: DuplicateProfileDraftRequest,
 ) -> Result<ProfileDraft, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let source_id = normalize_token("Profile ID", &request.profile_id)?;
     let source = load_profile_by_id(&source_id)?;
@@ -249,6 +271,9 @@ pub fn duplicate_profile_draft(
         return Err("Built-in official profiles cannot be duplicated.".to_string());
     }
     ensure_profile_tool_installed(&canonical_profile_app(&source.app))?;
+    if is_codex_family_app(&source.app) {
+        checkpoint_active_codex_account(&app_paths().map_err(|err| err.to_string())?)?;
+    }
     let new_id = unique_profile_id(&slugify(&source.name))?;
     let now = Utc::now().to_rfc3339();
     let app = canonical_profile_app(&source.app);
@@ -313,6 +338,7 @@ pub fn duplicate_profile_draft(
 
 pub fn delete_profile_draft(request: DeleteProfileDraftRequest) -> Result<ProfileSummary, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let profile_id = normalize_token("Profile ID", &request.profile_id)?;
     if is_builtin_profile_id(&profile_id) {
@@ -352,6 +378,7 @@ pub fn reorder_profile_drafts(
     request: ReorderProfileDraftsRequest,
 ) -> Result<ProfileSummary, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let app = canonical_profile_app(&normalize_token("Tool", &request.app)?);
     let mode = request.mode;
@@ -519,9 +546,17 @@ pub fn preview_profile_write(
     items.push(ProfileWritePreviewItem {
         label: "Credential".to_string(),
         path: None,
-        action: plan.secret_status.to_string(),
+        action: if request.codex_account.is_some() && is_codex_family_app(&plan.app) {
+            "staged_local_auth".to_string()
+        } else {
+            plan.secret_status.to_string()
+        },
         backup_required: false,
-        detail: credential_detail(&plan.provider, request.secret_provided),
+        detail: if request.codex_account.is_some() && is_codex_family_app(&plan.app) {
+            "Saving stores the selected account in the local credential database. Applying writes auth.json after backing up changed files; raw tokens are not shown in this preview.".to_string()
+        } else {
+            credential_detail(&plan.provider, request.secret_provided)
+        },
         content: None,
     });
 
@@ -600,6 +635,13 @@ pub fn preview_profile_apply(
         .as_ref()
         .map(|diff| diff.write_enabled)
         .unwrap_or(false);
+    let auth_write_enabled = if is_codex_tool {
+        build_native_apply_plan(&profile, &paths, &profile.mode, false)?
+            .iter()
+            .any(|plan| matches!(plan.kind, NativeConfigWriteKind::CodexAuthJson))
+    } else {
+        false
+    };
     let mode_previews =
         build_provider_mode_previews(&profile, &config_native_diff, &gateway_native_diff);
     let mut warnings = Vec::new();
@@ -649,11 +691,20 @@ pub fn preview_profile_apply(
             },
             ProfileApplyPreviewItem {
                 label: "Credential".to_string(),
-                path: None,
-                action: "not_written".to_string(),
-                backup_required: false,
-                detail: "Apply writes no API keys or tokens. Existing official login/keychain state remains untouched."
-                    .to_string(),
+                path: auth_write_enabled.then(|| display_path(&native::codex::auth_json_path(&paths))),
+                action: if auth_write_enabled {
+                    "create_or_update".to_string()
+                } else {
+                    "not_written".to_string()
+                },
+                backup_required: auth_write_enabled,
+                detail: if auth_write_enabled && is_custom_codex_oauth_profile(&profile) {
+                    "codexAccount.applyDetail".to_string()
+                } else if auth_write_enabled {
+                    "codexAccount.nativeCredentialDetail".to_string()
+                } else {
+                    "Client adapters may write existing credentials from local storage to native configuration. This does not issue new keys or tokens.".to_string()
+                },
             },
         ],
         native_diff,
@@ -890,6 +941,7 @@ fn native_config_change_writes(change: &NativeConfigDiffLine) -> bool {
 
 pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let profile_id = normalize_token("Profile ID", &request.profile_id)?;
     let profiles = load_profiles()?;
@@ -909,17 +961,19 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
         ));
     }
     let paths = app_paths().map_err(|err| err.to_string())?;
+    if is_codex_tool { checkpoint_active_codex_account(&paths)?; }
     let mode = profile.mode;
     if request.restart_after_apply && mode != ProviderApplyMode::Config {
         return Err("Apply and restart is only available for Config profiles.".to_string());
     }
-    let native_plans = filter_native_write_plans(build_native_apply_plan(
+    let all_native_plans = build_native_apply_plan(
         &profile,
         &paths,
         &mode,
         request.sync_claude_vs_code,
-    )?)?;
-    if request.restart_after_apply && native_plans.is_empty() {
+    )?;
+    let native_plans = filter_native_write_plans(all_native_plans.clone())?;
+    if request.restart_after_apply && all_native_plans.is_empty() {
         return Err(
             "Apply and restart requires a native client config write for this profile.".to_string(),
         );
@@ -940,20 +994,20 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
     // Write native tool configs before flipping the active pointer so a concurrent
     // summary load cannot observe "new active + old on-disk config" and import a
     // ghost draft from the previous disk state.
-    let native_verified = if native_plans.is_empty() {
+    let native_verified = if all_native_plans.is_empty() {
         false
     } else {
         for plan in &native_plans {
             apply_native_config_write_plan(plan)?;
         }
-        native_plans
+        all_native_plans
             .iter()
             .map(|plan| verify_native_config_write(plan, &profile, &mode))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .all(|verified| verified)
     };
-    if !native_plans.is_empty() && !native_verified {
+    if !all_native_plans.is_empty() && !native_verified {
         return Err("Native configuration did not pass verification; the active profile was not changed.".to_string());
     }
     activate_profile_for_tool(&mut config, &profile, &profiles);

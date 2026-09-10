@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
+  import CodexAccountPanel from "../components/CodexAccountPanel.svelte";
+  import { codexAccountErrorKey, discardCodexAccountSession, selectedCodexAccount, type CodexAccountSession } from "../lib/codexAccounts";
   import {
     applyProfile,
     clearClaudeEnvironmentVariables,
@@ -141,6 +144,17 @@
   let pendingEdit: ProfileDraft | null = null;
   let editForm: EditProfileForm = emptyEditForm();
   let editingId: string | null = null;
+  let editAccountSession: CodexAccountSession | null = null;
+  let editAccountIndex = 0;
+  let editAccountBusy = false;
+  let editAccountMode: "oauth" | "json" = "oauth";
+  function clearEditAccount() {
+    if (editAccountSession) void discardCodexAccountSession(editAccountSession.id).catch(() => {});
+    editAccountSession = null;
+    editAccountIndex = 0;
+    editAccountBusy = false;
+  }
+  onDestroy(clearEditAccount);
   let editModelOptions: ProfileModelOption[] = [];
   let editModelLoading = false;
   let editModelError: string | null = null;
@@ -376,6 +390,7 @@
     (!providerRequiresApiKey(editProvider) || Boolean(pendingEdit?.authRef) || editForm.apiKey.trim().length > 0) &&
     editModelMappingsValid &&
     editCodexContextValid &&
+    !editAccountBusy &&
     !pendingEdit?.isBuiltin &&
     editingId === null;
   $: canFetchEditModels =
@@ -477,6 +492,8 @@
       return;
     }
     pendingEdit = profile;
+    clearEditAccount();
+    editAccountMode = "oauth";
     editError = null;
     resetEditModels();
     const nextForm = {
@@ -507,6 +524,7 @@
       return;
     }
     pendingEdit = null;
+    clearEditAccount();
     editError = null;
     resetEditModels();
     editForm = emptyEditForm();
@@ -589,6 +607,7 @@
 
     try {
       const request = {
+        codexAccount: editOfficial ? selectedCodexAccount(editAccountSession, editAccountIndex) : null,
         name: editForm.name,
         icon: normalizedProfileIcon(editForm.icon),
         remark: editForm.remark,
@@ -610,6 +629,7 @@
         : await updateProfileDraft({ ...request, profileId: pendingEdit.id });
       await onProfileSwitched(updated);
       pendingEdit = null;
+      clearEditAccount();
       editForm = emptyEditForm();
     } catch (err) {
       editError = errorLabel(err instanceof Error ? err.message : String(err));
@@ -962,6 +982,7 @@
   }
 
   function previewTextLabel(message: string) {
+    if (message === "codexAccount.applyDetail" || message === "codexAccount.nativeCredentialDetail") return $t(message);
     const exact: Partial<Record<string, TranslationKey>> = {
       "Config file mode needs a stored Provider API key for this Provider.": "profiles.warning.configNeedsStoredKey",
       "Config profiles need a stored Provider API key for this Provider.": "profiles.warning.configNeedsStoredKey",
@@ -1141,6 +1162,7 @@
   }
 
   function errorLabel(message: string) {
+    if (message.startsWith("codexAccount.")) return $t(codexAccountErrorKey(message));
     if (message === "Codex uses API Key / config file mode in XIASS Tools and cannot use Local Gateway mode.") {
       return $t("wizard.error.codexConfigOnly");
     }
@@ -1511,6 +1533,22 @@
           </div>
         </div>
 
+        {#if editOfficial && editSupportsReviewModel}
+          <div class={profileIconActionsRecipe()} role="group" aria-label={$t("codexAccount.title")}>
+            <button class={actionButtonRecipe()} type="button" aria-pressed={editAccountMode === "oauth"} disabled={editingId !== null || editAccountBusy}
+              on:click={() => { if (editAccountMode !== "oauth") { clearEditAccount(); editAccountMode = "oauth"; } }}>
+              <AppIcon name="user" size={16} />{$t("codexAccount.oauthTitle")}
+            </button>
+            <button class={actionButtonRecipe()} type="button" aria-pressed={editAccountMode === "json"} disabled={editingId !== null || editAccountBusy}
+              on:click={() => { if (editAccountMode !== "json") { clearEditAccount(); editAccountMode = "json"; } }}>
+              <AppIcon name="upload" size={16} />{$t("codexAccount.importTitle")}
+            </button>
+          </div>
+          {#key editAccountMode}
+            <CodexAccountPanel mode={editAccountMode} replacing bind:session={editAccountSession}
+              bind:accountIndex={editAccountIndex} bind:busy={editAccountBusy} disabled={editingId !== null} />
+          {/key}
+        {/if}
         <div class={profileFormGridRecipe({ columns: "double" })}>
           <label>
             {$t("wizard.profileName")}

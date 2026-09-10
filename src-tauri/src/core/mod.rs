@@ -7,6 +7,7 @@ pub mod chatgpt_desktop;
 pub mod claude_desktop_patch;
 pub mod claude_desktop_release;
 pub mod codex_plugin_marketplace;
+pub mod codex_accounts;
 pub mod codex_provider_sync;
 pub mod computer_use_guard;
 pub mod credentials;

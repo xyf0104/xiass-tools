@@ -65,6 +65,11 @@ pub fn run() {
             commands::macos_app_scope::load_macos_application_scope_status,
             commands::macos_app_scope::take_codestudio_self_cleanup_failure,
             commands::profiles::apply_profile,
+            commands::profiles::import_codex_account_json,
+            commands::profiles::import_local_codex_account,
+            commands::profiles::start_codex_account_login,
+            commands::profiles::poll_codex_account_session,
+            commands::profiles::discard_codex_account_session,
             commands::profiles::clear_environment_variables,
             commands::profiles::delete_profile_draft,
             commands::profiles::duplicate_profile_draft,
@@ -147,6 +152,9 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("failed to build XIASS Tools")
         .run(|_app, _event| {
+            if matches!(_event, tauri::RunEvent::Exit) {
+                crate::core::codex_accounts::cancel_all();
+            }
             // macOS Dock clicks go through Reopen, not the single-instance callback.
             #[cfg(target_os = "macos")]
             if matches!(_event, tauri::RunEvent::Reopen { .. }) {

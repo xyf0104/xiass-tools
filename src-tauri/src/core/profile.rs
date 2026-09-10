@@ -3,6 +3,7 @@ use crate::core::app_paths::{app_paths, codex_home_dir, display_path, ensure_dir
 use crate::core::backup;
 use crate::core::chatgpt_desktop;
 use crate::core::credentials;
+use crate::core::codex_accounts;
 use crate::core::detector;
 use crate::core::env_health;
 use crate::core::gateway;
@@ -31,7 +32,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
 use url::Url;
@@ -380,7 +380,16 @@ struct LoadProfileSummaryOptions {
     sync_native: bool,
 }
 
+// A profile's credential file, config file and active pointer are one logical
+// operation. Native reconciliation must not observe a half-switched account.
+static PROFILE_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn profile_write_lock() -> Result<std::sync::MutexGuard<'static, ()>, String> {
+    PROFILE_WRITE_LOCK.lock().map_err(|_| "Profile write state is unavailable.".into())
+}
+
 pub fn load_profile_summary() -> Result<ProfileSummary, String> {
+    let _guard = profile_write_lock()?;
     load_profile_summary_with_options(LoadProfileSummaryOptions { sync_native: true })
 }
 
@@ -397,6 +406,7 @@ fn load_profile_summary_with_options(
     let mut drafts = load_profiles()?;
     let mut active_profiles_changed = clean_active_profiles(&mut config, &drafts);
     if options.sync_native {
+        checkpoint_active_codex_account(&paths)?;
         active_profiles_changed |=
             sync_active_profiles_from_native_configs(&mut config, &mut drafts, &paths)?;
     }
@@ -437,19 +447,9 @@ pub fn codex_auth_status() -> CodexAuthStatus {
 }
 
 pub fn start_codex_oauth_login() -> Result<StartCodexOAuthLoginResult, String> {
-    let codex = resolve_command("codex")
-        .ok_or_else(|| "Codex CLI is not installed or is not on PATH.".to_string())?;
-    let mut command = hidden_command_with_args(&codex, &["login"]);
-    command
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|err| format!("Failed to start Codex official login: {err}"))?;
-    Ok(StartCodexOAuthLoginResult {
-        started: true,
-        command: Some(format!("{codex} login")),
-        message: "Codex official login started. Complete the browser authorization, then return to CodeStudio Lite.".to_string(),
-    })
+    // Legacy RPC has no session handle, so starting an isolated login here
+    // would create credentials that no caller could save or cancel.
+    Err("codexAccount.useAccountPanel".into())
 }
 
 pub fn update_app_settings(request: UpdateAppSettingsRequest) -> Result<AppSettings, String> {
@@ -498,10 +498,12 @@ fn apply_active_native_configs(
     backup_reason: &str,
 ) -> Result<usize, String> {
     ensure_app_dirs()?;
+    let _guard = profile_write_lock()?;
 
     let paths = app_paths().map_err(|err| err.to_string())?;
     let profiles = load_profiles()?;
     let mut config = read_app_config()?;
+    checkpoint_active_codex_account(&paths)?;
     if clean_active_profiles(&mut config, &profiles) {
         write_app_config(&config)?;
     }
@@ -884,9 +886,14 @@ fn is_custom_codex_oauth_profile(profile: &ProfileDraft) -> bool {
         && profile.mode == ProviderApplyMode::Config
 }
 
-fn capture_codex_oauth_profile_if_needed(profile: &ProfileDraft) -> Result<(), String> {
+fn capture_codex_oauth_profile_if_needed(profile: &ProfileDraft, selection: Option<&codex_accounts::AccountSelection>) -> Result<(), String> {
     if !is_custom_codex_oauth_profile(profile) {
+        if selection.is_some() { return Err("codexAccount.officialOnly".into()); }
         return Ok(());
+    }
+    if let Some(selection) = selection {
+        let content = codex_accounts::selected_content(selection)?;
+        return storage::save_codex_oauth_profile(&profile.id, &content);
     }
     let paths = app_paths().map_err(|err| err.to_string())?;
     let source_path = native::codex::auth_json_path(&paths);
@@ -896,16 +903,20 @@ fn capture_codex_oauth_profile_if_needed(profile: &ProfileDraft) -> Result<(), S
             display_path(&source_path)
         )
     })?;
-    let status = codex_auth_status_from_file_content(&source_path, "file", &content);
-    if !matches!(
-        status.method,
-        CodexAuthMethod::ChatGpt | CodexAuthMethod::AccessToken
-    ) {
-        return Err(
-            "Codex OAuth authorization is required before saving this profile.".to_string(),
-        );
+    let value = serde_json::from_str(&content).map_err(|_| "codexAccount.invalidJson")?;
+    let account = codex_accounts::normalize_account(&value)?;
+    storage::save_codex_oauth_profile(&profile.id, &account.content)?;
+    Ok(())
+}
+
+fn checkpoint_active_codex_account(paths: &crate::core::app_paths::AppPaths) -> Result<(), String> {
+    let config = read_app_config()?;
+    let Some(id) = config.active_profiles_by_mode.config.get("codex") else { return Ok(()); };
+    let Some(saved) = storage::load_codex_oauth_profile(id)? else { return Ok(()); };
+    let Ok(live) = native::codex::read_auth_json(paths) else { return Ok(()); };
+    if let Some(content) = codex_accounts::refreshed_account_content(&saved, &live) {
+        storage::save_codex_oauth_profile(id, &content)?;
     }
-    storage::save_codex_oauth_profile(&profile.id, &content)?;
     Ok(())
 }
 
@@ -1075,7 +1086,10 @@ fn infer_codex_auth_method(value: &serde_json::Value) -> CodexAuthMethod {
         };
     }
     if auth_mode.eq_ignore_ascii_case("chatgpt") {
-        return CodexAuthMethod::ChatGpt;
+        return if ["id_token", "access_token"].iter().all(|key| {
+            value.get("tokens").and_then(|tokens| tokens.get(key))
+                .and_then(serde_json::Value::as_str).is_some_and(|token| !token.trim().is_empty())
+        }) { CodexAuthMethod::ChatGpt } else { CodexAuthMethod::None };
     }
     if auth_mode.eq_ignore_ascii_case("access_token") {
         return CodexAuthMethod::AccessToken;

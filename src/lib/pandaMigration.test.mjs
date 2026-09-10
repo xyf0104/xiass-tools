@@ -817,7 +817,7 @@ test("Setup Wizard route surfaces use Panda recipes", () => {
   assert.match(route, /wizardModeChoiceRecipe/);
   assert.match(route, /wizardFormGridRecipe/);
   assert.match(route, /wizardInlineNoticeRecipe/);
-  assert.match(route, /wizardCodexAuthCardRecipe/);
+  assert.match(read("src/components/CodexAccountPanel.svelte"), /wizardCodexAuthCardRecipe/);
   assert.match(route, /wizardSecurityNoteRecipe/);
   assert.match(route, /wizardPreviewBoxRecipe/);
   assert.match(route, /wizardPreviewHeadingRecipe/);
@@ -829,7 +829,8 @@ test("Setup Wizard route surfaces use Panda recipes", () => {
   assert.match(route, /data-step-state=\{index === currentStep \? "active" : index < currentStep \? "done" : "idle"\}/);
   assert.match(route, /data-selected=\{selectedTool === tool\.id\}/);
   assert.match(route, /data-selected=\{profileMode === "config"\}/);
-  assert.match(route, /data-selected=\{codexOAuthConfig\}/);
+  assert.match(read("src/components/CodexAccountPanel.svelte"), /mode === "oauth"/);
+  assert.match(route, /codexOAuthConfig && codexAccountSource === "oauth"/);
 
   assert.doesNotMatch(route, /class="route-stack wizard-route"/);
   assert.doesNotMatch(route, /class="wizard-actions"/);

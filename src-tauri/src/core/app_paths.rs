@@ -39,6 +39,17 @@ pub fn codex_home_dir(home_dir: &Path) -> PathBuf {
 pub fn ensure_dirs(paths: &AppPaths) -> io::Result<()> {
     std::fs::create_dir_all(&paths.config_dir)?;
     std::fs::create_dir_all(&paths.downloads_dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // The SQLite database contains protected OAuth snapshots. Keep the
+        // app state directory and database private to the current user.
+        std::fs::set_permissions(&paths.config_dir, std::fs::Permissions::from_mode(0o700))?;
+        std::fs::set_permissions(&paths.downloads_dir, std::fs::Permissions::from_mode(0o700))?;
+        if paths.database_file.exists() {
+            std::fs::set_permissions(&paths.database_file, std::fs::Permissions::from_mode(0o600))?;
+        }
+    }
     Ok(())
 }
 

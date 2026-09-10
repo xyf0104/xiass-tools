@@ -584,7 +584,12 @@ pub(in crate::core::profile) fn config_matches_profile_with_auth(
         return false;
     }
     if provider_is_official(&profile.provider) {
-        return official_config_matches_profile(value, profile);
+        if !official_config_matches_profile(value, profile) { return false; }
+        if !is_custom_codex_oauth_profile(profile) { return true; }
+        return storage::load_codex_oauth_profile(&profile.id).ok().flatten()
+            .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
+            .zip(auth)
+            .is_some_and(|(saved, live)| codex_accounts::same_account(&saved, live));
     }
     let Some(provider_id) = active_provider_id_for_profile(value, profile) else {
         return false;

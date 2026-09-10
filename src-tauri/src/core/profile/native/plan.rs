@@ -70,7 +70,11 @@ pub(in crate::core::profile) fn apply_native_config_write_plan(
         };
     }
 
-    write_native_config(&plan.path, &plan.content)
+    write_native_config_with_privacy(
+        &plan.path,
+        &plan.content,
+        matches!(plan.kind, NativeConfigWriteKind::CodexAuthJson),
+    )
 }
 
 pub(in crate::core::profile) fn filter_native_write_plans(
@@ -97,21 +101,39 @@ fn native_write_plan_changes_file(plan: &NativeConfigWritePlan) -> Result<bool, 
     Ok(current != plan.content.as_bytes())
 }
 
+#[cfg(test)]
 pub(crate) fn write_native_config(path: &Path, content: &str) -> Result<(), String> {
+    write_native_config_with_privacy(path, content, false)
+}
+
+fn write_native_config_with_privacy(path: &Path, content: &str, private: bool) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
     }
-    write_atomic(path, content.as_bytes())
+    write_atomic(path, content.as_bytes(), private)
 }
 
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+fn write_atomic(path: &Path, bytes: &[u8], private: bool) -> Result<(), String> {
     let tmp_path = path.with_extension("tmp");
     {
         let mut file = fs::File::create(&tmp_path).map_err(|err| err.to_string())?;
+        #[cfg(unix)]
+        if private {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600))
+                .map_err(|err| err.to_string())?;
+        }
         file.write_all(bytes).map_err(|err| err.to_string())?;
         file.sync_all().map_err(|err| err.to_string())?;
     }
-    fs::rename(&tmp_path, path).map_err(|err| err.to_string())
+    fs::rename(&tmp_path, path).map_err(|err| err.to_string())?;
+    #[cfg(unix)]
+    if private {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+            .map_err(|err| err.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

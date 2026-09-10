@@ -8,6 +8,37 @@ use crate::core::types::{
     TestProfileConnectionResult, UpdateProfileDraftRequest,
 };
 use crate::core::{env_health, profile};
+use crate::core::codex_accounts::{self, AccountSession};
+
+#[tauri::command]
+pub async fn import_codex_account_json(content: String) -> Result<AccountSession, String> {
+    tauri::async_runtime::spawn_blocking(move || codex_accounts::import_json(content))
+        .await.map_err(|_| "codexAccount.unavailable")?
+}
+
+#[tauri::command]
+pub async fn import_local_codex_account() -> Result<AccountSession, String> {
+    tauri::async_runtime::spawn_blocking(codex_accounts::import_local)
+        .await.map_err(|_| "codexAccount.unavailable")?
+}
+
+#[tauri::command]
+pub async fn start_codex_account_login() -> Result<AccountSession, String> {
+    tauri::async_runtime::spawn_blocking(codex_accounts::start_login)
+        .await.map_err(|_| "codexAccount.unavailable")?
+}
+
+#[tauri::command]
+pub async fn poll_codex_account_session(id: String) -> Result<AccountSession, String> {
+    tauri::async_runtime::spawn_blocking(move || codex_accounts::poll_session(id))
+        .await.map_err(|_| "codexAccount.unavailable")?
+}
+
+#[tauri::command]
+pub async fn discard_codex_account_session(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || codex_accounts::discard_session(id))
+        .await.map_err(|_| "codexAccount.unavailable")?
+}
 
 #[tauri::command]
 pub async fn load_profile_summary() -> Result<ProfileSummary, String> {

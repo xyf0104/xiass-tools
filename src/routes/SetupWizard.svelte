@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
+  import CodexAccountPanel from "../components/CodexAccountPanel.svelte";
+  import { codexAccountErrorKey, discardCodexAccountSession, selectedCodexAccount, type CodexAccountSession } from "../lib/codexAccounts";
   import { cubicOut } from "svelte/easing";
   import { fade, fly } from "svelte/transition";
-  import { detectEnvironment, listProfileModels, openExternalUrl, previewProfileWrite, saveProfileDraft, startCodexOAuthLogin } from "../lib/api";
+  import { listProfileModels, previewProfileWrite, saveProfileDraft } from "../lib/api";
   import { t, type TranslationKey } from "../lib/i18n";
   import { profileNameErrorKey, profileProviderFromName, XIASS_API_PRESET } from "../lib/profiles/xiass";
   import {
@@ -28,7 +31,6 @@
     wizardButtonRowRecipe,
     wizardChoiceButtonRecipe,
     wizardChoiceGridRecipe,
-    wizardCodexAuthCardRecipe,
     wizardFieldErrorRecipe,
     wizardFormGridRecipe,
     wizardInlineNoticeRecipe,
@@ -64,7 +66,6 @@
     WizardPrefill
   } from "../types";
 
-  const CODEX_AUTH_URL = "https://developers.openai.com/codex/auth";
   const wizardStepEnter = { y: 14, duration: 240, opacity: 0, easing: cubicOut };
   const wizardStepExit = { duration: 110 };
   const modelPickerClass = css({
@@ -236,10 +237,21 @@
   let writePreview: PreviewProfileWriteResult | null = null;
   let writePreviewKey: string | null = null;
   let codexOAuthConfig = false;
-  let codexAuthChecking = false;
-  let codexAuthError: string | null = null;
-  let codexAuthMessage: string | null = null;
-  let localCodexAuth = snapshot?.codexAuth ?? null;
+  let apiProfileName: string = XIASS_API_PRESET.name;
+  let accountProfileName: string | null = null;
+  let accountModel = "";
+  let accountReviewModel = "";
+  let codexAccountSource: "oauth" | "json" = "oauth";
+  let codexAccountSession: CodexAccountSession | null = null;
+  let codexAccountIndex = 0;
+  let codexAccountBusy = false;
+  function clearCodexSelection() {
+    if (codexAccountSession) void discardCodexAccountSession(codexAccountSession.id).catch(() => {});
+    codexAccountSession = null;
+    codexAccountIndex = 0;
+    codexAccountBusy = false;
+  }
+  onDestroy(clearCodexSelection);
 
   $: if (prefill && appliedPrefillKey !== prefillKey(prefill)) {
     if (prefill.toolId) {
@@ -252,9 +264,6 @@
     if (prefill.lockTool && prefill.toolId) currentStep = 1;
   }
 
-  $: if (snapshot?.codexAuth) {
-    localCodexAuth = snapshot.codexAuth;
-  }
   $: selectedToolInstalled = toolCanCreateProfile(selectedTool);
   $: visibleToolDefaults = toolDefaults.filter((tool) => toolVisibleInSnapshot(tool.id));
   $: canUseCodexOAuthConfig = canonicalProfileToolId(selectedTool) === "codex" && profileMode === "config";
@@ -264,9 +273,9 @@
   $: activeProvider = profileProviderFromName(profileName, codexOAuthConfig);
   $: nameErrorKey = profileNameErrorKey(profileName, codexOAuthConfig);
   $: activeProtocol = codexOAuthConfig ? "openai-responses" : protocol;
-  $: activeModel = codexOAuthConfig ? "" : model;
+  $: activeModel = codexOAuthConfig ? accountModel : model;
   $: supportsReviewModel = canonicalProfileToolId(selectedTool) === "codex";
-  $: activeReviewModel = supportsReviewModel ? reviewModel.trim() || null : null;
+  $: activeReviewModel = supportsReviewModel ? (codexOAuthConfig ? accountReviewModel : reviewModel).trim() || null : null;
   $: activeModelMappings = codexOAuthConfig ? [] : modelMappingsForRequest(selectedTool, modelMappings);
   $: activeBaseUrl = codexOAuthConfig ? "" : baseUrl;
   $: activeApiKey = codexOAuthConfig ? "" : apiKey;
@@ -275,7 +284,8 @@
       && Number.isInteger(modelAutoCompactTokenLimit) && modelAutoCompactTokenLimit >= 16000
       && modelAutoCompactTokenLimit < modelContextWindow);
   $: activeSecretProvided = !codexOAuthConfig && apiKey.trim().length > 0;
-  $: codexOAuthAuthorized = codexAuthIsOAuth(localCodexAuth);
+  $: codexAccountSelection = selectedCodexAccount(codexAccountSession, codexAccountIndex);
+  $: codexOAuthAuthorized = Boolean(codexAccountSelection) && !codexAccountBusy;
   $: availableProtocolOptions = protocolOptionsFor(selectedTool, profileMode);
   $: if (
     availableProtocolOptions.length > 0 &&
@@ -318,7 +328,7 @@
     imageModel.trim(),
     String(modelContextWindow),
     String(modelAutoCompactTokenLimit),
-    codexOAuthConfig ? "codex-oauth" : "api"
+    codexOAuthConfig ? `codex-account:${codexAccountSelection?.sessionId}:${codexAccountIndex}` : "api"
   ].join("|");
   $: baseUrlErrorKey = providerNeedsBaseUrl(activeProvider) ? baseUrlValidationErrorKey(activeBaseUrl) : null;
   $: visibleBaseUrlErrorKey =
@@ -421,26 +431,41 @@
     contextMode = "372000";
     modelMappings = [];
     codexOAuthConfig = false;
-    codexAuthError = null;
-    codexAuthMessage = null;
+    apiProfileName = profileName;
+    accountProfileName = null;
+    accountModel = "";
+    accountReviewModel = "";
+    clearCodexSelection();
     resetModelOptions();
     resetDraftState();
   }
 
-  function selectCodexOAuthConfig(nextValue: boolean) {
-    codexOAuthConfig = nextValue;
-    if (nextValue) {
-      apiKey = "";
-      baseUrl = "";
-      model = "";
-      modelMappings = [];
-      protocol = "openai-responses";
+  function selectCodexOAuthConfig(nextValue: boolean, source: "oauth" | "json" = "oauth") {
+    if (saving || codexAccountBusy) return;
+    if (nextValue !== codexOAuthConfig) {
+      if (nextValue) {
+        apiProfileName = profileName;
+        profileName = accountProfileName ?? $t("codexAccount.defaultName");
+      } else {
+        accountProfileName = profileName;
+        profileName = apiProfileName;
+      }
     }
+    if (nextValue !== codexOAuthConfig || source !== codexAccountSource) clearCodexSelection();
+    codexOAuthConfig = nextValue;
+    codexAccountSource = source;
     writePreview = null;
     writePreviewKey = null;
     previewError = null;
     saveError = null;
     resetModelOptions();
+  }
+
+  function goBack() {
+    if (saving) return;
+    if (codexAccountBusy) clearCodexSelection();
+    if (currentStep > firstStep) currentStep -= 1;
+    else onCancel();
   }
 
   function applyContextPreset(value: string) {
@@ -474,10 +499,6 @@
   function selectedToolLabel(toolId: string) {
     const canonicalToolId = canonicalProfileToolId(toolId);
     return toolDefaults.find((tool) => tool.id === canonicalToolId)?.label ?? canonicalToolId;
-  }
-
-  function codexAuthIsOAuth(auth: DetectionSnapshot["codexAuth"] | null | undefined) {
-    return Boolean(auth?.available) && (auth?.method === "chat_gpt" || auth?.method === "access_token");
   }
 
   function protocolOptionsFor(toolId: string, mode: ProviderApplyMode): readonly ProtocolOption[] {
@@ -569,6 +590,7 @@
 
   function buildProfileDraftRequest(): SaveProfileDraftRequest {
     return {
+      codexAccount: codexOAuthConfig ? codexAccountSelection : null,
       name: profileName,
       icon: null,
       remark: profileRemark,
@@ -679,44 +701,8 @@
     }
   }
 
-  async function startCodexAuthorization() {
-    codexAuthChecking = true;
-    codexAuthError = null;
-    codexAuthMessage = null;
-    try {
-      const result = await startCodexOAuthLogin();
-      codexAuthMessage = result.message || $t("wizard.codexOAuth.loginStarted");
-    } catch (err) {
-      codexAuthError = errorLabel(err instanceof Error ? err.message : String(err));
-      try {
-        await openExternalUrl(CODEX_AUTH_URL);
-        codexAuthMessage = $t("wizard.codexOAuth.loginFallbackOpened");
-      } catch (openErr) {
-        codexAuthError = errorLabel(openErr instanceof Error ? openErr.message : String(openErr));
-      }
-    } finally {
-      codexAuthChecking = false;
-    }
-  }
-
-  async function refreshCodexAuthStatus() {
-    codexAuthChecking = true;
-    codexAuthError = null;
-    codexAuthMessage = null;
-    try {
-      const nextSnapshot = await detectEnvironment();
-      localCodexAuth = nextSnapshot.codexAuth;
-      codexAuthMessage = codexAuthIsOAuth(nextSnapshot.codexAuth)
-        ? $t("wizard.codexOAuth.authDetected")
-        : $t("wizard.codexOAuth.authStillMissing");
-    } catch (err) {
-      codexAuthError = errorLabel(err instanceof Error ? err.message : String(err));
-    } finally {
-      codexAuthChecking = false;
-    }
-  }
-
   function actionLabel(action: string) {
+    if (action === "staged_local_auth") return $t("common.save");
     if (action === "create") {
       return $t("common.create");
     }
@@ -807,7 +793,7 @@
       );
     }
     if (item.label === "Credential") {
-      return credentialDetailLabel(activeProvider, activeSecretProvided);
+      return codexOAuthConfig ? $t("codexAccount.saveDetail") : credentialDetailLabel(activeProvider, activeSecretProvided);
     }
     if (item.label.endsWith(" config")) {
       return $t("wizard.preview.toolConfigDetail");
@@ -831,6 +817,7 @@
   }
 
   function errorLabel(message: string) {
+    if (message.startsWith("codexAccount.")) return $t(codexAccountErrorKey(message));
     if (message === "Codex uses API Key / config file mode in XIASS Tools and cannot use Local Gateway mode.") {
       return $t("wizard.error.codexConfigOnly");
     }
@@ -967,7 +954,7 @@
       <p>{$t("wizard.progress", { current: currentStep + 1 - firstStep, total: steps.length - firstStep })}{#if toolLocked} · Codex · {$t("profiles.mode.config")}{/if}</p>
     </div>
     <div class={wizardActionsRecipe()}>
-      <button class={actionButtonRecipe()} title={$t("common.back")} disabled={saving || (!toolLocked && currentStep === 0)} on:click={() => currentStep > firstStep ? currentStep -= 1 : onCancel()}>
+      <button class={actionButtonRecipe()} title={$t("common.back")} disabled={saving || (!toolLocked && currentStep === 0)} on:click={goBack}>
         <AppIcon name="arrowLeft" size={16} />
         {$t("common.back")}
       </button>
@@ -1074,10 +1061,12 @@
       </div>
 
       {#if canUseCodexOAuthConfig}
-        <div class={wizardChoiceGridRecipe({ kind: "compact" })}>
+        <div class={wizardChoiceGridRecipe({ kind: "compact" })} role="group" aria-label={$t("codexAccount.title")}>
           <button
             class={wizardChoiceButtonRecipe({ kind: "compact" })}
             data-selected={!codexOAuthConfig}
+            aria-pressed={!codexOAuthConfig}
+            disabled={saving || codexAccountBusy}
             type="button"
             on:click={() => selectCodexOAuthConfig(false)}
           >
@@ -1086,12 +1075,20 @@
           </button>
           <button
             class={wizardChoiceButtonRecipe({ kind: "compact" })}
-            data-selected={codexOAuthConfig}
+            data-selected={codexOAuthConfig && codexAccountSource === "oauth"}
+            aria-pressed={codexOAuthConfig && codexAccountSource === "oauth"}
+            disabled={saving || codexAccountBusy}
             type="button"
             on:click={() => selectCodexOAuthConfig(true)}
           >
             <AppIcon name="user" size={18} />
             <span>{$t("wizard.codexOAuth.typeOAuth")}</span>
+          </button>
+          <button class={wizardChoiceButtonRecipe({ kind: "compact" })} type="button"
+            data-selected={codexOAuthConfig && codexAccountSource === "json"}
+            aria-pressed={codexOAuthConfig && codexAccountSource === "json"}
+            disabled={saving || codexAccountBusy} on:click={() => selectCodexOAuthConfig(true, "json")}>
+            <AppIcon name="upload" size={18} /><span>{$t("codexAccount.importTitle")}</span>
           </button>
         </div>
       {/if}
@@ -1214,9 +1211,32 @@
             </section>
           {/if}
         {/if}
+        {#if codexOAuthConfig}
+          <div class={modelPickerClass}>
+            <label for={`${modelListId}-oauth-input`}>{$t("wizard.modelOptional")}</label>
+            <ModelSelectInput
+              id={`${modelListId}-oauth-input`}
+              bind:value={accountModel}
+              options={[]}
+              optionLabel={modelOptionLabel}
+              toggleTitle={$t("wizard.modelOptional")}
+              placeholder={$t("wizard.modelOptional")}
+            />
+            <small class={modelPickerStatusClass}>{$t("wizard.codexOAuth.modelHint")}</small>
+          </div>
+        {/if}
         {#if supportsReviewModel}
           <div class={modelPickerClass}>
             <label for={`${modelListId}-review-input`}>{$t("profiles.reviewModelLabel")}</label>
+            {#if codexOAuthConfig}
+            <ModelSelectInput
+              id={`${modelListId}-review-input`}
+              bind:value={accountReviewModel}
+              options={[]}
+              toggleTitle={$t("profiles.reviewModelLabel")}
+              placeholder={$t("profiles.reviewModelPlaceholder")}
+            />
+            {:else}
             <ModelSelectInput
               id={`${modelListId}-review-input`}
               bind:value={reviewModel}
@@ -1225,6 +1245,7 @@
               toggleTitle={$t("profiles.reviewModelLabel")}
               placeholder={$t("profiles.reviewModelPlaceholder")}
             />
+            {/if}
           </div>
         {/if}
         {#if canonicalProfileToolId(selectedTool) === "codex"}
@@ -1268,44 +1289,10 @@
         {/if}
       </div>
       {#if codexOAuthConfig}
-        <div class={wizardCodexAuthCardRecipe()}>
-          <div>
-            <strong>{$t("wizard.codexOAuth.authTitle")}</strong>
-            <span>
-              {#if codexOAuthAuthorized}
-                {$t("wizard.codexOAuth.authReady")}
-              {:else if localCodexAuth?.available && localCodexAuth?.method === "api_key"}
-                {$t("wizard.codexOAuth.apiKeyNotOAuth")}
-              {:else}
-                {$t("wizard.codexOAuth.authRequired")}
-              {/if}
-            </span>
-            {#if localCodexAuth?.path}
-              <small>{localCodexAuth.path}</small>
-            {/if}
-          </div>
-          <div class={wizardButtonRowRecipe()}>
-            <button class={actionButtonRecipe()} type="button" disabled={codexAuthChecking} on:click={startCodexAuthorization}>
-              {#if codexAuthChecking}
-                <AppIcon name="loading" class={spinRecipe()} size={16} />
-                {$t("common.loading")}
-              {:else}
-                <AppIcon name="externalLink" size={16} />
-                {$t("wizard.codexOAuth.openLogin")}
-              {/if}
-            </button>
-            <button class={actionButtonRecipe()} type="button" data-refresh-button="true" disabled={codexAuthChecking} on:click={refreshCodexAuthStatus}>
-              <AppIcon name={codexAuthChecking ? "loading" : "refresh"} class={codexAuthChecking ? spinRecipe() : ""} size={15} />
-              {$t("wizard.codexOAuth.recheck")}
-            </button>
-          </div>
-        </div>
-        {#if codexAuthError}
-          <div class={wizardInlineNoticeRecipe({ tone: "error" })}>{codexAuthError}</div>
-        {/if}
-        {#if codexAuthMessage}
-          <div class={wizardInlineNoticeRecipe({ tone: "success" })}>{codexAuthMessage}</div>
-        {/if}
+        {#key codexAccountSource}
+          <CodexAccountPanel mode={codexAccountSource} bind:session={codexAccountSession}
+            bind:accountIndex={codexAccountIndex} bind:busy={codexAccountBusy} disabled={saving} />
+        {/key}
       {:else}
         <div class={wizardSecurityNoteRecipe()}>
           <AppIcon name="key" size={18} />

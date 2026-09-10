@@ -689,6 +689,8 @@ pub struct UsageScriptState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SaveProfileDraftRequest {
+    #[serde(default)]
+    pub codex_account: Option<crate::core::codex_accounts::AccountSelection>,
     pub name: String,
     #[serde(default)]
     pub icon: Option<String>,
@@ -722,6 +724,8 @@ pub struct SaveProfileDraftRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProfileDraftRequest {
+    #[serde(default)]
+    pub codex_account: Option<crate::core::codex_accounts::AccountSelection>,
     pub profile_id: String,
     pub name: String,
     #[serde(default)]
@@ -770,6 +774,8 @@ pub struct ReorderProfileDraftsRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewProfileWriteRequest {
+    #[serde(default)]
+    pub codex_account: Option<crate::core::codex_accounts::AccountSelection>,
     pub name: String,
     #[serde(default)]
     pub icon: Option<String>,

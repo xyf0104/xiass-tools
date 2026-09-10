@@ -321,14 +321,20 @@ fn matching_native_config_profiles<'a, F>(
 where
     F: Fn(&ProfileDraft) -> bool,
 {
-    drafts
+    let mut matches: Vec<_> = drafts
         .iter()
         .filter(|profile| {
             canonical_profile_app(&profile.app) == app
                 && profile.mode == ProviderApplyMode::Config
                 && matches_profile(profile)
         })
-        .collect()
+        .collect();
+    // Built-in official is a config-only fallback. A saved, identity-matched
+    // account is more specific, even if the built-in pointer was active.
+    if app == "codex" && matches.iter().any(|profile| is_custom_codex_oauth_profile(profile)) {
+        matches.retain(|profile| !profile.is_builtin);
+    }
+    matches
 }
 
 fn should_correct_detected_native_profile(

@@ -375,6 +375,25 @@ export interface StartCodexOAuthLoginResult {
   message: string;
 }
 
+export interface CodexAccountInfo {
+  label: string;
+  accountId: string | null;
+  warnings: string[];
+}
+
+export interface CodexAccountSession {
+  id: string;
+  source: "oauth" | "json" | "local";
+  status: "waiting" | "ready" | "failed";
+  accounts: CodexAccountInfo[];
+  errorCode: string | null;
+}
+
+export interface CodexAccountSelection {
+  sessionId: string;
+  accountIndex: number;
+}
+
 export interface DoctorCheck {
   id: string;
   group: string;
@@ -501,6 +520,7 @@ export interface ActiveProfilesByMode {
 }
 
 export interface SaveProfileDraftRequest {
+  codexAccount?: CodexAccountSelection | null;
   name: string;
   icon?: string | null;
   remark?: string | null;
@@ -521,6 +541,7 @@ export interface SaveProfileDraftRequest {
 }
 
 export interface UpdateProfileDraftRequest {
+  codexAccount?: CodexAccountSelection | null;
   profileId: string;
   name: string;
   icon?: string | null;
@@ -554,6 +575,7 @@ export interface ReorderProfileDraftsRequest {
 }
 
 export interface PreviewProfileWriteRequest {
+  codexAccount?: CodexAccountSelection | null;
   name: string;
   icon?: string | null;
   remark?: string | null;
