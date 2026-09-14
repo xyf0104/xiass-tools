@@ -1,6 +1,6 @@
 [package]
 name = "xiass-tools"
-version = "1.9.3"
+version = "1.9.4"
 description = "XIASS Tools desktop control center for local AI coding agents."
 authors = ["XIASS Tools"]
 license = "MIT"

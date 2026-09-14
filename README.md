@@ -26,7 +26,7 @@ CodeStudio Lite 是面向本机 AI 编程工具的桌面控制台。它把本地
 
 ### Codex 账号登录与写入
 
-在「新建配置」或编辑 Codex 配置时，登录方式支持三条路径：已有 API Key、官方浏览器 OAuth、以及完整账号 JSON 导入。JSON 可以是 Codex `auth.json`、Cockpit 导出格式、扁平的 `id_token` / `access_token` 对象，或包含 `accounts` 的账号数组；数组导入后可选择其中一个账号。只支持完整 Token 结构，不接受密码、Cookie、单独 refresh token 或 API Key JSON。
+在「新建配置」或编辑 Codex 配置时，登录方式支持三条路径：已有 API Key、官方浏览器 OAuth、以及完整账号 JSON 导入。JSON 可以是 Codex `auth.json`、Cockpit 导出格式、Sub2API 账号包、扁平的 `id_token` / `access_token` 对象，或使用 `accounts`、`data`、`items` 外壳的账号数组；数组导入后可选择其中一个账号。旧版 Cockpit 的 `credentials`、`auth`、`tokens`、`tokenSet` 等嵌套容器和常用蛇形/驼峰/连字符字段名也可识别。只支持完整 Token 结构，不接受密码、Cookie、单独 refresh token 或 API Key JSON。
 
 OAuth/JSON 凭据先在 Rust 后端内存中暂存，前端只接收账号摘要和不透明会话编号。保存配置时仅把规范化快照放入本机 SQLite；点击应用或启动时，才会备份并原子写入 Codex 的 `auth.json`，随后读回校验。自动刷新只会更新身份匹配的同一账号，不会用另一个账号覆盖当前凭据。API Key 路径仍使用系统钥匙串，不写入前端存储、日志或 GitHub。官方 OAuth 不伪造上游模型列表请求，但允许直接填写模型 ID；API Key 配置仍可使用「获取模型」。
 
@@ -235,7 +235,7 @@ Use Settings → Check for updates → Download update to download the matching 
 
 ### Codex account sign-in and writes
 
-Codex configuration supports an existing API key, official browser OAuth, or importing a complete account JSON. Imports accept Codex `auth.json`, Cockpit exports, flattened `id_token` / `access_token` objects, and `accounts` arrays with explicit account selection. Passwords, cookies, standalone refresh tokens, and API-key-only JSON are rejected.
+Codex configuration supports an existing API key, official browser OAuth, or importing a complete account JSON. Imports accept Codex `auth.json`, Cockpit exports, Sub2API account bundles, flattened `id_token` / `access_token` objects, and account arrays wrapped by `accounts`, `data`, or `items`, with explicit account selection. Legacy Cockpit credential containers such as `credentials`, `auth`, `tokens`, and `tokenSet`, plus common snake-case, camelCase, and hyphenated field aliases, are recognized. Passwords, cookies, standalone refresh tokens, and API-key-only JSON are rejected.
 
 OAuth/JSON credentials are staged in the Rust backend; the UI receives only account summaries and an opaque session handle. Saving stores a normalized snapshot in the local SQLite database. Apply or Launch then backs up and atomically writes Codex `auth.json`, verifies the result, and updates only the identity-matched account after token refresh. API keys continue to use the system keychain and never enter browser storage, logs, or GitHub. Official OAuth does not fake an upstream model-list request, but still allows a model ID to be entered directly; API-key profiles retain Fetch Models.
 

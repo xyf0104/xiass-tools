@@ -34,6 +34,64 @@ fn accepts_standard_cockpit_flattened_and_wrapped_token_json() {
 }
 
 #[test]
+fn accepts_legacy_cockpit_nested_containers_and_field_aliases() {
+    let standard = fixture("legacy-user", "legacy-workspace");
+    let input = json!({
+        "name": "Legacy Cockpit account",
+        "credentials": {
+            "authentication": {
+                "tokenSet": {
+                    "id-token": standard["tokens"]["id_token"],
+                    "access-token": standard["tokens"]["access_token"],
+                    "refresh-token": standard["tokens"]["refresh_token"],
+                    "chatgptAccountId": "legacy-workspace"
+                }
+            }
+        },
+        "password": "must-not-be-copied",
+        "cookies": {"session": "must-not-be-copied"}
+    });
+    let account = normalize_account(&input).unwrap();
+    let written: Value = serde_json::from_str(&account.content).unwrap();
+    assert_eq!(written["auth_mode"], "chatgpt");
+    assert_eq!(written["tokens"]["account_id"], "legacy-workspace");
+    assert_eq!(account.info.label, "test@example.invalid");
+    assert!(!account.content.contains("must-not-be-copied"));
+}
+
+#[test]
+fn accepts_sub2api_and_legacy_batch_envelopes() {
+    let first = fixture("one", "team-a");
+    let second = fixture("two", "team-b");
+    let sub2api = json!({
+        "type": "sub2api-data",
+        "accounts": [
+            {"type":"oauth", "credentials": first["tokens"]},
+            {"type":"oauth", "credentials": second["tokens"]}
+        ]
+    });
+    let nested = json!({"data":{"items":sub2api["accounts"]}});
+    for input in [sub2api, nested] {
+        let accounts = parse_import(&input.to_string()).unwrap();
+        assert_eq!(accounts.len(), 2);
+        assert_eq!(accounts[0].info.account_id.as_deref(), Some("team-a"));
+        assert_eq!(accounts[1].info.account_id.as_deref(), Some("team-b"));
+    }
+}
+
+#[test]
+fn credential_container_traversal_is_bounded() {
+    let standard = fixture("deep", "team-deep");
+    let accepted = json!({"credentials":{"auth":{"tokens":standard["tokens"]}}});
+    assert!(normalize_account(&accepted).is_ok());
+    let rejected = json!({"credentials":{"auth":{"tokens":{"tokenSet":standard["tokens"]}}}});
+    assert_eq!(
+        normalize_account(&rejected).err().as_deref(),
+        Some("codexAccount.missingTokens")
+    );
+}
+
+#[test]
 fn keeps_only_native_auth_fields_and_recovers_account_id_from_claims() {
     let mut input = fixture("one", "workspace");
     input["tokens"]

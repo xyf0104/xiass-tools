@@ -3,7 +3,7 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -12,8 +12,21 @@ use std::time::{Duration, Instant};
 
 const MAX_IMPORT_BYTES: usize = 1024 * 1024;
 const MAX_ACCOUNTS: usize = 100;
+const MAX_CREDENTIAL_CONTAINER_DEPTH: usize = 3;
 const SESSION_TTL: Duration = Duration::from_secs(20 * 60);
 const LOGIN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const CREDENTIAL_CONTAINER_NAMES: [&str; 10] = [
+    "credentials",
+    "credential",
+    "auth",
+    "authentication",
+    "tokens",
+    "token",
+    "oauthTokens",
+    "oauth_tokens",
+    "tokenSet",
+    "token_set",
+];
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -117,6 +130,37 @@ fn text<'a>(value: &'a Value, names: &[&str]) -> Option<&'a str> {
     })
 }
 
+/// Credential exports are not treated as arbitrary object graphs. Follow only
+/// known credential containers, and stop after the same bounded depth used by
+/// the original Cockpit importer. This accepts older Cockpit/Sub2API wrappers
+/// without accidentally persisting browser sessions, cookies, or passwords.
+fn credential_sources(value: &Value) -> Vec<&Value> {
+    let mut queue = VecDeque::from([(value, 0usize)]);
+    let mut sources = Vec::with_capacity(8);
+    while let Some((current, depth)) = queue.pop_front() {
+        if !current.is_object() {
+            continue;
+        }
+        sources.push(current);
+        if depth >= MAX_CREDENTIAL_CONTAINER_DEPTH {
+            continue;
+        }
+        for name in CREDENTIAL_CONTAINER_NAMES {
+            if let Some(child) = current.get(name).filter(|child| child.is_object()) {
+                queue.push_back((child, depth + 1));
+            }
+        }
+    }
+    sources
+}
+
+fn source_text<'a>(sources: &[&'a Value], names: &[&str]) -> Option<&'a str> {
+    // Prefer canonical field names across all containers before trying aliases.
+    names
+        .iter()
+        .find_map(|name| sources.iter().find_map(|value| text(value, &[*name])))
+}
+
 fn claims(token: &str) -> Value {
     token
         .split('.')
@@ -135,34 +179,48 @@ fn display_label(value: &str) -> String {
 }
 
 pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, String> {
-    // Standard auth.json, Cockpit export and a flattened token JSON bundle.
-    let value = value
-        .get("auth")
-        .filter(|v| v.is_object())
-        .or_else(|| value.get("credentials").filter(|v| v.is_object()))
-        .unwrap_or(value);
     if !value.is_object() {
         return Err("codexAccount.invalidJson".into());
     }
+    // Standard auth.json, Cockpit/Sub2API exports and flattened token bundles.
+    // Only an explicit allow-list of credential containers is traversed.
+    let sources = credential_sources(value);
     if matches!(
-        text(value, &["auth_mode", "authMode"]),
+        source_text(&sources, &["auth_mode", "authMode"]),
         Some("apikey" | "api_key")
     ) {
         return Err("codexAccount.apiKeyOnly".into());
     }
-    let tokens = value
-        .get("tokens")
-        .filter(|v| v.is_object())
-        .unwrap_or(value);
-    let access = text(tokens, &["access_token", "accessToken"]);
-    let id = text(tokens, &["id_token", "idToken"]);
+    let access = source_text(&sources, &["access_token", "accessToken", "access-token"]);
+    let id = source_text(&sources, &["id_token", "idToken", "id-token"]);
     let (Some(access), Some(id)) = (access, id) else {
-        if text(value, &["OPENAI_API_KEY", "openai_api_key", "api_key"]).is_some() {
+        if source_text(
+            &sources,
+            &[
+                "OPENAI_API_KEY",
+                "openai_api_key",
+                "api_key",
+                "apiKey",
+                "api-key",
+            ],
+        )
+        .is_some()
+        {
             return Err("codexAccount.apiKeyOnly".into());
         }
         return Err("codexAccount.missingTokens".into());
     };
-    let refresh = text(tokens, &["refresh_token", "refreshToken"]).unwrap_or("");
+    let refresh = source_text(
+        &sources,
+        &[
+            "refresh_token",
+            "refreshToken",
+            "refresh-token",
+            "mobile_rt",
+            "mobileRT",
+        ],
+    )
+    .unwrap_or("");
     let id_claims = claims(id);
     let access_claims = claims(access);
     // An ID token must at least be a JWT with a subject. This is structural
@@ -175,20 +233,28 @@ pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, Stri
     {
         return Err("codexAccount.invalidTokens".into());
     }
-    let account_id = text(tokens, &["account_id", "accountId"])
-        .or_else(|| {
-            text(
-                &id_claims["https://api.openai.com/auth"],
-                &["chatgpt_account_id"],
-            )
-        })
-        .or_else(|| {
-            text(
-                &access_claims["https://api.openai.com/auth"],
-                &["chatgpt_account_id"],
-            )
-        })
-        .map(str::to_string);
+    let account_id = source_text(
+        &sources,
+        &[
+            "account_id",
+            "accountId",
+            "chatgpt_account_id",
+            "chatgptAccountId",
+        ],
+    )
+    .or_else(|| {
+        text(
+            &id_claims["https://api.openai.com/auth"],
+            &["chatgpt_account_id"],
+        )
+    })
+    .or_else(|| {
+        text(
+            &access_claims["https://api.openai.com/auth"],
+            &["chatgpt_account_id"],
+        )
+    })
+    .map(str::to_string);
     let expired = access_claims
         .get("exp")
         .and_then(Value::as_i64)
@@ -204,14 +270,14 @@ pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, Stri
         warnings.push("codexAccount.needsRefresh".into());
     }
     let label = text(&id_claims, &["email"])
-        .or_else(|| text(value, &["email", "account_name", "name"]))
+        .or_else(|| source_text(&sources, &["email", "account_name", "accountName", "name"]))
         .map(display_label)
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "Codex OAuth".into());
     let mut auth = json!({"auth_mode":"chatgpt", "OPENAI_API_KEY":null,
         "tokens": {"access_token":access, "id_token":id, "refresh_token":refresh, "account_id":account_id}});
-    if let Some(date) =
-        text(value, &["last_refresh"]).filter(|s| chrono::DateTime::parse_from_rfc3339(s).is_ok())
+    if let Some(date) = source_text(&sources, &["last_refresh", "lastRefresh"])
+        .filter(|s| chrono::DateTime::parse_from_rfc3339(s).is_ok())
     {
         auth["last_refresh"] = json!(date);
     }
@@ -228,6 +294,24 @@ pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, Stri
     })
 }
 
+fn import_values(value: &Value) -> Vec<&Value> {
+    match value {
+        Value::Array(values) => values.iter().collect(),
+        Value::Object(map) => {
+            for name in ["accounts", "data", "items"] {
+                if let Some(child) = map.get(name) {
+                    let values = import_values(child);
+                    if !values.is_empty() {
+                        return values;
+                    }
+                }
+            }
+            vec![value]
+        }
+        _ => Vec::new(),
+    }
+}
+
 fn parse_import(content: &str) -> Result<Vec<AccountCredential>, String> {
     if content.len() > MAX_IMPORT_BYTES {
         return Err("codexAccount.tooLarge".into());
@@ -235,16 +319,18 @@ fn parse_import(content: &str) -> Result<Vec<AccountCredential>, String> {
     // Never return serde's error text: it may contain part of a secret value.
     let value: Value = serde_json::from_str(content.trim().trim_start_matches('\u{feff}'))
         .map_err(|_| "codexAccount.invalidJson")?;
-    let values = value
-        .as_array()
-        .or_else(|| value.get("accounts").and_then(Value::as_array));
-    match values {
-        Some(values) if values.is_empty() || values.len() > MAX_ACCOUNTS => {
+    let values = import_values(&value);
+    if values.is_empty() {
+        return if value.is_array() {
             Err("codexAccount.accountCount".into())
-        }
-        Some(values) => values.iter().map(normalize_account).collect(),
-        None => normalize_account(&value).map(|item| vec![item]),
+        } else {
+            Err("codexAccount.invalidJson".into())
+        };
     }
+    if values.len() > MAX_ACCOUNTS {
+        return Err("codexAccount.accountCount".into());
+    }
+    values.into_iter().map(normalize_account).collect()
 }
 
 fn insert_session(
