@@ -1551,6 +1551,54 @@ model_reasoning_effort = "xhigh"
 }
 
 #[test]
+fn codex_direct_config_reactivates_custom_provider_over_legacy_xiass_provider() {
+    let mut profile = test_profile("codex", ProviderApplyMode::Config);
+    profile.provider = "XIASS API".to_string();
+    profile.name = "XIASS API".to_string();
+    profile.protocol = PROTOCOL_OPENAI_RESPONSES.to_string();
+    profile.model = "gpt-6-astra".to_string();
+    profile.base_url = "https://api.xiass.com".to_string();
+
+    let current = r#"
+model_provider = "codex_local_access"
+model = "gpt-6-astra"
+
+[model_providers.codex_local_access]
+name = "XIASS API"
+base_url = "https://api.openai.com/v1"
+wire_api = "responses"
+requires_openai_auth = false
+
+[model_providers.custom]
+name = "stale custom"
+base_url = "https://api.openai.com/v1"
+wire_api = "responses"
+requires_openai_auth = true
+"#;
+
+    let config = codex_direct_config_content(current, &profile).expect("config should render");
+    let value: toml::Value = toml::from_str(&config).expect("config should parse");
+
+    assert_eq!(
+        read_toml_string(&value, "model_provider").as_deref(),
+        Some("custom")
+    );
+    assert_eq!(
+        toml_lookup(&value, "model_providers.custom.base_url").and_then(|item| item.as_str()),
+        Some("https://api.xiass.com/v1")
+    );
+    assert_eq!(
+        toml_lookup(&value, "model_providers.custom.wire_api").and_then(|item| item.as_str()),
+        Some("responses")
+    );
+    assert!(codex_direct_config_matches_profile_without_keychain(
+        &value,
+        Some(&serde_json::json!({ "OPENAI_API_KEY": "sk-present" })),
+        &profile,
+    ));
+}
+
+#[test]
 fn direct_config_runtime_base_url_adds_v1_without_changing_profile_value() {
     let mut profile = test_profile("codex", ProviderApplyMode::Config);
     profile.provider = "compatible".to_string();
@@ -3367,6 +3415,7 @@ fn claude_restart_targets_only_include_vscode_backend_when_synced() {
         "claude",
         RestartContext {
             sync_claude_vs_code: true,
+            ..RestartContext::default()
         },
     );
     assert_eq!(synced_targets.len(), 2);
@@ -3377,6 +3426,21 @@ fn claude_restart_targets_only_include_vscode_backend_when_synced() {
         .command_markers
         .iter()
         .any(|marker| marker.contains("anthropic.claude-code")));
+}
+
+#[test]
+fn codex_desktop_only_restart_does_not_interrupt_cli_or_vscode() {
+    let targets = restart_targets_for_app(
+        "codex",
+        RestartContext {
+            codex_desktop_only: true,
+            ..RestartContext::default()
+        },
+    );
+
+    assert_eq!(targets.len(), 1);
+    assert_eq!(targets[0].label, "Codex");
+    assert!(matches!(targets[0].launch, RestartLaunch::ChatGptDesktop));
 }
 
 #[test]

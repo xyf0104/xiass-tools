@@ -58,7 +58,7 @@ beforeEach(() => {
     settingsDraft: { syncHistoryOnLaunch: false, pluginMarketplaceUnlockOnLaunch: true, officialRemotePluginCacheOnLaunch: true,
       pluginAutoExpandOnLaunch: true, modelWhitelistUnlockOnLaunch: true, serviceTierControlsOnLaunch: false },
     error: null, success: null, confirmUninstall: false } as unknown as Parameters<typeof chatgptDesktopView.set>[0]);
-  calls.applyProfile.mockResolvedValue({ verified: true, nativeVerified: true, mode: "config", summary: summary() });
+  calls.applyProfile.mockResolvedValue({ verified: true, nativeVerified: true, mode: "config", restartPerformed: true, summary: summary() });
   calls.launch.mockResolvedValue(undefined);
   calls.applied.mockResolvedValue(undefined);
 });
@@ -77,19 +77,35 @@ describe("Codex desktop two-step workflow", () => {
     await fireEvent.click(ui.getByRole("button", { name: "新建配置" }));
     expect(calls.create).toHaveBeenCalledOnce();
   });
-  it("writes and verifies the selected profile before restarting the desktop", async () => {
+  it("atomically stops, writes, verifies and restarts an already running desktop", async () => {
     const ui = screen(); await next(ui);
     expect(calls.applyProfile).not.toHaveBeenCalled();
     await fireEvent.click(ui.getByRole("button", { name: "启动" }));
-    await waitFor(() => expect(calls.launch).toHaveBeenCalledWith(true));
-    expect(calls.applyProfile).toHaveBeenCalledWith({ profileId: custom.id, restartAfterApply: false, reapply: true });
-    expect(calls.applyProfile.mock.invocationCallOrder[0]).toBeLessThan(calls.launch.mock.invocationCallOrder[0]);
+    await waitFor(() => expect(calls.applied).toHaveBeenCalledOnce());
+    expect(calls.applyProfile).toHaveBeenCalledWith({
+      profileId: custom.id,
+      restartAfterApply: true,
+      restartCodexDesktopOnly: true,
+      reapply: true
+    });
+    expect(calls.launch).not.toHaveBeenCalled();
+  });
+  it("launches without another restart when the desktop was not running", async () => {
+    calls.applyProfile.mockResolvedValueOnce({ verified: true, nativeVerified: true, mode: "config", restartPerformed: false, summary: summary() });
+    const ui = screen(); await next(ui);
+    await fireEvent.click(ui.getByRole("button", { name: "启动" }));
+    await waitFor(() => expect(calls.launch).toHaveBeenCalledWith(false));
   });
   it("revalidates an already active profile instead of trusting a stale active pointer", async () => {
     const ui = screen();
     await fireEvent.click(ui.getByRole("button", { name: "下一步" }));
     await fireEvent.click(ui.getByRole("button", { name: "启动" }));
-    await waitFor(() => expect(calls.applyProfile).toHaveBeenCalledWith({ profileId: official.id, restartAfterApply: false, reapply: true }));
+    await waitFor(() => expect(calls.applyProfile).toHaveBeenCalledWith({
+      profileId: official.id,
+      restartAfterApply: true,
+      restartCodexDesktopOnly: true,
+      reapply: true
+    }));
   });
   it.each(["write", "verification"])("does not launch after %s failure", async (failure) => {
     if (failure === "write") calls.applyProfile.mockRejectedValueOnce(new Error("test write failed"));
@@ -108,7 +124,7 @@ describe("Codex desktop two-step workflow", () => {
     const busy = ui.getByRole("button", { name: "正在应用配置…" });
     expect(busy.hasAttribute("disabled")).toBe(true);
     expect(calls.launch).not.toHaveBeenCalled();
-    finish({ verified: true, nativeVerified: true, mode: "config", summary: summary() });
+    finish({ verified: true, nativeVerified: true, mode: "config", restartPerformed: false, summary: summary() });
     await waitFor(() => expect(calls.launch).toHaveBeenCalledOnce());
   });
   it("keeps the choice when moving back and forth", async () => {
@@ -138,7 +154,7 @@ describe("Codex desktop two-step workflow", () => {
     for (const button of ui.container.querySelectorAll(".desktop-workflow-nav button, .desktop-workflow-actions button")) {
       expect(button.hasAttribute("disabled")).toBe(true);
     }
-    finish({ verified: true, nativeVerified: true, mode: "config", summary: summary() });
+    finish({ verified: true, nativeVerified: true, mode: "config", restartPerformed: false, summary: summary() });
     await waitFor(() => expect(calls.launch).toHaveBeenCalledOnce());
   });
   it("keeps New Configuration available with an empty profile list", () => {

@@ -927,6 +927,8 @@ pub struct ApplyProfileRequest {
     pub restart_after_apply: bool,
     #[serde(default)]
     pub sync_claude_vs_code: bool,
+    #[serde(default)]
+    pub restart_codex_desktop_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

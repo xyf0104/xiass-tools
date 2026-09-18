@@ -154,13 +154,23 @@
     profileApplyError = null;
     dismissSuccess();
     try {
-      const result = await applyProfile({ profileId, restartAfterApply: false, reapply: true });
+      const result = await applyProfile({
+        profileId,
+        restartAfterApply: true,
+        restartCodexDesktopOnly: true,
+        reapply: true
+      });
       if (!result.verified || !result.nativeVerified || result.mode !== "config") {
         throw new Error($t("chatgptDesktop.configVerificationFailed"));
       }
       profileSummary = result.summary;
       await onProfileApplied(result.summary);
-      await launchManagedChatGPTDesktop(true);
+      // If the desktop was already running, applyProfile closed it before the
+      // config write and restarted it only after verification. If it was not
+      // running, launch it now without another close/write race.
+      if (!result.restartPerformed) {
+        await launchManagedChatGPTDesktop(false);
+      }
     } catch (err) {
       profileApplyError = err instanceof Error ? err.message : String(err);
     } finally {

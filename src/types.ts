@@ -676,6 +676,7 @@ export interface ApplyProfileRequest {
   reapply?: boolean;
   restartAfterApply?: boolean;
   syncClaudeVsCode?: boolean;
+  restartCodexDesktopOnly?: boolean;
 }
 
 export interface ApplyProfileResult {

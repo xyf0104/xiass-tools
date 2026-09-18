@@ -16,6 +16,13 @@ struct RestartProcessResult {
 #[derive(Clone, Copy, Default)]
 pub(in crate::core::profile) struct RestartContext {
     pub sync_claude_vs_code: bool,
+    pub codex_desktop_only: bool,
+}
+
+pub(in crate::core::profile) struct PreparedRestart {
+    app: String,
+    context: RestartContext,
+    stopped_targets: Vec<(RestartTarget, RestartProcessResult)>,
 }
 
 #[derive(Clone, Copy)]
@@ -46,61 +53,94 @@ pub(in crate::core::profile) struct RestartTarget {
     pub launch: RestartLaunch,
 }
 
-pub(in crate::core::profile) fn restart_tool_for_profile(
+pub(in crate::core::profile) fn prepare_restart_before_profile_write(
     profile: &ProfileDraft,
     context: RestartContext,
-) -> Result<RestartOutcome, String> {
+) -> Result<PreparedRestart, String> {
     let app = canonical_profile_app(&profile.app);
     let targets = restart_targets_for_app(&app, context);
     if targets.is_empty() {
-        return Ok(RestartOutcome {
-            performed: false,
-            message: Some(format!(
-                "Tool '{}' does not have a client that needs automatic restart.",
-                profile.app
-            )),
+        return Ok(PreparedRestart {
+            app,
+            context,
+            stopped_targets: Vec::new(),
         });
     }
 
-    let mut messages = Vec::new();
-    let mut restarted_any = false;
     let mut stopped_targets = Vec::new();
 
     for target in targets {
-        let result = stop_restart_target_processes(target)?;
+        let result = match stop_restart_target_processes(target) {
+            Ok(result) => result,
+            Err(err) => {
+                let restore_error = finish_stopped_targets(stopped_targets).err();
+                return Err(with_restart_restore_error(err, restore_error));
+            }
+        };
         if result.total == 0 {
             continue;
         }
         if result.remaining > 0 {
-            return Err(format!(
+            let err = format!(
                 "{} is still running; restart was not continued.",
                 target.label
-            ));
+            );
+            let restore_error = finish_stopped_targets(stopped_targets).err();
+            return Err(with_restart_restore_error(err, restore_error));
         }
 
         stopped_targets.push((target, result));
     }
 
-    for (target, result) in stopped_targets {
-        launch_restart_target(target, &result.paths)
-            .map_err(|err| format!("Failed to restart {}: {err}", target.label))?;
-        restarted_any = true;
-        messages.push(restart_target_message(target, &result));
-    }
+    Ok(PreparedRestart {
+        app,
+        context,
+        stopped_targets,
+    })
+}
 
-    if restarted_any {
-        Ok(RestartOutcome {
-            performed: true,
-            message: Some(messages.join(" ")),
-        })
-    } else {
-        Ok(RestartOutcome {
+pub(in crate::core::profile) fn finish_prepared_restart(
+    prepared: PreparedRestart,
+) -> Result<RestartOutcome, String> {
+    if prepared.stopped_targets.is_empty() {
+        return Ok(RestartOutcome {
             performed: false,
             message: Some(format!(
                 "{} is not running, so no restart is needed.",
-                restart_category_label(&app, context)
+                restart_category_label(&prepared.app, prepared.context)
             )),
-        })
+        });
+    }
+
+    finish_stopped_targets(prepared.stopped_targets)
+}
+
+fn finish_stopped_targets(
+    stopped_targets: Vec<(RestartTarget, RestartProcessResult)>,
+) -> Result<RestartOutcome, String> {
+    let mut messages = Vec::new();
+
+    for (target, result) in stopped_targets {
+        launch_restart_target(target, &result.paths)
+            .map_err(|err| format!("Failed to restart {}: {err}", target.label))?;
+        messages.push(restart_target_message(target, &result));
+    }
+
+    Ok(RestartOutcome {
+        performed: true,
+        message: Some(messages.join(" ")),
+    })
+}
+
+pub(in crate::core::profile) fn with_restart_restore_error(
+    error: String,
+    restore_error: Option<String>,
+) -> String {
+    match restore_error {
+        Some(restore_error) => format!(
+            "{error} Previously stopped clients also could not be restored: {restore_error}"
+        ),
+        None => error,
     }
 }
 
@@ -145,8 +185,8 @@ pub(in crate::core::profile) fn restart_targets_for_app(
     const PI_NAMES: &[&str] = &["pi.exe", "pi", "Pi"];
     const EMPTY: &[&str] = &[];
     match app {
-        "codex" => vec![
-            RestartTarget {
+        "codex" => {
+            let mut targets = vec![RestartTarget {
                 label: "Codex",
                 process_names: CODEX_DESKTOP_NAMES,
                 command_markers: EMPTY,
@@ -154,8 +194,12 @@ pub(in crate::core::profile) fn restart_targets_for_app(
                 require_window: true,
                 reject_window: false,
                 launch: RestartLaunch::ChatGptDesktop,
-            },
-            RestartTarget {
+            }];
+            if context.codex_desktop_only {
+                return targets;
+            }
+            targets.extend([
+                RestartTarget {
                 label: "Codex VS Code extension backend",
                 process_names: EMPTY,
                 command_markers: CODEX_VSCODE_BACKEND_MARKERS,
@@ -163,8 +207,8 @@ pub(in crate::core::profile) fn restart_targets_for_app(
                 require_window: false,
                 reject_window: false,
                 launch: RestartLaunch::CloseOnly,
-            },
-            RestartTarget {
+                },
+                RestartTarget {
                 label: "Codex CLI",
                 process_names: CODEX_CLI_NAMES,
                 command_markers: CODEX_CLI_MARKERS,
@@ -175,8 +219,10 @@ pub(in crate::core::profile) fn restart_targets_for_app(
                     command: "codex",
                     hidden: true,
                 },
-            },
-        ],
+                },
+            ]);
+            targets
+        }
         "claude-desktop" => vec![RestartTarget {
             label: "Claude Desktop",
             process_names: CLAUDE_DESKTOP_NAMES,

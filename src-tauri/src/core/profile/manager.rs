@@ -991,43 +991,65 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
     }
     let backup = backup::backup_files("apply-profile", Some(&profile.id), &backup_targets)?;
 
-    // Write native tool configs before flipping the active pointer so a concurrent
-    // summary load cannot observe "new active + old on-disk config" and import a
-    // ghost draft from the previous disk state.
-    let native_verified = if all_native_plans.is_empty() {
-        false
-    } else {
-        for plan in &native_plans {
-            apply_native_config_write_plan(plan)?;
-        }
-        all_native_plans
-            .iter()
-            .map(|plan| verify_native_config_write(plan, &profile, &mode))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .all(|verified| verified)
-    };
-    if !all_native_plans.is_empty() && !native_verified {
-        return Err("Native configuration did not pass verification; the active profile was not changed.".to_string());
-    }
-    activate_profile_for_tool(&mut config, &profile, &profiles);
-    write_app_config(&config)?;
-    let verified = verify_active_profile(&config, &profile);
-    if !verified {
-        return Err("Applied profile database record did not pass verification".to_string());
-    }
-    let restart_outcome = if request.restart_after_apply {
-        restart_tool_for_profile(
+    // Stop clients before touching their config. Codex persists part of its
+    // in-memory configuration while exiting, so closing it after the write can
+    // overwrite the freshly selected provider/base URL with the old values.
+    let prepared_restart = if request.restart_after_apply {
+        Some(prepare_restart_before_profile_write(
             &profile,
             RestartContext {
                 sync_claude_vs_code: request.sync_claude_vs_code,
+                codex_desktop_only: request.restart_codex_desktop_only,
             },
-        )?
+        )?)
     } else {
-        RestartOutcome {
+        None
+    };
+
+    // Write native tool configs before flipping the active pointer so a concurrent
+    // summary load cannot observe "new active + old on-disk config" and import a
+    // ghost draft from the previous disk state.
+    let apply_result = (|| -> Result<(bool, bool), String> {
+        let native_verified = if all_native_plans.is_empty() {
+            false
+        } else {
+            for plan in &native_plans {
+                apply_native_config_write_plan(plan)?;
+            }
+            all_native_plans
+                .iter()
+                .map(|plan| verify_native_config_write(plan, &profile, &mode))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .all(|verified| verified)
+        };
+        if !all_native_plans.is_empty() && !native_verified {
+            return Err("Native configuration did not pass verification; the active profile was not changed.".to_string());
+        }
+        activate_profile_for_tool(&mut config, &profile, &profiles);
+        write_app_config(&config)?;
+        let verified = verify_active_profile(&config, &profile);
+        if !verified {
+            return Err("Applied profile database record did not pass verification".to_string());
+        }
+        Ok((native_verified, verified))
+    })();
+    let (native_verified, verified) = match apply_result {
+        Ok(result) => result,
+        Err(err) => {
+            if let Some(prepared) = prepared_restart {
+                let restore_error = finish_prepared_restart(prepared).err();
+                return Err(with_restart_restore_error(err, restore_error));
+            }
+            return Err(err);
+        }
+    };
+    let restart_outcome = match prepared_restart {
+        Some(prepared) => finish_prepared_restart(prepared)?,
+        None => RestartOutcome {
             performed: false,
             message: None,
-        }
+        },
     };
 
     activity_log::append(
