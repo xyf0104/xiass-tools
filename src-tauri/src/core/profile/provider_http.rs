@@ -186,10 +186,8 @@ fn resolve_model_list_api_key(
     if let Some(api_key) = request
         .api_key
         .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
     {
-        return Ok(api_key.to_string());
+        return credentials::normalize_api_key(api_key);
     }
 
     let Some(profile_id) = request
@@ -213,11 +211,7 @@ fn resolve_model_list_api_key(
         return Err("Stored Provider API key is missing for this profile.".to_string());
     };
     let api_key = credentials::load_keychain_secret(auth_ref)?;
-    let trimmed = api_key.trim();
-    if trimmed.is_empty() {
-        return Err("Stored Provider API key is empty.".to_string());
-    }
-    Ok(trimmed.to_string())
+    credentials::normalize_api_key(&api_key)
 }
 
 fn fetch_profile_model_list_payload(

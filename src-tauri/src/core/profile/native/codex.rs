@@ -443,10 +443,7 @@ pub(in crate::core::profile) fn auth_json_content_with_api_key(
     current: &str,
     api_key: &str,
 ) -> Result<String, String> {
-    let api_key = api_key.trim();
-    if api_key.is_empty() {
-        return Err("Codex auth.json requires a non-empty API key.".to_string());
-    }
+    let api_key = credentials::normalize_api_key(api_key)?;
     let mut value = parse_auth_json(current)?;
     let object = value
         .as_object_mut()
@@ -457,7 +454,7 @@ pub(in crate::core::profile) fn auth_json_content_with_api_key(
     );
     object.insert(
         "OPENAI_API_KEY".to_string(),
-        serde_json::Value::String(api_key.to_string()),
+        serde_json::Value::String(api_key),
     );
     object.remove("openai_api_key");
     object.remove("api_key");

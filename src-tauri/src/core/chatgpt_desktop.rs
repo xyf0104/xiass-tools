@@ -973,12 +973,44 @@ fn launch_detected_chatgpt_desktop(
     settings: &ChatGptDesktopSettings,
     installed: &InstalledChatGptDesktop,
 ) -> Result<(), String> {
+    // Codex gives process-level OPENAI_* variables precedence over its
+    // file-backed auth.json. A stale Windows user/machine environment value
+    // can therefore make a freshly applied XIASS API profile appear to have
+    // an invalid key. The desktop launch path is config-file based, so remove
+    // only the current XIASS Tools process copy before spawning Codex. This
+    // does not edit persistent user or machine environment settings.
+    let removed_env = clear_codex_launch_environment();
+    if !removed_env.is_empty() {
+        let _ = activity_log::append(
+            Severity::Info,
+            format!(
+                "Removed stale Codex launch environment overrides: {}.",
+                removed_env.join(", ")
+            ),
+        );
+    }
     ensure_official_remote_plugin_cache_if_enabled(&settings);
     ensure_computer_use_guard_if_enabled(&settings)?;
     enhancement::launch(settings, |args| launch_installed_codex(installed, args))?;
     start_computer_use_guard_watchdog_if_enabled(&settings);
     let _ = activity_log::append(Severity::Info, "Launched ChatGPT Desktop.");
     Ok(())
+}
+
+fn clear_codex_launch_environment() -> Vec<String> {
+    [
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_ORGANIZATION",
+        "OPENAI_MODEL",
+    ]
+    .into_iter()
+    .filter(|name| std::env::var_os(name).is_some())
+    .map(|name| {
+        std::env::remove_var(name);
+        name.to_string()
+    })
+    .collect()
 }
 
 pub fn restart() -> Result<String, String> {

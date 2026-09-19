@@ -1,13 +1,65 @@
 const KEYCHAIN_PREFIX: &str = "keychain:";
 
+/// Normalize a Provider API key at the application boundary.
+///
+/// Keys are often copied from `.env` files, JSON exports, or shell snippets.
+/// Those sources can include a UTF-8 BOM, surrounding quotes, or a leading
+/// `Bearer ` / `OPENAI_API_KEY=` wrapper.  Storing those wrappers verbatim is
+/// especially easy to miss on Windows because the value is later serialized
+/// through Credential Manager and written to Codex's auth.json.  Codex expects
+/// only the raw token after this point.
+pub fn normalize_api_key(value: &str) -> Result<String, String> {
+    let mut value = value.trim().trim_start_matches('\u{feff}').trim();
+
+    for prefix in ["OPENAI_API_KEY=", "OPENAI_API_KEY:", "api_key=", "apiKey="] {
+        if value
+            .get(..prefix.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+        {
+            value = value[prefix.len()..].trim();
+            break;
+        }
+    }
+
+    if value
+        .get(..7)
+        .is_some_and(|head| head.eq_ignore_ascii_case("Bearer "))
+    {
+        value = value[7..].trim();
+    }
+
+    loop {
+        let bytes = value.as_bytes();
+        if bytes.len() < 2 {
+            break;
+        }
+        let quoted = (bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'');
+        if !quoted {
+            break;
+        }
+        value = value[1..value.len() - 1].trim();
+    }
+
+    if value.is_empty() {
+        return Err("Provider API key is empty.".to_string());
+    }
+    if value.chars().any(char::is_whitespace) || value.chars().any(char::is_control) {
+        return Err("Provider API key contains whitespace or control characters.".to_string());
+    }
+    Ok(value.to_string())
+}
+
 pub fn store_keychain_secret(reference: &str, secret: &str) -> Result<(), String> {
     let target = parse_keychain_reference(reference)?;
-    platform::store(&target, secret)
+    let normalized = normalize_api_key(secret)?;
+    platform::store(&target, &normalized)
 }
 
 pub fn load_keychain_secret(reference: &str) -> Result<String, String> {
     let target = parse_keychain_reference(reference)?;
-    platform::load(&target)
+    let secret = platform::load(&target)?;
+    normalize_api_key(&secret)
 }
 
 fn parse_keychain_reference(reference: &str) -> Result<String, String> {
@@ -397,6 +449,19 @@ mod platform {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normalizes_imported_api_key_wrappers() {
+        assert_eq!(normalize_api_key("\u{feff}  Bearer \"sk-test\"  ").unwrap(), "sk-test");
+        assert_eq!(normalize_api_key("OPENAI_API_KEY='sk-test'").unwrap(), "sk-test");
+        assert_eq!(normalize_api_key("apiKey=sk-test").unwrap(), "sk-test");
+    }
+
+    #[test]
+    fn rejects_empty_or_internal_whitespace_api_keys() {
+        assert!(normalize_api_key("  ").is_err());
+        assert!(normalize_api_key("sk test").is_err());
+    }
 
     #[test]
     fn keychain_reference_preserves_account_slashes() {

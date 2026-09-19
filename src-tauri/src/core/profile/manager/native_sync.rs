@@ -391,8 +391,8 @@ fn upsert_detected_native_profile(
     if looks_like_local_gateway_url(&base_url) {
         return Err("Detected Provider base URL is the local gateway.".to_string());
     }
-    let api_key = detected.api_key.trim();
-    if api_key.is_empty() || looks_like_local_gateway_token(api_key) {
+    let api_key = credentials::normalize_api_key(&detected.api_key)?;
+    if looks_like_local_gateway_token(&api_key) {
         return Err("Detected Provider API key is not importable.".to_string());
     }
     let model = native_optional_model(&detected.model).unwrap_or_default();
@@ -407,7 +407,7 @@ fn upsert_detected_native_profile(
             &model,
             review_model.as_deref(),
             &base_url,
-            api_key,
+            &api_key,
         )
     }) {
         return Ok(existing.clone());
@@ -416,7 +416,7 @@ fn upsert_detected_native_profile(
     if let Some(existing_index) = drafts.iter().position(|profile| {
         is_auto_imported_native_profile(profile)
             && detected_native_profile_identity_matches(profile, &app, &protocol, &model, &base_url)
-            && profile_api_key_matches_config_without_keychain(profile, api_key)
+            && profile_api_key_matches_config_without_keychain(profile, &api_key)
     }) {
         let now = Utc::now().to_rfc3339();
         let mut updated = drafts[existing_index].clone();
@@ -439,7 +439,7 @@ fn upsert_detected_native_profile(
 
         storage::save_profile(&updated)?;
         if let Some(auth_ref) = updated.auth_ref.as_deref() {
-            credentials::store_keychain_secret(auth_ref, api_key)?;
+            credentials::store_keychain_secret(auth_ref, &api_key)?;
         }
         drafts[existing_index] = updated.clone();
         drafts.sort_by(compare_profiles);
@@ -487,7 +487,7 @@ fn upsert_detected_native_profile(
 
     storage::save_profile(&draft)?;
     if let Some(auth_ref) = draft.auth_ref.as_deref() {
-        credentials::store_keychain_secret(auth_ref, api_key)?;
+        credentials::store_keychain_secret(auth_ref, &api_key)?;
     }
     drafts.push(draft.clone());
     drafts.sort_by(compare_profiles);
