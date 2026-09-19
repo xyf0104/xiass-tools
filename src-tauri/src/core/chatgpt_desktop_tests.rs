@@ -555,6 +555,14 @@ fn macos_bundle_executable_drives_process_and_tool_identity() {
             "--remote-debugging-port=9229".to_string(),
         ]
     );
+    assert_eq!(
+        macos_open_command(&installed, &[]),
+        vec![
+            "open".to_string(),
+            "-a".to_string(),
+            app.to_string_lossy().to_string(),
+        ]
+    );
 
     fs::remove_dir_all(root).unwrap();
 }

@@ -616,6 +616,7 @@ export const zhCN = {
   "wizard.webSearch": "Web Search",
   "wizard.webSearchLive": "实时搜索",
   "wizard.webSearchCached": "缓存搜索",
+  "wizard.webSearchIndexed": "索引搜索",
   "wizard.webSearchDisabled": "关闭搜索",
   "wizard.imageModel": "图片模型（WF 路由元数据）",
   "wizard.imageModelHint": "用于图片输入/生图能力路由；不会擅自写入 Codex 未确认的字段。",

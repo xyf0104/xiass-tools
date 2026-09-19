@@ -132,9 +132,17 @@ func (m *Manager) Apply(input ApplyConfig) (ApplyResult, error) {
 	if err != nil {
 		return ApplyResult{}, err
 	}
+	if err := m.requireCodexConfigWriteSafety(); err != nil {
+		return ApplyResult{}, err
+	}
 
 	var result ApplyResult
 	err = m.withLock(func() error {
+		// Recheck after the native operation lock so a Codex process started
+		// during validation cannot race the final config replacement.
+		if err := m.requireCodexConfigWriteSafety(); err != nil {
+			return err
+		}
 		original, existed, mode, err := readRegularFile(m.ConfigPath)
 		if err != nil {
 			return err
@@ -188,8 +196,14 @@ func (m *Manager) Restore(backupID string) (RestoreResult, error) {
 	if err := m.validatePaths(); err != nil {
 		return RestoreResult{}, err
 	}
+	if err := m.requireCodexConfigWriteSafety(); err != nil {
+		return RestoreResult{}, err
+	}
 	var result RestoreResult
 	err := m.withLock(func() error {
+		if err := m.requireCodexConfigWriteSafety(); err != nil {
+			return err
+		}
 		backups, err := m.ListBackups()
 		if err != nil {
 			return err

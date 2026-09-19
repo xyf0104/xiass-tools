@@ -185,6 +185,9 @@ func (a *App) ApplyCodexConfiguration(input codexconfig.ApplyConfig) CodexConfig
 	}
 	result, err := manager.Apply(input)
 	if err != nil {
+		if errors.Is(err, codexconfig.ErrCodexConfigWriteUnsafe) {
+			return codexConfigurationAfterError(manager, "Codex Desktop 正在运行或运行状态无法安全确认；未保存配置。请使用安全应用流程，让 XIASS Tools 先正常退出并重新启动 Codex。")
+		}
 		return codexConfigurationAfterError(manager, "未保存 Codex 配置。请检查 API 地址、Key、模型名称及现有 config.toml 后重试。")
 	}
 	status := a.GetCodexConfiguration()
@@ -197,10 +200,11 @@ func (a *App) ApplyCodexConfiguration(input codexconfig.ApplyConfig) CodexConfig
 }
 
 // RemoveCodexXIASSProvider explicitly removes only the xiass_tools Provider
-// managed by this app. It never reads credentials, auth.json, cookies,
-// history, or Desktop state, and it never starts, stops, or restarts Codex.
-// The manager creates a recoverable backup before an actual removal and leaves
-// every unrelated provider and TOML setting intact.
+// managed by this app. It never reads credentials, auth.json, cookies, or
+// history, and it never starts, stops, or restarts Codex. It performs only the
+// bounded Desktop running-state safety check required to refuse concurrent
+// config writes. The manager creates a recoverable backup before an actual
+// removal and leaves every unrelated provider and TOML setting intact.
 func (a *App) RemoveCodexXIASSProvider() CodexConfigurationStatus {
 	manager, err := a.codexManager()
 	if err != nil {
@@ -208,6 +212,9 @@ func (a *App) RemoveCodexXIASSProvider() CodexConfigurationStatus {
 	}
 	result, err := manager.RemoveXIASSProvider()
 	if err != nil {
+		if errors.Is(err, codexconfig.ErrCodexConfigWriteUnsafe) {
+			return codexConfigurationRemovalAfterError(manager, "Codex Desktop 正在运行或运行状态无法安全确认；未移除 Provider。请先退出 Codex，再重试。")
+		}
 		return codexConfigurationRemovalAfterError(manager, "未移除 XIASS Tools Codex Provider。当前配置保持不变；请检查 config.toml 后重试。")
 	}
 	// Disconnect is intentionally config-only. Unlike the general modal refresh
@@ -364,6 +371,9 @@ func (a *App) ApplyCodexConfigurationFromAccount(input CodexApplyAccountInput) C
 	defer clearCodexApplyConfig(&config)
 	result, err := manager.Apply(config)
 	if err != nil {
+		if errors.Is(err, codexconfig.ErrCodexConfigWriteUnsafe) {
+			return codexConfigurationAfterError(manager, "Codex Desktop 正在运行或运行状态无法安全确认；未应用所选账户。请使用安全应用流程，让 XIASS Tools 先正常退出并重新启动 Codex。")
+		}
 		return codexConfigurationAfterError(manager, "未保存所选账户的 Codex 配置。现有配置保持可恢复状态；请检查账户和 config.toml 后重试。")
 	}
 	status := a.GetCodexConfiguration()

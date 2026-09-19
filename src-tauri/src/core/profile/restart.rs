@@ -119,11 +119,20 @@ fn finish_stopped_targets(
     stopped_targets: Vec<(RestartTarget, RestartProcessResult)>,
 ) -> Result<RestartOutcome, String> {
     let mut messages = Vec::new();
+    let mut errors = Vec::new();
 
     for (target, result) in stopped_targets {
-        launch_restart_target(target, &result.paths)
-            .map_err(|err| format!("Failed to restart {}: {err}", target.label))?;
-        messages.push(restart_target_message(target, &result));
+        match launch_restart_target(target, &result.paths) {
+            Ok(()) => messages.push(restart_target_message(target, &result)),
+            Err(err) => errors.push(format!("Failed to restart {}: {err}", target.label)),
+        }
+    }
+
+    // A failure to relaunch one target must not strand every later target that
+    // was already stopped for the same transaction. Attempt all restorations,
+    // then report the complete set of failures to the caller.
+    if !errors.is_empty() {
+        return Err(errors.join(" "));
     }
 
     Ok(RestartOutcome {

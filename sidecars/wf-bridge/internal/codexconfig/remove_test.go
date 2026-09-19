@@ -116,6 +116,30 @@ enabled = true`
 	}
 }
 
+func TestRemoveXIASSProviderRefusesWhileCodexConfigSafetyGuardRejects(t *testing.T) {
+	manager := NewManagerWithOptions(t.TempDir(), ManagerOptions{
+		HistoryWriteGuard: func() error { return ErrCodexHistoryWriteUnsafe },
+	})
+	original := []byte(`model_provider = "xiass_tools"
+[model_providers.xiass_tools]
+name = "XIASS Tools"
+base_url = "https://api.xiass.com/v1"
+wire_api = "responses"
+experimental_bearer_token = "guarded-secret"
+`)
+	if err := os.WriteFile(manager.ConfigPath, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := manager.RemoveXIASSProvider()
+	if !errors.Is(err, ErrCodexConfigWriteUnsafe) || result.Removed || result.BackupID != "" {
+		t.Fatalf("guarded remove = %#v / %v", result, err)
+	}
+	if got, readErr := os.ReadFile(manager.ConfigPath); readErr != nil || !bytes.Equal(got, original) {
+		t.Fatalf("guarded remove changed config: %q / %v", got, readErr)
+	}
+}
+
 func TestRemoveXIASSProviderLeavesSelectionsAloneWhenAnotherProviderIsActive(t *testing.T) {
 	manager := NewManager(t.TempDir())
 	original := `model_provider = "official"

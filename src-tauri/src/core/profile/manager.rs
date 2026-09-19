@@ -966,14 +966,19 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
     if request.restart_after_apply && mode != ProviderApplyMode::Config {
         return Err("Apply and restart is only available for Config profiles.".to_string());
     }
-    let all_native_plans = build_native_apply_plan(
+    // Preflight before stopping a client so malformed input or an unreadable
+    // native config fails without interrupting the user's running application.
+    // The plans are deliberately rebuilt after the stop below: Codex can flush
+    // additional state while exiting, and writing a plan rendered from the
+    // pre-exit file would discard that final state.
+    let preflight_native_plans = build_native_apply_plan(
         &profile,
         &paths,
         &mode,
         request.sync_claude_vs_code,
     )?;
-    let native_plans = filter_native_write_plans(all_native_plans.clone())?;
-    if request.restart_after_apply && all_native_plans.is_empty() {
+    let _preflight_write_plans = filter_native_write_plans(preflight_native_plans.clone())?;
+    if request.restart_after_apply && preflight_native_plans.is_empty() {
         return Err(
             "Apply and restart requires a native client config write for this profile.".to_string(),
         );
@@ -985,25 +990,58 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
     if profile_is_active(&config, &profile) && !request.reapply {
         return Err("Profile is already active for this tool and mode.".to_string());
     }
-    let mut backup_targets = Vec::new();
-    for plan in &native_plans {
-        backup_targets.push(plan.path.clone());
-    }
-    let backup = backup::backup_files("apply-profile", Some(&profile.id), &backup_targets)?;
 
     // Stop clients before touching their config. Codex persists part of its
     // in-memory configuration while exiting, so closing it after the write can
     // overwrite the freshly selected provider/base URL with the old values.
-    let prepared_restart = if request.restart_after_apply {
+    // Even the Profiles page's plain "Apply" action must guard Codex Desktop:
+    // otherwise a later normal exit can restore the old provider over the new
+    // config. This automatic safety guard only touches the desktop client; an
+    // explicitly requested full restart keeps the caller's broader semantics.
+    let codex_write_guard = is_codex_tool && !preflight_native_plans.is_empty();
+    let mut prepared_restart = if request.restart_after_apply || codex_write_guard {
         Some(prepare_restart_before_profile_write(
             &profile,
             RestartContext {
                 sync_claude_vs_code: request.sync_claude_vs_code,
-                codex_desktop_only: request.restart_codex_desktop_only,
+                codex_desktop_only: request.restart_codex_desktop_only
+                    || (codex_write_guard && !request.restart_after_apply),
             },
         )?)
     } else {
         None
+    };
+
+    let final_plan_result = (|| {
+        // Capture an OAuth refresh that Codex may have persisted during its
+        // normal exit before rendering auth.json for the selected profile.
+        if is_codex_tool {
+            checkpoint_active_codex_account(&paths)?;
+        }
+        let all_native_plans = build_native_apply_plan(
+            &profile,
+            &paths,
+            &mode,
+            request.sync_claude_vs_code,
+        )?;
+        let native_plans = filter_native_write_plans(all_native_plans.clone())?;
+        let backup_targets = native_plans
+            .iter()
+            .map(|plan| plan.path.clone())
+            .collect::<Vec<_>>();
+        let backup =
+            backup::backup_files("apply-profile", Some(&profile.id), &backup_targets)?;
+        Ok::<_, String>((all_native_plans, native_plans, backup))
+    })();
+    let (all_native_plans, native_plans, backup) = match final_plan_result {
+        Ok(result) => result,
+        Err(err) => {
+            if let Some(prepared) = prepared_restart.take() {
+                let restore_error = finish_prepared_restart(prepared).err();
+                return Err(with_restart_restore_error(err, restore_error));
+            }
+            return Err(err);
+        }
     };
 
     // Write native tool configs before flipping the active pointer so a concurrent
@@ -1037,14 +1075,14 @@ pub fn apply_profile(request: ApplyProfileRequest) -> Result<ApplyProfileResult,
     let (native_verified, verified) = match apply_result {
         Ok(result) => result,
         Err(err) => {
-            if let Some(prepared) = prepared_restart {
+            if let Some(prepared) = prepared_restart.take() {
                 let restore_error = finish_prepared_restart(prepared).err();
                 return Err(with_restart_restore_error(err, restore_error));
             }
             return Err(err);
         }
     };
-    let restart_outcome = match prepared_restart {
+    let restart_outcome = match prepared_restart.take() {
         Some(prepared) => finish_prepared_restart(prepared)?,
         None => RestartOutcome {
             performed: false,

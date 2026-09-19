@@ -647,6 +647,51 @@ async function flushChatGPTDesktopSettingsDraft() {
   }
 }
 
+export async function flushChatGPTDesktopSettingsForLaunch() {
+  // Launch is a hard persistence boundary. Unlike the debounced background
+  // save, it must wait for every in-flight revision and must surface failures
+  // so callers never stop/restart Codex with stale launch options.
+  while (true) {
+    while (settingsSaveInFlight) {
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    }
+    if (settingsSaveTimer !== null) {
+      window.clearTimeout(settingsSaveTimer);
+      settingsSaveTimer = null;
+    }
+
+    const draft = get(chatgptDesktopView).settingsDraft;
+    if (!draft || settingsKey(draft) === lastSavedSettingsKey) {
+      if (draft) patch({ settingsSaveStatus: "saved" });
+      return;
+    }
+
+    settingsSaveInFlight = true;
+    patch({ settingsSaveStatus: "saving", error: null });
+    try {
+      const saved = await updateChatGPTDesktopSettings(draft);
+      lastSavedSettingsKey = settingsKey(saved);
+      lastSavedSettings = { ...saved };
+    } catch (err) {
+      patch({
+        settingsSaveStatus: "error",
+        error: err instanceof Error ? err.message : String(err)
+      });
+      throw err;
+    } finally {
+      settingsSaveInFlight = false;
+    }
+
+    const latestDraft = get(chatgptDesktopView).settingsDraft;
+    if (!latestDraft || settingsKey(latestDraft) === lastSavedSettingsKey) {
+      patch({ settingsSaveStatus: "saved" });
+      return;
+    }
+    // The user changed an option while the previous revision was saving.
+    // Loop immediately so the native launcher observes the newest draft.
+  }
+}
+
 export async function stageChatGPTDesktopPackage() {
   const snapshot = get(chatgptDesktopView);
   const installKind = snapshot.selectedKind;
@@ -745,30 +790,7 @@ export async function removeChatGPTDesktop() {
 export async function launchManagedChatGPTDesktop(restartAfterConfig = false) {
   const installKind = get(chatgptDesktopView).selectedKind;
   await runAction(installKind, "launch", async () => {
-    // Debounced option edits must reach disk before the native launcher reads
-    // them. Wait for an existing save, then persist the latest revision only.
-    while (settingsSaveInFlight) {
-      await new Promise((resolve) => window.setTimeout(resolve, 25));
-    }
-    if (settingsSaveTimer !== null) {
-      window.clearTimeout(settingsSaveTimer);
-      settingsSaveTimer = null;
-    }
-    const draft = get(chatgptDesktopView).settingsDraft;
-    if (draft && settingsKey(draft) !== lastSavedSettingsKey) {
-      const revision = settingsSaveRevision;
-      patch({ settingsSaveStatus: "saving" });
-      try {
-        const saved = await updateChatGPTDesktopSettings(draft);
-        lastSavedSettingsKey = settingsKey(saved);
-        lastSavedSettings = { ...saved };
-        if (revision === settingsSaveRevision) patch({ settingsSaveStatus: "saved" });
-        else scheduleSettingsAutoSave();
-      } catch (err) {
-        patch({ settingsSaveStatus: "error" });
-        throw err;
-      }
-    }
+    await flushChatGPTDesktopSettingsForLaunch();
     await launchChatGPTDesktop(restartAfterConfig);
   }, async () => {
     patch({ success: { key: "chatgptDesktop.launchRequested" } });

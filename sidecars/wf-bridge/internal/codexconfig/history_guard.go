@@ -16,6 +16,12 @@ import (
 // should ask the user to exit Codex themselves and retry deliberately.
 var ErrCodexHistoryWriteUnsafe = errors.New("Codex is still running; quit it yourself before changing local Codex history")
 
+// ErrCodexConfigWriteUnsafe is the configuration counterpart of the history
+// guard above. Direct/legacy UI entrypoints may inspect and validate while
+// Codex is open, but every mutation must either use the explicit desktop
+// lifecycle transaction or wait until the client is fully stopped.
+var ErrCodexConfigWriteUnsafe = errors.New("Codex is still running; use the desktop lifecycle before changing config.toml")
+
 type historyWriteGuard func() error
 
 func defaultHistoryWriteGuard() error {
@@ -66,6 +72,20 @@ func (m *Manager) requireCodexHistoryWriteSafety() error {
 	}
 	if err := guard(); err != nil {
 		return fmt.Errorf("refusing to modify local Codex history: %w", err)
+	}
+	return nil
+}
+
+func (m *Manager) requireCodexConfigWriteSafety() error {
+	if m == nil {
+		return errors.New("Codex configuration safety guard is unavailable")
+	}
+	guard := m.historyWriteGuard
+	if guard == nil {
+		guard = defaultHistoryWriteGuard
+	}
+	if err := guard(); err != nil {
+		return fmt.Errorf("%w: %v", ErrCodexConfigWriteUnsafe, err)
 	}
 	return nil
 }

@@ -198,8 +198,8 @@ pub(in crate::core::profile) fn normalize_codex_web_search(
     }
     let normalized = value.map(str::trim).filter(|item| !item.is_empty()).unwrap_or("live");
     match normalized {
-        "live" | "cached" | "disabled" => Ok(Some(normalized.to_string())),
-        _ => Err("Codex Web Search must be live, cached, or disabled.".to_string()),
+        "live" | "cached" | "indexed" | "disabled" => Ok(Some(normalized.to_string())),
+        _ => Err("Codex Web Search must be live, cached, indexed, or disabled.".to_string()),
     }
 }
 use native::claude_desktop::{
@@ -508,77 +508,65 @@ fn apply_active_native_configs(
         write_app_config(&config)?;
     }
 
-    let target_apps = lifecycle_target_apps(
-        &config.active_profiles_by_mode,
+    let preflight_lifecycle_plans = build_active_native_lifecycle_plans(
+        &config,
+        &profiles,
+        &paths,
         mode,
         include_gateway_targets,
-    );
-    let mut lifecycle_plans = Vec::new();
-    let mut errors = Vec::new();
-
-    for app in target_apps {
-        let profile =
-            active_profile_for_lifecycle_app(&config, &profiles, &app, mode).or_else(|| {
-                if mode == ProviderApplyMode::Config {
-                    default_official_profile_for_app(&profiles, &app)
-                } else {
-                    None
-                }
-            });
-
-        let Some(profile) = profile else {
-            continue;
-        };
-
-        match build_native_apply_plan(&profile, &paths, &mode, false)
-            .and_then(filter_native_write_plans)
-        {
-            Ok(plans) if !plans.is_empty() => {
-                lifecycle_plans.extend(plans.into_iter().map(|plan| NativeConfigLifecyclePlan {
-                    profile: profile.clone(),
-                    mode,
-                    plan,
-                    verify_after_write: true,
-                }));
-            }
-            Ok(_)
-                if mode == ProviderApplyMode::Config && provider_is_official(&profile.provider) =>
-            {
-                match build_gateway_cleanup_plan(&profile, &paths) {
-                    Ok(plans) => {
-                        lifecycle_plans.extend(plans.into_iter().map(|plan| {
-                            NativeConfigLifecyclePlan {
-                                profile: profile.clone(),
-                                mode,
-                                plan,
-                                verify_after_write: false,
-                            }
-                        }));
-                    }
-                    Err(err) => errors.push(format!("{}: {err}", profile.app)),
-                }
-            }
-            Ok(_) => {}
-            Err(err) => errors.push(format!("{}: {err}", profile.app)),
-        }
-    }
-
-    if !errors.is_empty() {
-        return Err(format!(
-            "Could not prepare native config lifecycle writes: {}",
-            errors.join("; ")
-        ));
-    }
-
-    if lifecycle_plans.is_empty() {
+    )?;
+    if preflight_lifecycle_plans.is_empty() {
         return Ok(0);
     }
 
-    let backup_targets = lifecycle_plans
+    // Gateway start/stop can also rewrite Codex config.toml. Guard that write
+    // with the same desktop-only lifecycle used by direct profile applies, then
+    // rebuild from the file Codex leaves on disk after its normal exit.
+    let codex_profile = preflight_lifecycle_plans
         .iter()
-        .map(|item| item.plan.path.clone())
-        .collect::<Vec<_>>();
-    backup::backup_files(backup_reason, None, &backup_targets)?;
+        .find(|item| is_codex_family_app(&item.profile.app))
+        .map(|item| item.profile.clone());
+    let mut prepared_restart = match codex_profile.as_ref() {
+        Some(profile) => Some(prepare_restart_before_profile_write(
+            profile,
+            RestartContext {
+                sync_claude_vs_code: false,
+                codex_desktop_only: true,
+            },
+        )?),
+        None => None,
+    };
+
+    let final_plan_result = (|| {
+        if codex_profile.is_some() {
+            checkpoint_active_codex_account(&paths)?;
+        }
+        let lifecycle_plans = build_active_native_lifecycle_plans(
+            &config,
+            &profiles,
+            &paths,
+            mode,
+            include_gateway_targets,
+        )?;
+        let backup_targets = lifecycle_plans
+            .iter()
+            .map(|item| item.plan.path.clone())
+            .collect::<Vec<_>>();
+        if !backup_targets.is_empty() {
+            backup::backup_files(backup_reason, None, &backup_targets)?;
+        }
+        Ok::<_, String>(lifecycle_plans)
+    })();
+    let lifecycle_plans = match final_plan_result {
+        Ok(plans) => plans,
+        Err(err) => {
+            if let Some(prepared) = prepared_restart.take() {
+                let restore_error = finish_prepared_restart(prepared).err();
+                return Err(with_restart_restore_error(err, restore_error));
+            }
+            return Err(err);
+        }
+    };
 
     let mut written = 0usize;
     let mut write_errors = Vec::new();
@@ -611,13 +599,94 @@ fn apply_active_native_configs(
     }
 
     if !write_errors.is_empty() {
-        return Err(format!(
+        let error = format!(
             "Could not complete native config lifecycle writes: {}",
             write_errors.join("; ")
-        ));
+        );
+        if let Some(prepared) = prepared_restart.take() {
+            let restore_error = finish_prepared_restart(prepared).err();
+            return Err(with_restart_restore_error(error, restore_error));
+        }
+        return Err(error);
+    }
+
+    if let Some(prepared) = prepared_restart.take() {
+        finish_prepared_restart(prepared)?;
     }
 
     Ok(written)
+}
+
+fn build_active_native_lifecycle_plans(
+    config: &AppConfig,
+    profiles: &[ProfileDraft],
+    paths: &crate::core::app_paths::AppPaths,
+    mode: ProviderApplyMode,
+    include_gateway_targets: bool,
+) -> Result<Vec<NativeConfigLifecyclePlan>, String> {
+    let target_apps = lifecycle_target_apps(
+        &config.active_profiles_by_mode,
+        mode,
+        include_gateway_targets,
+    );
+    let mut lifecycle_plans = Vec::new();
+    let mut errors = Vec::new();
+
+    for app in target_apps {
+        let profile =
+            active_profile_for_lifecycle_app(config, profiles, &app, mode).or_else(|| {
+                if mode == ProviderApplyMode::Config {
+                    default_official_profile_for_app(profiles, &app)
+                } else {
+                    None
+                }
+            });
+
+        let Some(profile) = profile else {
+            continue;
+        };
+
+        match build_native_apply_plan(&profile, paths, &mode, false)
+            .and_then(filter_native_write_plans)
+        {
+            Ok(plans) if !plans.is_empty() => {
+                lifecycle_plans.extend(plans.into_iter().map(|plan| NativeConfigLifecyclePlan {
+                    profile: profile.clone(),
+                    mode,
+                    plan,
+                    verify_after_write: true,
+                }));
+            }
+            Ok(_)
+                if mode == ProviderApplyMode::Config && provider_is_official(&profile.provider) =>
+            {
+                match build_gateway_cleanup_plan(&profile, paths) {
+                    Ok(plans) => {
+                        lifecycle_plans.extend(plans.into_iter().map(|plan| {
+                            NativeConfigLifecyclePlan {
+                                profile: profile.clone(),
+                                mode,
+                                plan,
+                                verify_after_write: false,
+                            }
+                        }));
+                    }
+                    Err(err) => errors.push(format!("{}: {err}", profile.app)),
+                }
+            }
+            Ok(_) => {}
+            Err(err) => errors.push(format!("{}: {err}", profile.app)),
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(lifecycle_plans)
+    } else {
+        Err(format!(
+            "Could not prepare native config lifecycle writes: {}",
+            errors.join("; ")
+        ))
+    }
 }
 
 fn lifecycle_target_apps(
@@ -773,25 +842,62 @@ fn rewrite_native_configs_for_profile(
 ) -> Result<(), String> {
     let paths = app_paths().map_err(|err| err.to_string())?;
     let mode = profile.mode;
-    let plans = filter_native_write_plans(build_native_apply_plan(profile, &paths, &mode, false)?)?;
-    if plans.is_empty() {
+    let preflight_plans =
+        filter_native_write_plans(build_native_apply_plan(profile, &paths, &mode, false)?)?;
+    if preflight_plans.is_empty() {
         return Ok(());
     }
 
-    let backup_targets = plans
-        .iter()
-        .map(|plan| plan.path.clone())
-        .collect::<Vec<_>>();
-    backup::backup_files(backup_reason, Some(&profile.id), &backup_targets)?;
-    for plan in &plans {
-        apply_native_config_write_plan(plan)?;
-        if !verify_native_config_write(plan, profile, &mode)? {
-            return Err(format!(
-                "Native config verification failed while updating active profile '{}' at {}",
-                profile.name,
-                display_path(&plan.path)
-            ));
+    let is_codex = is_codex_family_app(&profile.app);
+    let mut prepared_restart = if is_codex {
+        Some(prepare_restart_before_profile_write(
+            profile,
+            RestartContext {
+                sync_claude_vs_code: false,
+                codex_desktop_only: true,
+            },
+        )?)
+    } else {
+        None
+    };
+
+    let write_result = (|| {
+        if is_codex {
+            // A normal Codex exit may rotate OAuth credentials. Preserve that
+            // newest account snapshot before the final post-exit plan is built.
+            checkpoint_active_codex_account(&paths)?;
         }
+        let plans =
+            filter_native_write_plans(build_native_apply_plan(profile, &paths, &mode, false)?)?;
+        let backup_targets = plans
+            .iter()
+            .map(|plan| plan.path.clone())
+            .collect::<Vec<_>>();
+        if !backup_targets.is_empty() {
+            backup::backup_files(backup_reason, Some(&profile.id), &backup_targets)?;
+        }
+        for plan in &plans {
+            apply_native_config_write_plan(plan)?;
+            if !verify_native_config_write(plan, profile, &mode)? {
+                return Err(format!(
+                    "Native config verification failed while updating active profile '{}' at {}",
+                    profile.name,
+                    display_path(&plan.path)
+                ));
+            }
+        }
+        Ok::<_, String>(())
+    })();
+
+    if let Err(err) = write_result {
+        if let Some(prepared) = prepared_restart.take() {
+            let restore_error = finish_prepared_restart(prepared).err();
+            return Err(with_restart_restore_error(err, restore_error));
+        }
+        return Err(err);
+    }
+    if let Some(prepared) = prepared_restart.take() {
+        finish_prepared_restart(prepared)?;
     }
     Ok(())
 }

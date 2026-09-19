@@ -6,6 +6,7 @@
   } from "../lib/api";
   import {
     chatgptDesktopView,
+    flushChatGPTDesktopSettingsForLaunch,
     installOrUpdateChatGPTDesktop,
     launchManagedChatGPTDesktop,
     refreshChatGPTDesktop,
@@ -154,6 +155,9 @@
     profileApplyError = null;
     dismissSuccess();
     try {
+      // Persist the newest launch-enhancement options before the backend may
+      // close and relaunch an already-running Codex Desktop instance.
+      await flushChatGPTDesktopSettingsForLaunch();
       const result = await applyProfile({
         profileId,
         restartAfterApply: true,

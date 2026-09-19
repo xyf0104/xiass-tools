@@ -122,7 +122,7 @@
     provider: string;
     protocol: string;
     model: string;
-    webSearch: "live" | "cached" | "disabled" | null;
+    webSearch: "live" | "cached" | "indexed" | "disabled" | null;
     imageModel: string;
     modelContextWindow: number;
     modelAutoCompactTokenLimit: number;
@@ -1628,6 +1628,7 @@
                   <select bind:value={editForm.webSearch} disabled={editingId !== null}>
                     <option value="live">{$t("wizard.webSearchLive")}</option>
                     <option value="cached">{$t("wizard.webSearchCached")}</option>
+                    <option value="indexed">{$t("wizard.webSearchIndexed")}</option>
                     <option value="disabled">{$t("wizard.webSearchDisabled")}</option>
                   </select>
                 </label>

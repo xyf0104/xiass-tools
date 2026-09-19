@@ -56,8 +56,8 @@ type codexLifecycleOperations struct {
 }
 
 // ApplyCodexConfigurationWithLifecycle performs one user-confirmed lifecycle
-// transaction. The legacy ApplyCodexConfiguration method is intentionally
-// unchanged and remains available for callers that want no process control.
+// transaction. The direct ApplyCodexConfiguration method remains config-only
+// and refuses to write while Codex is running or its state is uncertain.
 func (a *App) ApplyCodexConfigurationWithLifecycle(input CodexConfigurationLifecycleInput) CodexConfigurationLifecycleStatus {
 	if a == nil || a.ctx == nil {
 		return CodexConfigurationLifecycleStatus{OK: false, Message: "助手尚未完成启动，暂时无法应用 Codex 配置。"}
@@ -251,7 +251,7 @@ func mayRestorePriorDesktop(result CodexConfigurationLifecycleStatus) bool {
 
 func hasRendererCodexDesktopProcessWarning(status CodexDesktopControlStatus) bool {
 	for _, warning := range status.Warnings {
-		if warning == codexdesktop.WarningProcessListUnavailable {
+		if isCodexDesktopSafetyWarning(warning) {
 			return true
 		}
 	}
@@ -337,9 +337,21 @@ func lifecycleFailure(result CodexConfigurationLifecycleStatus, operations codex
 
 func hasCodexDesktopProcessWarning(status codexdesktop.ControlStatus) bool {
 	for _, warning := range status.Warnings {
-		if warning == codexdesktop.WarningProcessListUnavailable {
+		if isCodexDesktopSafetyWarning(warning) {
 			return true
 		}
 	}
 	return false
+}
+
+func isCodexDesktopSafetyWarning(warning codexdesktop.Warning) bool {
+	switch warning {
+	case codexdesktop.WarningEnvironmentUnavailable,
+		codexdesktop.WarningInspectionUnavailable,
+		codexdesktop.WarningInvalidInstallation,
+		codexdesktop.WarningProcessListUnavailable:
+		return true
+	default:
+		return false
+	}
 }

@@ -20,7 +20,7 @@ const PROFILE_CAPABILITIES: &[ProfileCapabilities] = &[
         id: "codex",
         display_name: "Codex",
         official_protocol: OPENAI_RESPONSES,
-        config_protocols: &[OPENAI_CHAT_COMPLETIONS, OPENAI_RESPONSES],
+        config_protocols: &[OPENAI_RESPONSES],
         supports_review_model: true,
         supports_model_mappings: false,
     },
@@ -180,6 +180,7 @@ mod tests {
     #[test]
     fn profile_capabilities_hold_the_protocol_matrix() {
         assert!(supports_config_protocol("codex", OPENAI_RESPONSES));
+        assert!(!supports_config_protocol("codex", OPENAI_CHAT_COMPLETIONS));
         assert!(!supports_config_protocol("codex", ANTHROPIC_MESSAGES));
         assert!(supports_config_protocol("grok", ANTHROPIC_MESSAGES));
         assert!(supports_config_protocol("pi", GOOGLE_GEMINI));

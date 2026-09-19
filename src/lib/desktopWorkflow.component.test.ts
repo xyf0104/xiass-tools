@@ -8,7 +8,7 @@ import type { ProfileDraft, ProfileSummary, DetectionSnapshot } from "../types";
 
 const calls = vi.hoisted(() => ({
   applyProfile: vi.fn(), launch: vi.fn(), create: vi.fn(), applied: vi.fn(),
-  preview: vi.fn(), save: vi.fn(), listModels: vi.fn()
+  preview: vi.fn(), save: vi.fn(), listModels: vi.fn(), flushSettings: vi.fn()
 }));
 vi.mock("./api", () => ({
   applyProfile: calls.applyProfile, openChatGPTDesktopPath: vi.fn(),
@@ -20,6 +20,7 @@ vi.mock("./chatgptDesktopStore", async () => {
   const { writable } = await import("svelte/store");
   return {
     chatgptDesktopView: writable({}),
+    flushChatGPTDesktopSettingsForLaunch: calls.flushSettings,
     launchManagedChatGPTDesktop: calls.launch,
     installOrUpdateChatGPTDesktop: vi.fn(), refreshChatGPTDesktop: vi.fn(),
     removeChatGPTDesktop: vi.fn(), setChatGPTDesktopConfirmUninstall: vi.fn(),
@@ -59,6 +60,7 @@ beforeEach(() => {
       pluginAutoExpandOnLaunch: true, modelWhitelistUnlockOnLaunch: true, serviceTierControlsOnLaunch: false },
     error: null, success: null, confirmUninstall: false } as unknown as Parameters<typeof chatgptDesktopView.set>[0]);
   calls.applyProfile.mockResolvedValue({ verified: true, nativeVerified: true, mode: "config", restartPerformed: true, summary: summary() });
+  calls.flushSettings.mockResolvedValue(undefined);
   calls.launch.mockResolvedValue(undefined);
   calls.applied.mockResolvedValue(undefined);
 });
@@ -88,6 +90,16 @@ describe("Codex desktop two-step workflow", () => {
       restartCodexDesktopOnly: true,
       reapply: true
     });
+    expect(calls.flushSettings).toHaveBeenCalledOnce();
+    expect(calls.flushSettings.mock.invocationCallOrder[0]).toBeLessThan(calls.applyProfile.mock.invocationCallOrder[0]);
+    expect(calls.launch).not.toHaveBeenCalled();
+  });
+  it("does not stop or launch Codex when launch settings cannot be saved", async () => {
+    calls.flushSettings.mockRejectedValueOnce(new Error("settings save failed"));
+    const ui = screen(); await next(ui);
+    await fireEvent.click(ui.getByRole("button", { name: "启动" }));
+    await waitFor(() => expect(ui.getByText("settings save failed")).toBeTruthy());
+    expect(calls.applyProfile).not.toHaveBeenCalled();
     expect(calls.launch).not.toHaveBeenCalled();
   });
   it("launches without another restart when the desktop was not running", async () => {

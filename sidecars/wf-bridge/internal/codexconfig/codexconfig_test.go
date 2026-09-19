@@ -1,6 +1,7 @@
 package codexconfig
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -68,6 +69,30 @@ func TestNormalizeBaseURL(t *testing.T) {
 		if _, err := NormalizeBaseURL(input); err == nil {
 			t.Fatalf("unsafe base URL was accepted: %q", input)
 		}
+	}
+}
+
+func TestIndexedWebSearchModeRoundTrips(t *testing.T) {
+	home := t.TempDir()
+	manager := NewManager(home)
+	_, err := manager.Apply(ApplyConfig{
+		BaseURL:                    "https://api.xiass.com/v1",
+		APIKey:                     "sk-indexed-test",
+		Model:                      "gpt-5.6-sol",
+		ReviewModel:                "gpt-5.6-sol",
+		WebSearch:                  "indexed",
+		ModelContextWindow:         372000,
+		ModelAutoCompactTokenLimit: 334800,
+	})
+	if err != nil {
+		t.Fatalf("Apply(indexed) error = %v", err)
+	}
+	snapshot, err := manager.Verify()
+	if err != nil {
+		t.Fatalf("Verify(indexed) error = %v", err)
+	}
+	if snapshot.WebSearch != "indexed" || !snapshot.ManagedProviderVerified {
+		t.Fatalf("indexed snapshot = %+v", snapshot)
 	}
 }
 
@@ -182,6 +207,49 @@ func TestApplyInspectAndRestorePreservesUserConfiguration(t *testing.T) {
 	}
 	if string(configAfterRestore) != originalConfig {
 		t.Fatal("restore did not restore original bytes")
+	}
+}
+
+func TestApplyAndRestoreRefuseWhileCodexConfigSafetyGuardRejects(t *testing.T) {
+	home := t.TempDir()
+	manager := NewManagerWithOptions(home, ManagerOptions{
+		HistoryWriteGuard: func() error { return nil },
+	})
+	if err := os.WriteFile(manager.ConfigPath, []byte(originalConfig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Apply(ApplyConfig{
+		BaseURL: "https://api.xiass.com",
+		APIKey:  "guard-test-secret",
+		Model:   "gpt-5.6-sol",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	applied, err := os.ReadFile(manager.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	manager.historyWriteGuard = func() error { return ErrCodexHistoryWriteUnsafe }
+	blocked, err := manager.Apply(ApplyConfig{
+		BaseURL: "https://blocked.example.test",
+		APIKey:  "must-not-be-written",
+		Model:   "blocked-model",
+	})
+	if !errors.Is(err, ErrCodexConfigWriteUnsafe) || blocked.BackupID != "" {
+		t.Fatalf("guarded apply = %#v / %v", blocked, err)
+	}
+	if got, readErr := os.ReadFile(manager.ConfigPath); readErr != nil || !bytes.Equal(got, applied) {
+		t.Fatalf("guarded apply changed config: %q / %v", got, readErr)
+	}
+
+	restored, err := manager.Restore(result.BackupID)
+	if !errors.Is(err, ErrCodexConfigWriteUnsafe) || restored.RestoredBackupID != "" {
+		t.Fatalf("guarded restore = %#v / %v", restored, err)
+	}
+	if got, readErr := os.ReadFile(manager.ConfigPath); readErr != nil || !bytes.Equal(got, applied) {
+		t.Fatalf("guarded restore changed config: %q / %v", got, readErr)
 	}
 }
 

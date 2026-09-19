@@ -201,9 +201,10 @@ test("ChatGPT desktop launch restarts a running client only when history sync is
   assert.match(launchBody, /is_chatgpt_desktop_running/);
   assert.match(
     launchBody,
-    /if\s+settings\.sync_history_on_launch\s*&&\s*running[\s\S]*close_chatgpt_desktop_processes[\s\S]*sync_history_if_enabled/
+    /if\s+running[\s\S]*if\s+settings\.sync_history_on_launch[\s\S]*close_chatgpt_desktop_processes[\s\S]*sync_history_if_enabled/
   );
-  assert.match(launchBody, /else\s+if\s+!running[\s\S]*sync_history_if_enabled/);
+  assert.match(launchBody, /else\s*\{[\s\S]*launch_installed_codex\(&installed, &\[\]\)[\s\S]*return Ok\(\(\)\)/);
+  assert.match(launchBody, /}\s+else\s*\{[\s\S]*sync_history_if_enabled/);
 
   assert.ok(restartLaunchBody, "restart launch body should exist");
   assert.match(restartLaunchBody, /close_chatgpt_desktop_processes/);

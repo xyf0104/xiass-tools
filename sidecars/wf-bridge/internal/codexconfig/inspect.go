@@ -67,7 +67,7 @@ func (m *Manager) Inspect() (ConfigSnapshot, error) {
 func webSearchValue(value any) string {
 	mode := strings.ToLower(strings.TrimSpace(stringValue(value)))
 	switch mode {
-	case "live", "cached", "disabled":
+	case "live", "cached", "indexed", "disabled":
 		return mode
 	case "off":
 		// Codex accepts this legacy spelling. Present the canonical UI value
@@ -243,7 +243,7 @@ func validManagedWebSearch(value any) bool {
 		return false
 	}
 	switch mode {
-	case "live", "cached", "disabled", "off":
+	case "live", "cached", "indexed", "disabled", "off":
 		return true
 	default:
 		return false

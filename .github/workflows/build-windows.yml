@@ -26,6 +26,9 @@ jobs:
       - run: npm test
       - working-directory: src-tauri
         run: cargo test --locked
+      - name: Test WF bridge
+        working-directory: sidecars/wf-bridge
+        run: go test -tags wfbridge ./...
 
   build:
     needs: quality

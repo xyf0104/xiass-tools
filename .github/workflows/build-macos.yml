@@ -46,6 +46,10 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked
 
+      - name: Test WF bridge
+        working-directory: sidecars/wf-bridge
+        run: go test -tags wfbridge ./...
+
       - name: Check Rust compilation
         working-directory: src-tauri
         run: cargo check --locked --all-targets

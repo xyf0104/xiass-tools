@@ -143,6 +143,9 @@ func (a *App) ApplyCodexXIASSSelection(sessionID string, input codexconfig.Apply
 		return applyErr
 	})
 	if err != nil {
+		if errors.Is(err, codexconfig.ErrCodexConfigWriteUnsafe) {
+			return codexConfigurationAfterError(manager, "Codex Desktop 正在运行或运行状态无法安全确认；未应用所选 XIASS API Key。请使用安全应用流程，让 XIASS Tools 先正常退出并重新启动 Codex。")
+		}
 		return codexConfigurationAfterError(manager, "未保存通过 XIASS API 选择的 Codex 配置。请重新选择 Key 并检查模型设置后重试。")
 	}
 	status := a.GetCodexConfiguration()

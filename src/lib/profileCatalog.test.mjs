@@ -21,7 +21,8 @@ test("profile catalog centralizes aliases and capabilities", () => {
 
   assert.equal(PROFILE_TOOL_CATALOG.length, 9);
   assert.equal(PROFILE_TOOL_CATALOG.some((tool) => tool.id === "antigravity"), false);
-  assert.deepEqual(configProtocolIdsForTool("codex"), ["openai-chat-completions", "openai-responses"]);
+  assert.deepEqual(configProtocolIdsForTool("codex"), ["openai-responses"]);
+  assert.equal(profileSupportsConfigProtocol("codex", "openai-chat-completions"), false);
   assert.equal(profileSupportsConfigProtocol("grok", "anthropic-messages"), true);
   assert.equal(profileSupportsConfigProtocol("codex", "anthropic-messages"), false);
   assert.equal(profileSupportsModelMappings("claude"), true);

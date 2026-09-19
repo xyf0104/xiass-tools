@@ -89,6 +89,9 @@ type FileSystem interface {
 // implementation. The detector never returns this path to its caller.
 type Process struct {
 	Executable string
+	// PID is kept only for verified, native lifecycle operations. It is never
+	// copied into Status or any renderer-facing value.
+	PID uint32
 }
 
 // ProcessLister obtains a read-only process snapshot. Implementations must
@@ -109,9 +112,28 @@ type BundleFinder interface {
 	FindBundles(ctx context.Context, bundleIdentifier string, limit int) ([]string, error)
 }
 
-// Registry is a deliberately narrow read-only registry surface. It is used by
-// the Windows implementation for public Store package registration and is
-// ignored on macOS.
+// WindowsPackage is the private-in-practice result of reading public Appx
+// registration metadata. Although it is exported so deterministic test
+// doubles can implement WindowsPackageFinder, no value of this type is ever
+// serialized or returned to the renderer.
+type WindowsPackage struct {
+	Root              string
+	Executable        string
+	Version           string
+	PackageFamilyName string
+	ApplicationID     string
+}
+
+// WindowsPackageFinder performs a bounded lookup for one exact public MSIX
+// identity. Production reads only package registration and manifest metadata;
+// it never reads Codex user data, accounts, history, or credentials.
+type WindowsPackageFinder interface {
+	FindPackages(ctx context.Context, packageIdentity string, limit int) ([]WindowsPackage, error)
+}
+
+// Registry is retained as a deliberately narrow compatibility seam for public
+// Windows registration metadata and is ignored on macOS. Current production
+// discovery uses WindowsPackageFinder so package values stay structured.
 type Registry interface {
 	Subkeys(path string, limit int) ([]string, error)
 }
@@ -119,12 +141,13 @@ type Registry interface {
 // Options supplies optional test doubles. Nil dependencies use the platform's
 // built-in read-only implementations.
 type Options struct {
-	FileSystem     FileSystem
-	Processes      ProcessLister
-	Registry       Registry
-	BundleFinder   BundleFinder
-	Now            func() time.Time
-	ProcessTimeout time.Duration
+	FileSystem      FileSystem
+	Processes       ProcessLister
+	Registry        Registry
+	BundleFinder    BundleFinder
+	WindowsPackages WindowsPackageFinder
+	Now             func() time.Time
+	ProcessTimeout  time.Duration
 }
 
 // Detector performs bounded, read-only local discovery.

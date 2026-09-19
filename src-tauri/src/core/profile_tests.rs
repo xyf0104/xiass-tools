@@ -1,6 +1,23 @@
 use super::*;
 
 #[test]
+fn codex_indexed_web_search_is_preserved_in_native_config() {
+    assert_eq!(
+        normalize_codex_web_search("codex", Some("indexed")).unwrap(),
+        Some("indexed".to_string())
+    );
+    let mut profile = test_profile("codex", ProviderApplyMode::Config);
+    profile.web_search = Some("indexed".to_string());
+    profile.protocol = PROTOCOL_OPENAI_RESPONSES.to_string();
+    let content = codex_direct_config_content("", &profile).unwrap();
+    let config: toml::Value = toml::from_str(&content).unwrap();
+    assert_eq!(
+        read_toml_string(&config, "web_search").as_deref(),
+        Some("indexed")
+    );
+}
+
+#[test]
 fn xiass_profile_name_is_the_provider_display_name() {
     for name in ["XIASS API", "我的 API", "API \"测试\""] {
         assert_eq!(normalize_profile_provider(name, "compatible").unwrap(), name);
@@ -3574,7 +3591,11 @@ fn test_profile(app: &str, mode: ProviderApplyMode) -> ProfileDraft {
         is_builtin: false,
         mode,
         provider: "openai".to_string(),
-        protocol: PROTOCOL_OPENAI_CHAT_COMPLETIONS.to_string(),
+        protocol: if canonical_profile_app(app) == "codex" {
+            PROTOCOL_OPENAI_RESPONSES.to_string()
+        } else {
+            PROTOCOL_OPENAI_CHAT_COMPLETIONS.to_string()
+        },
         model: String::new(),
         web_search: None,
         image_model: None,

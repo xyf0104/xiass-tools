@@ -218,7 +218,7 @@
   let baseUrl: string = XIASS_API_PRESET.baseUrl;
   let model: string = XIASS_API_PRESET.model;
   let reviewModel: string = XIASS_API_PRESET.reviewModel;
-  let webSearch: "live" | "cached" | "disabled" = "live";
+  let webSearch: "live" | "cached" | "indexed" | "disabled" = "live";
   let imageModel = "";
   let modelContextWindow = 372000;
   let modelAutoCompactTokenLimit = 334800;
@@ -1258,6 +1258,7 @@
                 <select bind:value={webSearch}>
                   <option value="live">{$t("wizard.webSearchLive")}</option>
                   <option value="cached">{$t("wizard.webSearchCached")}</option>
+                  <option value="indexed">{$t("wizard.webSearchIndexed")}</option>
                   <option value="disabled">{$t("wizard.webSearchDisabled")}</option>
                 </select>
               </label>

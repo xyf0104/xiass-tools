@@ -618,6 +618,7 @@ export const zhTW = {
   "wizard.webSearch": "Web Search",
   "wizard.webSearchLive": "即時搜尋",
   "wizard.webSearchCached": "快取搜尋",
+  "wizard.webSearchIndexed": "索引搜尋",
   "wizard.webSearchDisabled": "關閉搜尋",
   "wizard.imageModel": "圖片模型（WF 路由中繼資料）",
   "wizard.imageModelHint": "用於圖片輸入／生圖能力路由；不會擅自寫入未確認的 Codex 欄位。",

@@ -254,6 +254,11 @@ func TestOpenAICodexProfileUsesReviewedHexPKCEFormat(t *testing.T) {
 }
 
 func TestReviewedProfileIgnoresHiddenExternalRedirectOverride(t *testing.T) {
+	probe, err := net.Listen("tcp", "127.0.0.1:1455")
+	if err != nil {
+		t.Skipf("reviewed OpenAI callback port is in use by another local application: %v", err)
+	}
+	_ = probe.Close()
 	storage.Init(t.TempDir())
 	app := &App{}
 	started := app.BeginOAuthProviderAuthorization("openai-codex", storage.UpstreamAccount{

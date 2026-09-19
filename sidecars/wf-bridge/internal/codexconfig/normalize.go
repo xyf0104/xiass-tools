@@ -71,7 +71,7 @@ func NormalizeApplyConfig(input ApplyConfig) (ApplyConfig, error) {
 		return input, errors.New("Codex provider wire API must be responses")
 	}
 	switch input.WebSearch {
-	case "live", "cached", "disabled", "off":
+	case "live", "cached", "indexed", "disabled", "off":
 	default:
 		return input, errors.New("invalid web search mode")
 	}

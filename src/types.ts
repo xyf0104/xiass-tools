@@ -435,7 +435,7 @@ export interface ProfileDraft {
   provider: string;
   protocol: string;
   model: string;
-  webSearch: "live" | "cached" | "disabled" | null;
+  webSearch: "live" | "cached" | "indexed" | "disabled" | null;
   imageModel: string | null;
   modelContextWindow: number | null;
   modelAutoCompactTokenLimit: number | null;
@@ -534,7 +534,7 @@ export interface SaveProfileDraftRequest {
   baseUrl: string;
   secretProvided: boolean;
   apiKey?: string | null;
-  webSearch?: "live" | "cached" | "disabled" | null;
+  webSearch?: "live" | "cached" | "indexed" | "disabled" | null;
   imageModel?: string | null;
   modelContextWindow?: number | null;
   modelAutoCompactTokenLimit?: number | null;
@@ -554,7 +554,7 @@ export interface UpdateProfileDraftRequest {
   modelMappings?: ProfileModelMapping[] | null;
   baseUrl: string;
   apiKey?: string | null;
-  webSearch?: "live" | "cached" | "disabled" | null;
+  webSearch?: "live" | "cached" | "indexed" | "disabled" | null;
   imageModel?: string | null;
   modelContextWindow?: number | null;
   modelAutoCompactTokenLimit?: number | null;
@@ -589,7 +589,7 @@ export interface PreviewProfileWriteRequest {
   baseUrl: string;
   secretProvided: boolean;
   apiKey?: string | null;
-  webSearch?: "live" | "cached" | "disabled" | null;
+  webSearch?: "live" | "cached" | "indexed" | "disabled" | null;
   imageModel?: string | null;
   modelContextWindow?: number | null;
   modelAutoCompactTokenLimit?: number | null;

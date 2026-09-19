@@ -42,9 +42,15 @@ func (m *Manager) RemoveXIASSProvider() (RemoveResult, error) {
 	if !preflightPlan.changed {
 		return RemoveResult{WasActive: preflightPlan.wasActive}, nil
 	}
+	if err := m.requireCodexConfigWriteSafety(); err != nil {
+		return RemoveResult{}, err
+	}
 
 	var result RemoveResult
 	err = m.withLock(func() error {
+		if err := m.requireCodexConfigWriteSafety(); err != nil {
+			return err
+		}
 		original, existed, mode, err := readRegularFile(m.ConfigPath)
 		if err != nil {
 			return err

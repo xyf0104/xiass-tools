@@ -10,6 +10,7 @@ pub(in crate::core::profile) const CODEX_ACTOR_AUTHORIZATION_INLINE_TOML: &str =
 fn codex_web_search(profile: &ProfileDraft) -> &str {
     match profile.web_search.as_deref() {
         Some("cached") => "cached",
+        Some("indexed") => "indexed",
         Some("disabled") => "disabled",
         _ => "live",
     }
@@ -114,7 +115,10 @@ pub(in crate::core::profile) fn auth_json_has_canonical_api_key(
 fn wire_api_for_protocol(protocol: &str) -> Result<&'static str, String> {
     match normalize_protocol(Some(protocol))?.as_str() {
         PROTOCOL_OPENAI_RESPONSES => Ok("responses"),
-        PROTOCOL_OPENAI_CHAT_COMPLETIONS => Ok("chat"),
+        PROTOCOL_OPENAI_CHAT_COMPLETIONS => Err(
+            "Codex custom providers require the OpenAI Responses API; Chat Completions is not supported."
+                .to_string(),
+        ),
         PROTOCOL_ANTHROPIC_MESSAGES => {
             Err("Codex native config does not support Claude Messages API directly.".to_string())
         }

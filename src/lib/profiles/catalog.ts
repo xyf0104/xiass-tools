@@ -27,7 +27,7 @@ export const PROFILE_TOOL_CATALOG: readonly ProfileToolDefinition[] = [
     defaultProfileNameKey: "wizard.defaultProfile.codex",
     officialProtocol: "openai-responses",
     defaultProtocol: "openai-responses",
-    configProtocols: ["openai-chat-completions", "openai-responses"],
+    configProtocols: ["openai-responses"],
     supportsReviewModel: true,
     supportsModelMappings: false
   },

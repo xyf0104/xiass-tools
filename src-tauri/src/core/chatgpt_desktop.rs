@@ -941,11 +941,20 @@ pub fn launch() -> Result<(), String> {
     let installed = detect_installed(&settings)
         .ok_or_else(|| "ChatGPT Desktop was not detected.".to_string())?;
     let running = is_chatgpt_desktop_running(Some(&installed));
-    if settings.sync_history_on_launch && running {
-        let mut notes = Vec::new();
-        close_chatgpt_desktop_processes(&installed, &mut notes)?;
-        sync_history_if_enabled(&settings)?;
-    } else if !running {
+    if running {
+        if settings.sync_history_on_launch {
+            let mut notes = Vec::new();
+            close_chatgpt_desktop_processes(&installed, &mut notes)?;
+            sync_history_if_enabled(&settings)?;
+        } else {
+            // A second launch is an activate/focus action. Do not rewrite
+            // config.toml or start another CDP injector against a port the
+            // already-running Electron process was never launched with.
+            launch_installed_codex(&installed, &[])?;
+            let _ = activity_log::append(Severity::Info, "Activated ChatGPT Desktop.");
+            return Ok(());
+        }
+    } else {
         sync_history_if_enabled(&settings)?;
     }
     launch_detected_chatgpt_desktop(&settings, &installed)
@@ -2776,9 +2785,11 @@ fn macos_open_command(installed: &InstalledChatGptDesktop, args: &[String]) -> V
         "open".to_string(),
         "-a".to_string(),
         installed.path.clone(),
-        "--args".to_string(),
     ];
-    command.extend(args.iter().cloned());
+    if !args.is_empty() {
+        command.push("--args".to_string());
+        command.extend(args.iter().cloned());
+    }
     command
 }
 
@@ -3073,6 +3084,28 @@ mod chatgpt_macos_scope_tests {
         }
     }
 
+    #[test]
+    fn activating_a_running_macos_client_does_not_emit_an_empty_args_marker() {
+        let installed = InstalledChatGptDesktop {
+            path: "/Applications/ChatGPT.app".to_string(),
+            version: "1.0.0".to_string(),
+            arch: Some("arm64".to_string()),
+            source: "macos".to_string(),
+            generation: ChatGptDesktopProductGeneration::Current,
+            package_family_name: Some(CODEX_MACOS_BUNDLE_ID.to_string()),
+            installed_at: None,
+        };
+
+        assert_eq!(
+            macos_open_command(&installed, &[]),
+            vec![
+                "open".to_string(),
+                "-a".to_string(),
+                "/Applications/ChatGPT.app".to_string(),
+            ]
+        );
+    }
+
     fn write_app(applications: &Path, app_name: &str, executable: &str, version: &str) -> PathBuf {
         let app = applications.join(app_name);
         fs::create_dir_all(app.join("Contents")).unwrap();
@@ -3148,7 +3181,6 @@ mod chatgpt_macos_scope_tests {
                 "open".to_string(),
                 "-a".to_string(),
                 user_app.to_string_lossy().to_string(),
-                "--args".to_string(),
             ]
         );
         assert_eq!(

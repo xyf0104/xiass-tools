@@ -618,6 +618,7 @@ export const enUS: Record<TranslationKey, string> = {
   "wizard.webSearch": "Web Search",
   "wizard.webSearchLive": "Live search",
   "wizard.webSearchCached": "Cached search",
+  "wizard.webSearchIndexed": "Indexed search",
   "wizard.webSearchDisabled": "Disabled",
   "wizard.imageModel": "Image model (WF routing metadata)",
   "wizard.imageModelHint": "Used to route image input and generation; it is not written to an unconfirmed Codex TOML field.",
