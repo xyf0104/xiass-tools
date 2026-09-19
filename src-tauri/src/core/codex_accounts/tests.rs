@@ -81,6 +81,45 @@ fn accepts_cockpit_token_container_arrays() {
 }
 
 #[test]
+fn accepts_cockpit_accounts_with_access_and_refresh_without_id_token() {
+    let input = json!({
+        "type": "cockpit-export",
+        "accounts": [{
+            "name": "workspace@example.invalid----myWorkspace",
+            "platform": "openai",
+            "type": "oauth",
+            "credentials": {
+                "access_token": "cockpit-access-token",
+                "refresh_token": "cockpit-refresh-token",
+                "chatgpt_account_id": "cockpit-account",
+                "organization_id": "cockpit-workspace",
+                "expires_at": 1900000000,
+                "expires_in": 3600,
+                "plan_type": "plus"
+            },
+            "extra": {
+                "email": "workspace@example.invalid",
+                "display_name": "myWorkspace"
+            },
+            "concurrency": 2,
+            "priority": 0
+        }]
+    });
+    let accounts = parse_import(&input.to_string()).unwrap();
+    assert_eq!(accounts.len(), 1);
+    let written: Value = serde_json::from_str(&accounts[0].content).unwrap();
+    assert_eq!(written["auth_mode"], "chatgpt");
+    assert_eq!(written["tokens"]["access_token"], "cockpit-access-token");
+    assert_eq!(written["tokens"]["refresh_token"], "cockpit-refresh-token");
+    assert_eq!(written["tokens"]["account_id"], "cockpit-account");
+    assert!(written["tokens"].get("id_token").is_none());
+    assert_eq!(
+        accounts[0].info.account_id.as_deref(),
+        Some("cockpit-account")
+    );
+}
+
+#[test]
 fn accepts_sub2api_and_legacy_batch_envelopes() {
     let first = fixture("one", "team-a");
     let second = fixture("two", "team-b");

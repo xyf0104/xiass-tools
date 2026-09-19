@@ -207,7 +207,21 @@ pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, Stri
     }
     let access = source_text(&sources, &["access_token", "accessToken", "access-token"]);
     let id = source_text(&sources, &["id_token", "idToken", "id-token"]);
-    let (Some(access), Some(id)) = (access, id) else {
+    let refresh = source_text(
+        &sources,
+        &[
+            "refresh_token",
+            "refreshToken",
+            "refresh-token",
+            "mobile_rt",
+            "mobileRT",
+        ],
+    );
+    // Cockpit/WF account exports may intentionally omit id_token while still
+    // carrying a usable access_token plus refresh_token. The native importer
+    // treats that as an OAuth account; id_token is optional metadata, not a
+    // prerequisite for importing the account.
+    let Some(access) = access else {
         if source_text(
             &sources,
             &[
@@ -224,25 +238,19 @@ pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, Stri
         }
         return Err("codexAccount.missingTokens".into());
     };
-    let refresh = source_text(
-        &sources,
-        &[
-            "refresh_token",
-            "refreshToken",
-            "refresh-token",
-            "mobile_rt",
-            "mobileRT",
-        ],
-    )
-    .unwrap_or("");
-    let id_claims = claims(id);
+    let refresh = refresh.unwrap_or("");
+    let id_claims = id.map(claims).unwrap_or(Value::Null);
     let access_claims = claims(access);
-    // An ID token must at least be a JWT with a subject. This is structural
-    // validation only, not signature verification or a server login check.
-    if id.split('.').count() != 3
-        || text(&id_claims, &["sub"]).is_none()
-        || [id, access, refresh]
-            .iter()
+    // If an id_token is supplied, retain structural validation. When it is
+    // absent, the access/refresh pair remains valid in Cockpit exports. This
+    // is structural validation only, not signature verification or a server
+    // login check.
+    let invalid_id = id
+        .is_some_and(|token| token.split('.').count() != 3 || text(&id_claims, &["sub"]).is_none());
+    if invalid_id
+        || [Some(access), id, Some(refresh)]
+            .into_iter()
+            .flatten()
             .any(|token| token.chars().any(char::is_whitespace))
     {
         return Err("codexAccount.invalidTokens".into());
@@ -288,8 +296,17 @@ pub(crate) fn normalize_account(value: &Value) -> Result<AccountCredential, Stri
         .map(display_label)
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "Codex OAuth".into());
-    let mut auth = json!({"auth_mode":"chatgpt", "OPENAI_API_KEY":null,
-        "tokens": {"access_token":access, "id_token":id, "refresh_token":refresh, "account_id":account_id}});
+    let mut tokens = json!({"access_token": access});
+    if let Some(id) = id {
+        tokens["id_token"] = json!(id);
+    }
+    if !refresh.is_empty() {
+        tokens["refresh_token"] = json!(refresh);
+    }
+    if let Some(account_id) = &account_id {
+        tokens["account_id"] = json!(account_id);
+    }
+    let mut auth = json!({"auth_mode":"chatgpt", "OPENAI_API_KEY":null, "tokens": tokens});
     if let Some(date) = source_text(&sources, &["last_refresh", "lastRefresh"])
         .filter(|s| chrono::DateTime::parse_from_rfc3339(s).is_ok())
     {
@@ -600,11 +617,8 @@ pub(crate) fn same_account(left: &Value, right: &Value) -> bool {
     let right = &right["tokens"];
     let l_id = text(left, &["id_token"]);
     let r_id = text(right, &["id_token"]);
-    let (Some(l_id), Some(r_id)) = (l_id, r_id) else {
-        return false;
-    };
-    let l_claims = claims(l_id);
-    let r_claims = claims(r_id);
+    let l_claims = l_id.map(claims).unwrap_or(Value::Null);
+    let r_claims = r_id.map(claims).unwrap_or(Value::Null);
     let l_account = text(left, &["account_id"]).or_else(|| {
         text(
             &l_claims["https://api.openai.com/auth"],
@@ -617,7 +631,7 @@ pub(crate) fn same_account(left: &Value, right: &Value) -> bool {
             &["chatgpt_account_id"],
         )
     });
-    if l_account != r_account {
+    if l_account.is_some() && r_account.is_some() && l_account != r_account {
         return false;
     }
     if let (Some(l_sub), Some(r_sub)) = (text(&l_claims, &["sub"]), text(&r_claims, &["sub"])) {
@@ -626,8 +640,8 @@ pub(crate) fn same_account(left: &Value, right: &Value) -> bool {
     let l_refresh = text(left, &["refresh_token"]);
     let r_refresh = text(right, &["refresh_token"]);
     (l_refresh.is_some() && l_refresh == r_refresh)
-        || (l_id == r_id
-            && text(left, &["access_token"]).is_some()
+        || (l_id.is_some() && l_id == r_id)
+        || (text(left, &["access_token"]).is_some()
             && text(left, &["access_token"]) == text(right, &["access_token"]))
 }
 

@@ -1192,10 +1192,22 @@ fn infer_codex_auth_method(value: &serde_json::Value) -> CodexAuthMethod {
         };
     }
     if auth_mode.eq_ignore_ascii_case("chatgpt") {
-        return if ["id_token", "access_token"].iter().all(|key| {
-            value.get("tokens").and_then(|tokens| tokens.get(key))
-                .and_then(serde_json::Value::as_str).is_some_and(|token| !token.trim().is_empty())
-        }) { CodexAuthMethod::ChatGpt } else { CodexAuthMethod::None };
+        let tokens = value.get("tokens");
+        let has_access = tokens
+            .and_then(|tokens| tokens.get("access_token"))
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|token| !token.trim().is_empty());
+        let has_identity = ["id_token", "refresh_token"].iter().any(|key| {
+            tokens
+                .and_then(|tokens| tokens.get(key))
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|token| !token.trim().is_empty())
+        });
+        return if has_access && has_identity {
+            CodexAuthMethod::ChatGpt
+        } else {
+            CodexAuthMethod::None
+        };
     }
     if auth_mode.eq_ignore_ascii_case("access_token") {
         return CodexAuthMethod::AccessToken;
