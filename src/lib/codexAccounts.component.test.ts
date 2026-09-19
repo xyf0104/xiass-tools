@@ -172,15 +172,20 @@ describe("wizard account integration", () => {
     const keyInput = ui.container.querySelector('input[type="password"]')!;
     await fireEvent.input(keyInput, { target: { value: "fixture-api-key" } });
     await fireEvent.click(ui.getByRole("button", { name: "JSON 账号导入" }));
-    expect((ui.getByLabelText("配置名称") as HTMLInputElement).value).toBe("Codex 官方账号");
+    expect(ui.queryByLabelText("配置名称")).toBeNull();
+    expect(ui.queryByLabelText("模型（可选）")).toBeNull();
+    expect(ui.queryByLabelText("审查模型（可选）")).toBeNull();
+    const accountPanel = ui.container.querySelector('section[aria-label="登录方式"]') as HTMLElement;
+    expect(accountPanel).toBeTruthy();
+    const contextPanel = ui.container.querySelector('section[aria-label="上下文窗口"]') as HTMLElement;
+    expect(contextPanel).toBeTruthy();
+    expect(accountPanel.compareDocumentPosition(contextPanel) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(ui.getByRole("button", { name: "下一步" }).hasAttribute("disabled")).toBe(true);
-    expect((ui.container.querySelector('[id$="-oauth-input"]') as HTMLInputElement).value).toBe("");
-    await fireEvent.input(ui.getByLabelText("配置名称"), { target: { value: "Work account" } });
     await fireEvent.click(ui.getByRole("button", { name: "自定义 API 配置" }));
     expect((ui.getByLabelText("配置名称") as HTMLInputElement).value).toBe("My API");
     expect((ui.container.querySelector('input[type="password"]') as HTMLInputElement).value).toBe("fixture-api-key");
     await fireEvent.click(ui.getByRole("button", { name: "JSON 账号导入" }));
-    expect((ui.getByLabelText("配置名称") as HTMLInputElement).value).toBe("Work account");
+    expect(ui.queryByLabelText("配置名称")).toBeNull();
   });
   it("saves a selected JSON account through an opaque handle and retains it across Next/Back", async () => {
     const ui = wizard();

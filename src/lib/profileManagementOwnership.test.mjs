@@ -184,7 +184,7 @@ test("Codex profiles own an optional review model across forms, cards, mocks, an
   assert.match(wizard, /let reviewModel: string = XIASS_API_PRESET.reviewModel;/);
   assert.match(wizard, /\$: supportsReviewModel = canonicalProfileToolId\(selectedTool\) === "codex";/);
   assert.match(wizard, /reviewModel: activeReviewModel/);
-  assert.match(wizard, /\{#if supportsReviewModel\}[\s\S]*?profiles\.reviewModelLabel[\s\S]*?bind:value=\{reviewModel\}/);
+  assert.match(wizard, /\{#if supportsReviewModel && !codexJsonImport\}[\s\S]*?profiles\.reviewModelLabel[\s\S]*?bind:value=\{reviewModel\}/);
   assert.match(wizard, /bind:value=\{accountReviewModel\}/);
 
   assert.match(profiles, /reviewModel: string;/);

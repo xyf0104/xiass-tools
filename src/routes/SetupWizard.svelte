@@ -279,6 +279,7 @@
   $: activeModelMappings = codexOAuthConfig ? [] : modelMappingsForRequest(selectedTool, modelMappings);
   $: activeBaseUrl = codexOAuthConfig ? "" : baseUrl;
   $: activeApiKey = codexOAuthConfig ? "" : apiKey;
+  $: codexJsonImport = codexOAuthConfig && codexAccountSource === "json";
   $: codexContextValid = canonicalProfileToolId(selectedTool) !== "codex"
     || (Number.isInteger(modelContextWindow) && modelContextWindow >= 64000 && modelContextWindow <= 1050000
       && Number.isInteger(modelAutoCompactTokenLimit) && modelAutoCompactTokenLimit >= 16000
@@ -1093,12 +1094,21 @@
         </div>
       {/if}
 
+      {#if codexJsonImport}
+        {#key codexAccountSource}
+          <CodexAccountPanel mode={codexAccountSource} bind:session={codexAccountSession}
+            bind:accountIndex={codexAccountIndex} bind:busy={codexAccountBusy} disabled={saving} />
+        {/key}
+      {/if}
+
       <div class={wizardFormGridRecipe()}>
-        <label>
-          {$t("wizard.profileName")}
-          <input bind:value={profileName} />
-          {#if nameErrorKey}<small class={wizardFieldErrorRecipe()}>{$t(nameErrorKey)}</small>{/if}
-        </label>
+        {#if !codexJsonImport}
+          <label>
+            {$t("wizard.profileName")}
+            <input bind:value={profileName} />
+            {#if nameErrorKey}<small class={wizardFieldErrorRecipe()}>{$t(nameErrorKey)}</small>{/if}
+          </label>
+        {/if}
         {#if !supportsReviewModel}
         <label class={wizardWideFieldRecipe()}>
           {$t("profiles.remarkLabel")}
@@ -1211,7 +1221,7 @@
             </section>
           {/if}
         {/if}
-        {#if codexOAuthConfig}
+        {#if codexOAuthConfig && !codexJsonImport}
           <div class={modelPickerClass}>
             <label for={`${modelListId}-oauth-input`}>{$t("wizard.modelOptional")}</label>
             <ModelSelectInput
@@ -1225,7 +1235,7 @@
             <small class={modelPickerStatusClass}>{$t("wizard.codexOAuth.modelHint")}</small>
           </div>
         {/if}
-        {#if supportsReviewModel}
+        {#if supportsReviewModel && !codexJsonImport}
           <div class={modelPickerClass}>
             <label for={`${modelListId}-review-input`}>{$t("profiles.reviewModelLabel")}</label>
             {#if codexOAuthConfig}
@@ -1289,7 +1299,7 @@
           </section>
         {/if}
       </div>
-      {#if codexOAuthConfig}
+      {#if codexOAuthConfig && !codexJsonImport}
         {#key codexAccountSource}
           <CodexAccountPanel mode={codexAccountSource} bind:session={codexAccountSession}
             bind:accountIndex={codexAccountIndex} bind:busy={codexAccountBusy} disabled={saving} />

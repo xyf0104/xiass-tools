@@ -1,7 +1,7 @@
 {
   "name": "xiass-tools",
   "private": true,
-  "version": "1.9.7",
+  "version": "1.9.8",
   "license": "MIT",
   "type": "module",
   "scripts": {

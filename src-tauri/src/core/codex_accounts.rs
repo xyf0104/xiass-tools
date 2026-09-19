@@ -146,8 +146,22 @@ fn credential_sources(value: &Value) -> Vec<&Value> {
             continue;
         }
         for name in CREDENTIAL_CONTAINER_NAMES {
-            if let Some(child) = current.get(name).filter(|child| child.is_object()) {
-                queue.push_back((child, depth + 1));
+            match current.get(name) {
+                Some(child) if child.is_object() => queue.push_back((child, depth + 1)),
+                Some(Value::Array(children)) => {
+                    // Some Cockpit-style exports serialize `tokens` as an
+                    // array even for a single account. Follow object entries
+                    // only, keep the same allow-listed container boundary,
+                    // and cap traversal to the existing account limit.
+                    for child in children
+                        .iter()
+                        .filter(|child| child.is_object())
+                        .take(MAX_ACCOUNTS)
+                    {
+                        queue.push_back((child, depth + 1));
+                    }
+                }
+                _ => {}
             }
         }
     }

@@ -60,6 +60,27 @@ fn accepts_legacy_cockpit_nested_containers_and_field_aliases() {
 }
 
 #[test]
+fn accepts_cockpit_token_container_arrays() {
+    let standard = fixture("array-user", "array-workspace");
+    let input = json!({
+        "OPENAI_API_KEY": null,
+        "tokens": [
+            {
+                "access_token": standard["tokens"]["access_token"],
+                "id_token": standard["tokens"]["id_token"],
+                "refresh_token": standard["tokens"]["refresh_token"],
+                "account_id": standard["tokens"]["account_id"]
+            }
+        ]
+    });
+    let account = normalize_account(&input).unwrap();
+    let written: Value = serde_json::from_str(&account.content).unwrap();
+    assert_eq!(written["auth_mode"], "chatgpt");
+    assert_eq!(written["tokens"], standard["tokens"]);
+    assert_eq!(account.info.account_id.as_deref(), Some("array-workspace"));
+}
+
+#[test]
 fn accepts_sub2api_and_legacy_batch_envelopes() {
     let first = fixture("one", "team-a");
     let second = fixture("two", "team-b");
