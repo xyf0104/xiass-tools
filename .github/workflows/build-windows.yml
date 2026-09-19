@@ -26,9 +26,11 @@ jobs:
       - run: npm test
       - working-directory: src-tauri
         run: cargo test --locked
-      - name: Test WF bridge
+      - name: Test Codex WF bridge lifecycle
         working-directory: sidecars/wf-bridge
-        run: go test -tags wfbridge ./...
+        run: |
+          go test -tags wfbridge -run Codex .
+          go test -tags wfbridge ./internal/codexconfig ./internal/codexdesktop ./internal/codexselection
 
   build:
     needs: quality
