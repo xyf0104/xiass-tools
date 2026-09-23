@@ -61,6 +61,7 @@ func patchConfig(original []byte, input ApplyConfig, managedIDs []string) []byte
 		`name = "` + escapeTOML(input.ProviderName) + `"`,
 		`base_url = "` + escapeTOML(input.BaseURL) + `"`,
 		`wire_api = "` + escapeTOML(input.WireAPI) + `"`,
+		"models = " + builtInCodexModelsTOML(),
 		"requires_openai_auth = false",
 		`experimental_bearer_token = "` + escapeTOML(input.APIKey) + `"`,
 		`http_headers = { "x-openai-actor-authorization" = "` + escapeTOML(actorAuthorization(input.BaseURL)) + `" }`,
@@ -72,6 +73,14 @@ func patchConfig(original []byte, input ApplyConfig, managedIDs []string) []byte
 	}
 	parts = append(parts, strings.Join(provider, "\n"))
 	return []byte(strings.Join(parts, "\n\n") + "\n")
+}
+
+func builtInCodexModelsTOML() string {
+	values := make([]string, 0, len(BuiltInCodexModels))
+	for _, model := range BuiltInCodexModels {
+		values = append(values, `"`+escapeTOML(strings.TrimSpace(model))+`"`)
+	}
+	return "[" + strings.Join(values, ", ") + "]"
 }
 
 func verifyManagedConfig(data []byte, expected ApplyConfig) error {
@@ -112,6 +121,22 @@ func verifyManagedConfig(data []byte, expected ApplyConfig) error {
 	} {
 		if got, _ := provider[key].(string); got != want {
 			return fmt.Errorf("provider %s mismatch", key)
+		}
+	}
+	models, ok := provider["models"].([]any)
+	if !ok {
+		return errors.New("provider model catalog missing")
+	}
+	for _, expected := range BuiltInCodexModels {
+		found := false
+		for _, candidate := range models {
+			if stringValue(candidate) == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("provider model catalog missing %s", expected)
 		}
 	}
 	if value, ok := provider["requires_openai_auth"].(bool); !ok || value {

@@ -1551,6 +1551,15 @@ model_reasoning_effort = "xhigh"
         toml_lookup(&value, "model_providers.custom.wire_api").and_then(|item| item.as_str()),
         Some("responses")
     );
+    let provider_models = toml_lookup(&value, "model_providers.custom.models")
+        .and_then(|item| item.as_array())
+        .expect("Codex provider model catalog should be an array");
+    for expected in ["gpt-6-sol", "gpt-6-luna"] {
+        assert!(
+            provider_models.iter().any(|item| item.as_str() == Some(expected)),
+            "provider model catalog is missing {expected}"
+        );
+    }
     assert_codex_managed_provider_contract(&value, "custom");
     assert_eq!(
         read_toml_string(&value, "cli_auth_credentials_store").as_deref(),

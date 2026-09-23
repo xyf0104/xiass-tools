@@ -151,6 +151,7 @@ func TestApplyInspectAndRestorePreservesUserConfiguration(t *testing.T) {
 		`web_search = "cached"`,
 		`name = "无风的 XIASS"`,
 		`base_url = "https://api.xiass.com/v1"`,
+		`models = ["gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]`,
 		`experimental_bearer_token = "sk-test-1234567890"`,
 		`[mcp_servers.example]`,
 		`[model_providers.official]`,
@@ -176,7 +177,7 @@ func TestApplyInspectAndRestorePreservesUserConfiguration(t *testing.T) {
 	if !snapshot.Valid || snapshot.ModelProvider != DefaultProviderID || snapshot.Model != "gpt-5.6-sol" || snapshot.WebSearch != "cached" {
 		t.Fatalf("snapshot = %+v", snapshot)
 	}
-	if got := strings.Join(snapshot.ConfiguredModels, ","); got != "gpt-5.6-luna,gpt-5.6-sol" {
+	if got := strings.Join(snapshot.ConfiguredModels, ","); got != "gpt-5.6-luna,gpt-5.6-sol,gpt-5.6-terra,gpt-6-astra,gpt-6-luna,gpt-6-sol" {
 		t.Fatalf("configured models = %q", got)
 	}
 	encoded, err := json.Marshal(snapshot)

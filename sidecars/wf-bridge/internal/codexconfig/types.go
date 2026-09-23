@@ -26,6 +26,19 @@ const (
 	MinimumAutoCompactTokenLimit int64 = 16000
 )
 
+// BuiltInCodexModels is the cross-platform XIASS model directory fallback.
+// Codex's official provider may not expose every selectable model through its
+// local `/models` endpoint, so Windows and macOS UIs use this stable list in
+// addition to models explicitly present in config.toml.
+var BuiltInCodexModels = []string{
+	"gpt-6-astra",
+	"gpt-6-sol",
+	"gpt-6-luna",
+	"gpt-5.6-sol",
+	"gpt-5.6-terra",
+	"gpt-5.6-luna",
+}
+
 // ApplyConfig describes the Codex provider entry to write. BaseURL accepts a
 // bare hostname, an API root, or a normal OpenAI-compatible /v1 endpoint.
 // APIKey is never written to a manifest or returned by inspection APIs.

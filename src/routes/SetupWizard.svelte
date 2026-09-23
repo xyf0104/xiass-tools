@@ -6,7 +6,12 @@
   import { fade, fly } from "svelte/transition";
   import { listProfileModels, previewProfileWrite, saveProfileDraft } from "../lib/api";
   import { t, type TranslationKey } from "../lib/i18n";
-  import { profileNameErrorKey, profileProviderFromName, XIASS_API_PRESET } from "../lib/profiles/xiass";
+  import {
+    profileNameErrorKey,
+    profileProviderFromName,
+    XIASS_API_PRESET,
+    XIASS_CODEX_MODEL_OPTIONS
+  } from "../lib/profiles/xiass";
   import {
     canonicalProfileToolId,
     configProtocolIdsForTool,
@@ -224,7 +229,7 @@
   let modelAutoCompactTokenLimit = 334800;
   let contextMode: "235000" | "372000" | "512000" | "1000000" | "custom" = "372000";
   let modelMappings: ProfileModelMappingForm[] = [];
-  let modelOptions: ProfileModelOption[] = [];
+  let modelOptions: ProfileModelOption[] = [...XIASS_CODEX_MODEL_OPTIONS];
   let modelLoading = false;
   let modelError: string | null = null;
   let modelLoadedKey = "";
@@ -309,7 +314,7 @@
     apiKey: activeApiKey
   });
   $: if (modelLoadedKey && modelLoadedKey !== modelRequestKey) {
-    modelOptions = [];
+    modelOptions = builtInModelOptionsForTool();
     modelError = null;
     modelLoadedKey = "";
   }
@@ -531,8 +536,27 @@
     return providerId.trim() === "official";
   }
 
+  function builtInModelOptionsForTool(toolId = selectedTool): ProfileModelOption[] {
+    return canonicalProfileToolId(toolId) === "codex"
+      ? XIASS_CODEX_MODEL_OPTIONS.map((option) => ({ ...option }))
+      : [];
+  }
+
+  function mergeModelOptions(options: ProfileModelOption[], toolId = selectedTool): ProfileModelOption[] {
+    if (canonicalProfileToolId(toolId) !== "codex") {
+      return options;
+    }
+    const merged = new Map<string, ProfileModelOption>();
+    for (const option of builtInModelOptionsForTool(toolId)) merged.set(option.id, option);
+    for (const option of options) {
+      const id = option.id.trim();
+      if (id) merged.set(id, { ...option, id });
+    }
+    return [...merged.values()];
+  }
+
   function resetModelOptions() {
-    modelOptions = [];
+    modelOptions = builtInModelOptionsForTool();
     modelLoading = false;
     modelError = null;
     modelLoadedKey = "";
@@ -652,13 +676,13 @@
         baseUrl: normalizeBaseUrl(activeBaseUrl),
         apiKey: activeApiKey
       });
-      modelOptions = result.models;
+      modelOptions = mergeModelOptions(result.models);
       modelLoadedKey = requestKey;
-      if (result.models.length === 0) {
+      if (modelOptions.length === 0) {
         modelError = $t("profiles.modelListEmpty");
       }
     } catch (err) {
-      modelOptions = [];
+      modelOptions = builtInModelOptionsForTool();
       modelLoadedKey = "";
       modelError = errorLabel(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1227,7 +1251,7 @@
             <ModelSelectInput
               id={`${modelListId}-oauth-input`}
               bind:value={accountModel}
-              options={[]}
+              options={builtInModelOptionsForTool("codex")}
               optionLabel={modelOptionLabel}
               toggleTitle={$t("wizard.modelOptional")}
               placeholder={$t("wizard.modelOptional")}
@@ -1242,7 +1266,7 @@
             <ModelSelectInput
               id={`${modelListId}-review-input`}
               bind:value={accountReviewModel}
-              options={[]}
+              options={builtInModelOptionsForTool("codex")}
               toggleTitle={$t("profiles.reviewModelLabel")}
               placeholder={$t("profiles.reviewModelPlaceholder")}
             />

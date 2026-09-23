@@ -2,6 +2,27 @@ import type { ProfileDraft } from "../../types";
 import { canonicalProfileToolId } from "./catalog.js";
 
 export const XIASS_PROFILE_LOGO = "/xiass-tools-logo.png";
+
+// Codex's official desktop client does not expose its model directory through
+// the normal OpenAI-compatible `/models` endpoint. Keep the XIASS-managed
+// built-in list in one place so the setup wizard, profile editor, and the
+// desktop enhancement layer all offer the same models on macOS and Windows.
+// Users can still type any additional model ID into ModelSelectInput.
+export const XIASS_CODEX_MODEL_IDS = [
+  "gpt-6-astra",
+  "gpt-6-sol",
+  "gpt-6-luna",
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna"
+] as const;
+
+export const XIASS_CODEX_MODEL_OPTIONS = XIASS_CODEX_MODEL_IDS.map((id) => ({
+  id,
+  name: id,
+  supports1m: false
+}));
+
 export const XIASS_API_PRESET = {
   name: "XIASS API",
   baseUrl: "https://api.xiass.com",

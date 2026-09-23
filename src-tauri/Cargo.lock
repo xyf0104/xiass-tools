@@ -6217,7 +6217,7 @@ dependencies = [
 
 [[package]]
 name = "xiass-tools"
-version = "1.9.10"
+version = "1.9.11"
 dependencies = [
  "base64 0.22.1",
  "chrono",

@@ -141,6 +141,12 @@ func providersFromRoot(root map[string]any) []Provider {
 
 func configuredModels(model, review string) []string {
 	set := map[string]struct{}{}
+	for _, candidate := range BuiltInCodexModels {
+		candidate = strings.TrimSpace(candidate)
+		if candidate != "" {
+			set[candidate] = struct{}{}
+		}
+	}
 	for _, candidate := range []string{strings.TrimSpace(model), strings.TrimSpace(review)} {
 		if candidate != "" {
 			set[candidate] = struct{}{}

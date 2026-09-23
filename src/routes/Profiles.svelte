@@ -46,7 +46,14 @@
     profileModelOptionLabel,
     providerIsOfficial
   } from "../lib/profiles/presentation";
-  import { canReuseProfileKeyForModels, createXiassApiTemplate, profileNameErrorKey, profileProviderFromName, XIASS_API_TEMPLATE_ID } from "../lib/profiles/xiass";
+  import {
+    canReuseProfileKeyForModels,
+    createXiassApiTemplate,
+    profileNameErrorKey,
+    profileProviderFromName,
+    XIASS_API_TEMPLATE_ID,
+    XIASS_CODEX_MODEL_OPTIONS
+  } from "../lib/profiles/xiass";
   import AppIcon from "../components/AppIcon.svelte";
   import DismissibleNotice from "../components/DismissibleNotice.svelte";
   import ModelSelectInput from "../components/ModelSelectInput.svelte";
@@ -375,7 +382,7 @@
       })
     : "";
   $: if (editModelLoadedKey && editModelLoadedKey !== editModelRequestKey) {
-    editModelOptions = [];
+    editModelOptions = builtInModelOptionsForTool(pendingEdit?.app ?? "");
     editModelError = null;
     editModelLoadedKey = "";
   }
@@ -549,10 +556,29 @@
   }
 
   function resetEditModels() {
-    editModelOptions = [];
+    editModelOptions = builtInModelOptionsForTool(pendingEdit?.app ?? "");
     editModelLoading = false;
     editModelError = null;
     editModelLoadedKey = "";
+  }
+
+  function builtInModelOptionsForTool(toolId: string): ProfileModelOption[] {
+    return canonicalProfileToolId(toolId) === "codex"
+      ? XIASS_CODEX_MODEL_OPTIONS.map((option) => ({ ...option }))
+      : [];
+  }
+
+  function mergeModelOptions(options: ProfileModelOption[], toolId: string): ProfileModelOption[] {
+    if (canonicalProfileToolId(toolId) !== "codex") {
+      return options;
+    }
+    const merged = new Map<string, ProfileModelOption>();
+    for (const option of builtInModelOptionsForTool(toolId)) merged.set(option.id, option);
+    for (const option of options) {
+      const id = option.id.trim();
+      if (id) merged.set(id, { ...option, id });
+    }
+    return [...merged.values()];
   }
 
   async function refreshEditModels() {
@@ -578,13 +604,13 @@
         baseUrl: normalizeBaseUrl(editForm.baseUrl),
         apiKey: editForm.apiKey.trim() || null
       });
-      editModelOptions = result.models;
+      editModelOptions = mergeModelOptions(result.models, pendingEdit.app);
       editModelLoadedKey = requestKey;
-      if (result.models.length === 0) {
+      if (editModelOptions.length === 0) {
         editModelError = $t("profiles.modelListEmpty");
       }
     } catch (err) {
-      editModelOptions = [];
+      editModelOptions = builtInModelOptionsForTool(pendingEdit.app);
       editModelLoadedKey = "";
       editModelError = errorLabel(err instanceof Error ? err.message : String(err));
     } finally {
