@@ -69,7 +69,11 @@ if (current.status !== 0) {
   const release = JSON.parse(current.stdout);
   assert(!release.isPrerelease, "Refusing to mutate a prerelease");
 }
-let release = api(`releases/tags/${tag}`);
+// GitHub's by-tag endpoint does not resolve draft releases. Resolve the draft
+// by its numeric ID from the authenticated release list until it is published.
+const releaseId = api("releases?per_page=100").find((item) => item.tag_name === tag)?.id;
+assert(releaseId, "Could not resolve the draft release");
+let release = api(`releases/${releaseId}`);
 assert(release.assets.every((asset) => expected.includes(asset.name)), "Unexpected existing release asset");
 for (let index = 0; index < files.length; index++) {
   const existing = release.assets.find((asset) => asset.name === names[index]);
@@ -79,7 +83,7 @@ for (let index = 0; index < files.length; index++) {
     gh("release", "upload", tag, files[index], "--repo", repo);
   }
 }
-release = api(`releases/tags/${tag}`);
+release = api(`releases/${releaseId}`);
 assert.equal(release.assets.length, 3);
 for (let index = 0; index < files.length; index++) {
   const asset = release.assets.find((item) => item.name === names[index]);
