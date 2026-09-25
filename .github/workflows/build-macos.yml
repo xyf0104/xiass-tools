@@ -2,6 +2,19 @@ name: Build macOS
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_existing_tag:
+        description: 'Optional: publish installers from completed runs for this tag (skips rebuilding)'
+        required: false
+        default: ''
+      macos_run_id:
+        description: 'Successful macOS run ID for the tag'
+        required: false
+        default: ''
+      windows_run_id:
+        description: 'Successful Windows run ID for the tag'
+        required: false
+        default: ''
   push:
     tags:
       - "v*"
@@ -11,6 +24,7 @@ permissions:
 
 jobs:
   quality:
+    if: ${{ !inputs.publish_existing_tag }}
     name: macOS quality gates
     runs-on: macos-latest
     steps:
@@ -105,3 +119,26 @@ jobs:
           path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 14
+
+  publish-existing-installers:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_existing_tag != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: release-${{ inputs.publish_existing_tag }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify source runs and publish their installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.publish_existing_tag }}
+          MACOS_RUN_ID: ${{ inputs.macos_run_id }}
+          WINDOWS_RUN_ID: ${{ inputs.windows_run_id }}
+        run: node scripts/publish-ci-installers.mjs
