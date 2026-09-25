@@ -18,19 +18,6 @@ const CODEX_PATCH_INJECTION_RETRY_MS: u64 = 500;
 const CODEX_PATCH_WATCHDOG_POLL_MS: u64 = 2_000;
 const CODEX_PATCH_WATCHDOG_MAX_MISSES: usize = 15;
 
-// Official Codex does not always expose its complete model directory through
-// the local desktop API. Keep these XIASS-supported IDs available as a
-// fallback while still merging every model discovered from config.toml,
-// model_catalog_json, providers, or environment variables.
-const XIASS_CODEX_MODEL_IDS: &[&str] = &[
-    "gpt-6-astra",
-    "gpt-6-sol",
-    "gpt-6-luna",
-    "gpt-5.6-sol",
-    "gpt-5.6-terra",
-    "gpt-5.6-luna",
-];
-
 pub(super) fn launch<F>(settings: &ChatGptDesktopSettings, launcher: F) -> Result<(), String>
 where
     F: FnOnce(&[String]) -> Result<(), String>,
@@ -170,9 +157,6 @@ fn codex_model_catalog_for_injection() -> CodexModelCatalog {
         sources: Vec::new(),
         responses_api: json!({ "status": "unknown", "message": "" }),
     };
-    for model in XIASS_CODEX_MODEL_IDS {
-        push_unique_model(&mut catalog.models, model);
-    }
     if let Ok(home) = codex_home_dir() {
         let config_path = home.join("config.toml");
         if let Ok(text) = fs::read_to_string(&config_path) {
@@ -249,13 +233,6 @@ fn collect_codex_model_catalog_from_toml(
     for key in ["model", "default_model"] {
         if let Some(model) = provider.get(key).and_then(toml::Value::as_str) {
             push_unique_model(&mut catalog.models, model);
-        }
-    }
-    for key in ["models", "model_list", "available_models"] {
-        if let Some(models) = provider.get(key).and_then(toml::Value::as_array) {
-            for model in models.iter().filter_map(toml::Value::as_str) {
-                push_unique_model(&mut catalog.models, model);
-            }
         }
     }
 }
@@ -705,13 +682,10 @@ mod tests {
     }
 
     #[test]
-    fn model_catalog_always_contains_xiass_codex_models() {
-        let catalog = codex_model_catalog_for_injection();
-        for model in XIASS_CODEX_MODEL_IDS {
-            assert!(
-                catalog.models.iter().any(|item| item == model),
-                "missing {model}"
-            );
-        }
+    fn model_catalog_does_not_advertise_unwritten_provider_models() {
+        let mut catalog = CodexModelCatalog::default();
+        let value = "model = 'configured-only'\nmodel_provider = 'custom'\n[model_providers.custom]\nmodels = ['phantom']".parse::<toml::Value>().unwrap();
+        collect_codex_model_catalog_from_toml(Path::new("unused"), &value, &mut catalog);
+        assert_eq!(catalog.models, vec!["configured-only"]);
     }
 }

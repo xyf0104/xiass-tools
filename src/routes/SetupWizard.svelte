@@ -28,6 +28,7 @@
   } from "../lib/profiles/form";
   import AppIcon from "../components/AppIcon.svelte";
   import ModelSelectInput from "../components/ModelSelectInput.svelte";
+  import { fetchedModelOptions, profileModelOptionLabel } from "../lib/profiles/presentation";
   import SecretInput from "../components/SecretInput.svelte";
   import ToolIcon from "../components/ToolIcon.svelte";
   import {
@@ -229,7 +230,9 @@
   let modelAutoCompactTokenLimit = 334800;
   let contextMode: "235000" | "372000" | "512000" | "1000000" | "custom" = "372000";
   let modelMappings: ProfileModelMappingForm[] = [];
-  let modelOptions: ProfileModelOption[] = [...XIASS_CODEX_MODEL_OPTIONS];
+  let modelOptions: ProfileModelOption[] = [];
+  let modelRequestSerial = 0;
+  let observedModelRequestKey = "";
   let modelLoading = false;
   let modelError: string | null = null;
   let modelLoadedKey = "";
@@ -313,10 +316,9 @@
     baseUrl: activeBaseUrl,
     apiKey: activeApiKey
   });
-  $: if (modelLoadedKey && modelLoadedKey !== modelRequestKey) {
-    modelOptions = builtInModelOptionsForTool();
-    modelError = null;
-    modelLoadedKey = "";
+  $: if (observedModelRequestKey !== modelRequestKey) {
+    observedModelRequestKey = modelRequestKey;
+    resetModelOptions();
   }
   $: previewRequestKey = [
     profileName.trim(),
@@ -367,7 +369,7 @@
     ? $t("profiles.fetchingModels")
     : modelError
       ? modelError
-      : modelOptions.length > 0
+      : modelLoadedKey && modelOptions.length > 0
         ? $t("profiles.modelListLoaded", { count: modelOptions.length })
         : null;
   $: canContinue =
@@ -542,21 +544,9 @@
       : [];
   }
 
-  function mergeModelOptions(options: ProfileModelOption[], toolId = selectedTool): ProfileModelOption[] {
-    if (canonicalProfileToolId(toolId) !== "codex") {
-      return options;
-    }
-    const merged = new Map<string, ProfileModelOption>();
-    for (const option of builtInModelOptionsForTool(toolId)) merged.set(option.id, option);
-    for (const option of options) {
-      const id = option.id.trim();
-      if (id) merged.set(id, { ...option, id });
-    }
-    return [...merged.values()];
-  }
-
   function resetModelOptions() {
-    modelOptions = builtInModelOptionsForTool();
+    modelRequestSerial += 1;
+    modelOptions = [];
     modelLoading = false;
     modelError = null;
     modelLoadedKey = "";
@@ -598,19 +588,19 @@
     baseUrl: string;
     apiKey: string;
   }) {
-    return [
+    // In-memory only: never log, persist, or render this credential-sensitive key.
+    return JSON.stringify([
       input.app.trim(),
       input.mode,
       input.provider.trim(),
       input.protocol.trim(),
       normalizeBaseUrl(input.baseUrl),
-      input.apiKey.trim() ? "inline-key" : "no-key"
-    ].join("|");
+      input.apiKey.trim()
+    ]);
   }
 
   function modelOptionLabel(option: ProfileModelOption) {
-    const label = option.name && option.name !== option.id ? `${option.id} - ${option.name}` : option.id;
-    return option.supports1m ? `${label} (1M)` : label;
+    return profileModelOptionLabel(option);
   }
 
   function buildProfileDraftRequest(): SaveProfileDraftRequest {
@@ -666,6 +656,7 @@
     modelLoading = true;
     modelError = null;
     const requestKey = modelRequestKey;
+    const serial = ++modelRequestSerial;
 
     try {
       const result = await listProfileModels({
@@ -676,17 +667,19 @@
         baseUrl: normalizeBaseUrl(activeBaseUrl),
         apiKey: activeApiKey
       });
-      modelOptions = mergeModelOptions(result.models);
+      if (serial !== modelRequestSerial || requestKey !== modelRequestKey) return;
+      modelOptions = fetchedModelOptions(result.models);
       modelLoadedKey = requestKey;
       if (modelOptions.length === 0) {
         modelError = $t("profiles.modelListEmpty");
       }
     } catch (err) {
-      modelOptions = builtInModelOptionsForTool();
+      if (serial !== modelRequestSerial || requestKey !== modelRequestKey) return;
+      modelOptions = [];
       modelLoadedKey = "";
       modelError = errorLabel(err instanceof Error ? err.message : String(err));
     } finally {
-      modelLoading = false;
+      if (serial === modelRequestSerial) modelLoading = false;
     }
   }
 

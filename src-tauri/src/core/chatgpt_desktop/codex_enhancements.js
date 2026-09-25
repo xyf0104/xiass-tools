@@ -39,14 +39,6 @@
   const codexThreadServiceTierDraftBindWindowMs = 60 * 1000;
   const codexDefaultServiceTierSetting = { key: "default-service-tier", default: null };
   const codexServiceTierFallbackFastValue = "priority";
-  const codexBuiltInModelNames = [
-    "gpt-6-astra",
-    "gpt-6-sol",
-    "gpt-6-luna",
-    "gpt-5.6-sol",
-    "gpt-5.6-terra",
-    "gpt-5.6-luna",
-  ];
   const codexServiceTierSupportedFastModels = new Set([
     "gpt-5.4",
     "gpt-5.5",
@@ -690,7 +682,6 @@
   function codexPlusModelNames() {
     codexModelCatalog = normalizeModelCatalog(codestudioLiteSettings().modelCatalog || codexModelCatalog);
     return uniqueValues([
-      ...codexBuiltInModelNames,
       codexModelCatalog.default_model,
       codexModelCatalog.model,
       ...(Array.isArray(codexModelCatalog.models) ? codexModelCatalog.models : []),

@@ -152,6 +152,11 @@ func (m *Manager) Apply(input ApplyConfig) (ApplyResult, error) {
 				return fmt.Errorf("existing config.toml is invalid; no changes were made: %w", err)
 			}
 		}
+		catalog, err := m.prepareModelCatalog(original, normalized)
+		if err != nil {
+			return err
+		}
+		normalized.modelCatalogPath = catalog.path
 		backup, err := m.createBackup(original, existed, mode, "apply")
 		if err != nil {
 			return fmt.Errorf("create config backup: %w", err)
@@ -162,6 +167,10 @@ func (m *Manager) Apply(input ApplyConfig) (ApplyResult, error) {
 			return fmt.Errorf("generated config verification failed: %w", err)
 		}
 		if err := ensureFileUnchanged(m.ConfigPath, original, existed); err != nil {
+			return err
+		}
+		// Publish the catalog before publishing a config pointer to it.
+		if err := catalog.apply(); err != nil {
 			return err
 		}
 		if err := writeFileAtomic(m.ConfigPath, updated, secureMode(mode)); err != nil {

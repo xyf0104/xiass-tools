@@ -876,7 +876,14 @@ fn build_native_config_content_preview(
     }
 
     let current = read_file_if_exists(&path)?;
-    let render = |current: &str| native_config_content_for_preview(current, profile, mode);
+    let render = |current: &str| {
+        let content = native_config_content_for_preview(current, profile, mode)?;
+        if canonical_profile_app(&profile.app) == "codex" {
+            native::codex_catalog::prepare(&path, &content, profile).map(|(content, _)| content)
+        } else {
+            Ok(content)
+        }
+    };
     match render(&current) {
         Ok(content) => Ok(Some(content)),
         Err(err) if preview_content_parse_error(&err) => render("").map(Some),

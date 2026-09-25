@@ -1680,6 +1680,11 @@ fn build_native_apply_plan(
         }
     };
 
+    let (content, mut plans) = if app == "codex" {
+        native::codex_catalog::prepare(&path, &content, profile)?
+    } else {
+        (content, Vec::new())
+    };
     let config_plan = NativeConfigWritePlan::write(
         path,
         content,
@@ -1688,8 +1693,6 @@ fn build_native_apply_plan(
             _ => NativeConfigWriteKind::ProfileConfig,
         },
     );
-    let mut plans = Vec::new();
-
     if let Some(auth_plan) = build_codex_auth_json_write_plan(profile, paths, mode)? {
         plans.push(auth_plan);
     }
@@ -1826,9 +1829,20 @@ fn verify_native_config_write(
     }
 
     match plan.kind {
-        NativeConfigWriteKind::ProfileConfig => verify_native_config(&plan.path, profile, mode),
+        NativeConfigWriteKind::ProfileConfig => {
+            if !verify_native_config(&plan.path, profile, mode)? {
+                return Ok(false);
+            }
+            if canonical_profile_app(&profile.app) == "codex" {
+                return native::codex_catalog::verify_config_pointer(plan);
+            }
+            Ok(true)
+        }
         NativeConfigWriteKind::CodexAuthJson => {
             native::codex::verify_auth_json_write(&plan.path, &plan.content)
+        }
+        NativeConfigWriteKind::CodexModelCatalog | NativeConfigWriteKind::CodexCatalogProfile => {
+            native::codex_catalog::verify(plan)
         }
         NativeConfigWriteKind::ClaudeVsCodePluginConfig => {
             verify_claude_vscode_plugin_config(&plan.path)

@@ -1,6 +1,7 @@
 pub(in crate::core::profile) mod claude;
 pub(in crate::core::profile) mod claude_desktop;
 pub(in crate::core::profile) mod codex;
+pub(in crate::core::profile) mod codex_catalog;
 pub(in crate::core::profile) mod gemini_code_assist;
 pub(in crate::core::profile) mod grok;
 pub(in crate::core::profile) mod hermes;

@@ -1551,15 +1551,7 @@ model_reasoning_effort = "xhigh"
         toml_lookup(&value, "model_providers.custom.wire_api").and_then(|item| item.as_str()),
         Some("responses")
     );
-    let provider_models = toml_lookup(&value, "model_providers.custom.models")
-        .and_then(|item| item.as_array())
-        .expect("Codex provider model catalog should be an array");
-    for expected in ["gpt-6-sol", "gpt-6-luna"] {
-        assert!(
-            provider_models.iter().any(|item| item.as_str() == Some(expected)),
-            "provider model catalog is missing {expected}"
-        );
-    }
+    assert!(toml_lookup(&value, "model_providers.custom.models").is_none());
     assert_codex_managed_provider_contract(&value, "custom");
     assert_eq!(
         read_toml_string(&value, "cli_auth_credentials_store").as_deref(),
@@ -3040,6 +3032,10 @@ fn codex_direct_apply_plan_writes_auth_json_before_config() {
 
     let plans = build_native_apply_plan(&profile, &paths, &ProviderApplyMode::Config, false)
         .expect("direct plan should build");
+    assert_eq!(plans[0].kind, NativeConfigWriteKind::CodexModelCatalog);
+    apply_native_config_write_plan(&plans[0]).unwrap();
+    assert!(verify_native_config_write(&plans[0], &profile, &ProviderApplyMode::Config).unwrap());
+    let plans = &plans[1..];
     assert_eq!(plans.len(), 2);
     assert!(matches!(
         plans[0].kind,
@@ -3130,6 +3126,10 @@ fn codex_gateway_apply_plan_writes_local_token_to_auth_json_before_config() {
     let client = gateway::client_config_for_tool("codex").expect("gateway client config");
     let plans = build_native_apply_plan(&profile, &paths, &ProviderApplyMode::Gateway, false)
         .expect("gateway plan should build");
+    assert_eq!(plans[0].kind, NativeConfigWriteKind::CodexModelCatalog);
+    apply_native_config_write_plan(&plans[0]).unwrap();
+    assert!(verify_native_config_write(&plans[0], &profile, &ProviderApplyMode::Gateway).unwrap());
+    let plans = &plans[1..];
     assert_eq!(plans.len(), 2);
     assert!(matches!(
         plans[0].kind,
@@ -3590,7 +3590,7 @@ fn claude_gateway_config_model_uses_first_mapping_alias() {
     );
 }
 
-fn test_profile(app: &str, mode: ProviderApplyMode) -> ProfileDraft {
+pub(super) fn test_profile(app: &str, mode: ProviderApplyMode) -> ProfileDraft {
     ProfileDraft {
         id: format!("{app}-custom"),
         name: "Custom".to_string(),
@@ -3627,7 +3627,7 @@ fn store_test_profile_secret(profile: &ProfileDraft, secret: &str) {
     credentials::store_keychain_secret(auth_ref, secret).expect("test key should store");
 }
 
-fn test_paths() -> crate::core::app_paths::AppPaths {
+pub(super) fn test_paths() -> crate::core::app_paths::AppPaths {
     let root = env::temp_dir().join(format!(
         "codestudio-lite-profile-test-{}",
         Utc::now().timestamp_nanos_opt().unwrap_or_default()

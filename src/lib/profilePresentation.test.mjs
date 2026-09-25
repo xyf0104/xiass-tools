@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { profileDisplayName } from "../../.tmp-tests/lib/profiles/presentation.js";
+import { profileDisplayName, profileModelOptionLabel, fetchedModelOptions } from "../../.tmp-tests/lib/profiles/presentation.js";
+
+test("fetched model list contains only distinct returned IDs, never builtin presets", () => {
+  const model = (id) => ({ id, name: id, supports1m: false });
+  assert.deepEqual(fetchedModelOptions([model(" gpt-6-sol "), model("gpt-6-sol"), model("gpt-6"), model("")]), [model("gpt-6-sol"), model("gpt-6")]);
+  assert.deepEqual(fetchedModelOptions([]), []);
+});
+
+test("model labels avoid repeating cosmetically identical names but keep distinct descriptions", () => {
+  assert.equal(profileModelOptionLabel({id: "gpt-6-sol", name: "GPT-6 Sol", supports1m: false}), "gpt-6-sol");
+  assert.equal(profileModelOptionLabel({id: "gpt-6", name: "GPT-6 (Astra)", supports1m: false}), "gpt-6 - GPT-6 (Astra)");
+});
 
 function profile(overrides = {}) {
   return {

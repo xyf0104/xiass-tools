@@ -7,15 +7,6 @@ pub(in crate::core::profile) const CODEX_ACTOR_AUTHORIZATION_VALUE: &str = "code
 pub(in crate::core::profile) const CODEX_ACTOR_AUTHORIZATION_INLINE_TOML: &str =
     r#"{ "x-openai-actor-authorization" = "codestudio-lite" }"#;
 
-const XIASS_CODEX_MODEL_IDS: &[&str] = &[
-    "gpt-6-astra",
-    "gpt-6-sol",
-    "gpt-6-luna",
-    "gpt-5.6-sol",
-    "gpt-5.6-terra",
-    "gpt-5.6-luna",
-];
-
 fn codex_web_search(profile: &ProfileDraft) -> &str {
     match profile.web_search.as_deref() {
         Some("cached") => "cached",
@@ -837,7 +828,6 @@ pub(in crate::core::profile) fn codex_gateway_config_content(
     document["model_providers"][&provider_id]["name"] = toml_edit::value(client.provider_name);
     document["model_providers"][&provider_id]["wire_api"] = toml_edit::value("responses");
     document["model_providers"][&provider_id]["base_url"] = toml_edit::value(client.base_url);
-    set_codex_provider_models(&mut document, &provider_id);
     set_managed_provider_auth(&mut document, &provider_id);
     repair_codex_preserved_auth_config(&mut document);
     render_valid_document(document)
@@ -875,7 +865,6 @@ pub(in crate::core::profile) fn codex_direct_config_content(
     document["model_providers"][&provider_id]["base_url"] = toml_edit::value(
         profile_runtime_base_url_for_protocol(&profile.protocol, &profile.base_url),
     );
-    set_codex_provider_models(&mut document, &provider_id);
     set_managed_provider_auth(&mut document, &provider_id);
     repair_codex_preserved_auth_config(&mut document);
     render_valid_document(document)
@@ -970,14 +959,6 @@ fn set_managed_provider_auth(document: &mut toml_edit::DocumentMut, provider_id:
         toml_edit::Value::from(CODEX_ACTOR_AUTHORIZATION_VALUE),
     );
     document["model_providers"][provider_id]["http_headers"] = toml_edit::value(headers);
-}
-
-fn set_codex_provider_models(document: &mut toml_edit::DocumentMut, provider_id: &str) {
-    let mut models = toml_edit::Array::new();
-    for model in XIASS_CODEX_MODEL_IDS {
-        models.push(*model);
-    }
-    document["model_providers"][provider_id]["models"] = toml_edit::value(models);
 }
 
 fn set_review_model(

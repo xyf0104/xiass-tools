@@ -48,6 +48,8 @@ pub(in crate::core::profile) struct NativeConfigLifecyclePlan {
 pub(in crate::core::profile) enum NativeConfigWriteKind {
     ProfileConfig,
     CodexAuthJson,
+    CodexModelCatalog,
+    CodexCatalogProfile,
     ClaudeVsCodePluginConfig,
     GeminiCodeAssistSettings,
     ClaudeDesktopDeploymentConfig,
@@ -73,7 +75,12 @@ pub(in crate::core::profile) fn apply_native_config_write_plan(
     write_native_config_with_privacy(
         &plan.path,
         &plan.content,
-        matches!(plan.kind, NativeConfigWriteKind::CodexAuthJson),
+        matches!(
+            plan.kind,
+            NativeConfigWriteKind::CodexAuthJson
+                | NativeConfigWriteKind::CodexModelCatalog
+                | NativeConfigWriteKind::CodexCatalogProfile
+        ),
     )
 }
 

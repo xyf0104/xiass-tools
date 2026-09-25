@@ -44,6 +44,7 @@
     profileIconTextTooLong,
     profileIconValue,
     profileModelOptionLabel,
+    fetchedModelOptions,
     providerIsOfficial
   } from "../lib/profiles/presentation";
   import {
@@ -163,6 +164,8 @@
   }
   onDestroy(clearEditAccount);
   let editModelOptions: ProfileModelOption[] = [];
+  let editModelRequestSerial = 0;
+  let observedEditModelRequestKey = "";
   let editModelLoading = false;
   let editModelError: string | null = null;
   let editModelLoadedKey = "";
@@ -381,10 +384,9 @@
         apiKey: editForm.apiKey
       })
     : "";
-  $: if (editModelLoadedKey && editModelLoadedKey !== editModelRequestKey) {
-    editModelOptions = builtInModelOptionsForTool(pendingEdit?.app ?? "");
-    editModelError = null;
-    editModelLoadedKey = "";
+  $: if (observedEditModelRequestKey !== editModelRequestKey) {
+    observedEditModelRequestKey = editModelRequestKey;
+    resetEditModels();
   }
   $: canSaveEdit =
     Boolean(pendingEdit) &&
@@ -417,7 +419,7 @@
     ? $t("profiles.fetchingModels")
     : editModelError
       ? editModelError
-      : editModelOptions.length > 0
+      : editModelLoadedKey && editModelOptions.length > 0
         ? $t("profiles.modelListLoaded", { count: editModelOptions.length })
         : null;
   async function openApply(profile: ProfileDraft) {
@@ -556,7 +558,9 @@
   }
 
   function resetEditModels() {
-    editModelOptions = builtInModelOptionsForTool(pendingEdit?.app ?? "");
+    editModelRequestSerial += 1;
+    editModelOptions = pendingEdit && providerIsOfficial(pendingEdit.provider)
+      ? builtInModelOptionsForTool(pendingEdit.app) : [];
     editModelLoading = false;
     editModelError = null;
     editModelLoadedKey = "";
@@ -566,19 +570,6 @@
     return canonicalProfileToolId(toolId) === "codex"
       ? XIASS_CODEX_MODEL_OPTIONS.map((option) => ({ ...option }))
       : [];
-  }
-
-  function mergeModelOptions(options: ProfileModelOption[], toolId: string): ProfileModelOption[] {
-    if (canonicalProfileToolId(toolId) !== "codex") {
-      return options;
-    }
-    const merged = new Map<string, ProfileModelOption>();
-    for (const option of builtInModelOptionsForTool(toolId)) merged.set(option.id, option);
-    for (const option of options) {
-      const id = option.id.trim();
-      if (id) merged.set(id, { ...option, id });
-    }
-    return [...merged.values()];
   }
 
   async function refreshEditModels() {
@@ -593,6 +584,7 @@
     editModelLoading = true;
     editModelError = null;
     const requestKey = editModelRequestKey;
+    const serial = ++editModelRequestSerial;
 
     try {
       const result = await listProfileModels({
@@ -604,17 +596,19 @@
         baseUrl: normalizeBaseUrl(editForm.baseUrl),
         apiKey: editForm.apiKey.trim() || null
       });
-      editModelOptions = mergeModelOptions(result.models, pendingEdit.app);
+      if (serial !== editModelRequestSerial || requestKey !== editModelRequestKey || !pendingEdit) return;
+      editModelOptions = fetchedModelOptions(result.models);
       editModelLoadedKey = requestKey;
       if (editModelOptions.length === 0) {
         editModelError = $t("profiles.modelListEmpty");
       }
     } catch (err) {
-      editModelOptions = builtInModelOptionsForTool(pendingEdit.app);
+      if (serial !== editModelRequestSerial || requestKey !== editModelRequestKey || !pendingEdit) return;
+      editModelOptions = [];
       editModelLoadedKey = "";
       editModelError = errorLabel(err instanceof Error ? err.message : String(err));
     } finally {
-      editModelLoading = false;
+      if (serial === editModelRequestSerial) editModelLoading = false;
     }
   }
 
@@ -836,15 +830,16 @@
     baseUrl: string;
     apiKey: string;
   }) {
-    return [
+    // In-memory only; changing one nonempty key to another invalidates results.
+    return JSON.stringify([
       input.profileId ?? "",
       input.app.trim(),
       input.mode,
       input.provider.trim(),
       input.protocol.trim(),
       normalizeBaseUrl(input.baseUrl),
-      input.apiKey.trim() ? "inline-key" : "stored-key"
-    ].join("|");
+      input.apiKey.trim()
+    ]);
   }
 
   const modelOptionLabel = profileModelOptionLabel;

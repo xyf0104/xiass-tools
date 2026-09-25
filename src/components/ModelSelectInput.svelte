@@ -4,6 +4,7 @@
   import { iconButtonRecipe } from "../../styled-system/recipes";
   import type { ProfileModelOption } from "../types";
   import AppIcon from "./AppIcon.svelte";
+  import { profileModelOptionLabel } from "../lib/profiles/presentation";
 
   export let id: string;
   export let value = "";
@@ -152,8 +153,7 @@
   });
 
   function defaultOptionLabel(option: ProfileModelOption) {
-    const label = option.name && option.name !== option.id ? `${option.id} - ${option.name}` : option.id;
-    return option.supports1m ? `${label} (1M)` : label;
+    return profileModelOptionLabel(option);
   }
 
   function activeOptionId(index: number) {

@@ -206,4 +206,50 @@ describe("Codex-only configuration wizard", () => {
     expect(ui.queryByLabelText("配置名称")).toBeNull();
     expect(ui.getByRole("button", { name: /Codex/ })).toBeTruthy();
   });
+
+  async function modelWizard() {
+    const ui = render(SetupWizard, { prefill: { toolId: "codex", mode: "config", lockTool: true }, snapshot: detection });
+    const key = ui.container.querySelector('input[type="password"]') as HTMLInputElement;
+    await fireEvent.input(key, { target: { value: "test-key-one" } });
+    return { ui, key };
+  }
+
+  it("counts only the API response, deduplicates IDs and clears it after changing the key", async () => {
+    calls.listModels.mockResolvedValueOnce({ models: [
+      { id: "gpt-6-sol", name: "GPT-6 Sol" },
+      { id: "gpt-6-sol", name: "GPT-6 Sol" },
+      { id: "backend-only", name: "backend-only" }
+    ] });
+    const { ui, key } = await modelWizard();
+    expect(ui.queryByText(/已获取.*个模型/)).toBeNull();
+    await fireEvent.click(ui.getByRole("button", { name: "获取模型" }));
+    await waitFor(() => expect(ui.getByText(/已获取 2 个模型/)).toBeTruthy());
+    await fireEvent.input(key, { target: { value: "test-key-two" } });
+    expect(ui.queryByText(/已获取.*个模型/)).toBeNull();
+  });
+
+  it("discards a late response for a previous API key", async () => {
+    let finish!: (value: unknown) => void;
+    calls.listModels.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const { ui, key } = await modelWizard();
+    await fireEvent.click(ui.getByRole("button", { name: "获取模型" }));
+    await fireEvent.input(key, { target: { value: "test-key-two" } });
+    calls.listModels.mockResolvedValueOnce({ models: [{ id: "new-key-model", name: "new-key-model" }] });
+    await fireEvent.click(ui.getByRole("button", { name: "获取模型" }));
+    await waitFor(() => expect(ui.getByText(/已获取 1 个模型/)).toBeTruthy());
+    finish({ models: [{ id: "old-a" }, { id: "old-b" }] });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(ui.queryByText(/已获取 2 个模型/)).toBeNull();
+    expect(ui.getByText(/已获取 1 个模型/)).toBeTruthy();
+  });
+
+  it.each(["empty", "error"])("does not invent models on an %s response", async (kind) => {
+    if (kind === "empty") calls.listModels.mockResolvedValueOnce({ models: [] });
+    else calls.listModels.mockRejectedValueOnce(new Error("test list failure"));
+    const { ui } = await modelWizard();
+    await fireEvent.click(ui.getByRole("button", { name: "获取模型" }));
+    await waitFor(() => expect(ui.queryByText("正在获取模型…")).toBeNull());
+    expect(ui.queryByText(/已获取.*个模型/)).toBeNull();
+    expect(ui.container.querySelectorAll('[role="option"]').length).toBe(0);
+  });
 });

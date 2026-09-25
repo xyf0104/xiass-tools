@@ -57,7 +57,7 @@ func (m *Manager) Inspect() (ConfigSnapshot, error) {
 	if _, plan, migrationErr := planLegacyProviderMigration(data, true); migrationErr == nil {
 		snapshot.LegacyProviderMigration = plan.status
 	}
-	snapshot.ConfiguredModels = configuredModels(snapshot.Model, snapshot.ReviewModel)
+	snapshot.ConfiguredModels = configuredModels(append(configuredCatalogModels(m.CodexHome, root), snapshot.Model, snapshot.ReviewModel)...)
 	return snapshot, nil
 }
 
@@ -139,15 +139,10 @@ func providersFromRoot(root map[string]any) []Provider {
 	return providers
 }
 
-func configuredModels(model, review string) []string {
+func configuredModels(candidates ...string) []string {
 	set := map[string]struct{}{}
-	for _, candidate := range BuiltInCodexModels {
+	for _, candidate := range candidates {
 		candidate = strings.TrimSpace(candidate)
-		if candidate != "" {
-			set[candidate] = struct{}{}
-		}
-	}
-	for _, candidate := range []string{strings.TrimSpace(model), strings.TrimSpace(review)} {
 		if candidate != "" {
 			set[candidate] = struct{}{}
 		}

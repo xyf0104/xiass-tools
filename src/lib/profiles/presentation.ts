@@ -47,6 +47,19 @@ export function profileIconTextTooLong(value: string): boolean {
 }
 
 export function profileModelOptionLabel(option: ProfileModelOption): string {
-  const label = option.name && option.name !== option.id ? `${option.id} - ${option.name}` : option.id;
+  // Do not repeat an ID merely because its display name uses capitals/spaces.
+  const comparable = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, "");
+  const label = option.name && comparable(option.name) !== comparable(option.id)
+    ? `${option.id} - ${option.name}` : option.id;
   return option.supports1m ? `${label} (1M)` : label;
+}
+
+/** A successful /models response is authoritative, not a request to add presets. */
+export function fetchedModelOptions(options: ProfileModelOption[]): ProfileModelOption[] {
+  const unique = new Map<string, ProfileModelOption>();
+  for (const option of options) {
+    const id = option.id.trim();
+    if (id && !unique.has(id)) unique.set(id, { ...option, id, name: option.name?.trim() || id });
+  }
+  return [...unique.values()];
 }
