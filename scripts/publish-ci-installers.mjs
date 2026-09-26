@@ -21,7 +21,11 @@ function command(bin, args, allowFailure = false) {
 }
 const gh = (...args) => command("gh", args).stdout.trim();
 const api = (path) => JSON.parse(gh("api", `repos/${repo}/${path}`));
-command("git", ["fetch", "origin", `refs/tags/${tag}:refs/tags/${tag}`]);
+// The workflow checkout may already have materialized the release tag locally.
+// Force-refresh the local tag instead of using a plain fetch, which fails with
+// "would clobber existing tag" even when the remote tag points to the exact
+// same commit. The source-run SHA checks below still fail closed on a mismatch.
+command("git", ["fetch", "--force", "origin", `refs/tags/${tag}:refs/tags/${tag}`]);
 const sha = command("git", ["rev-parse", `${tag}^{commit}`]).stdout.trim();
 const workflows = [".github/workflows/build-macos.yml", ".github/workflows/build-windows.yml"];
 for (let index = 0; index < runIds.length; index++) {
