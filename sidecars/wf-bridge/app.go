@@ -727,7 +727,7 @@ func (a *App) SaveModel(m storage.CustomModel) Result {
 	if err := storage.AddOrUpdateModel(m); err != nil {
 		return Result{OK: false, Message: err.Error()}
 	}
-	return Result{OK: true, Message: "模型已保存"}
+	return Result{OK: true, Message: "模型已保存；请重启 Antigravity 刷新模型列表。"}
 }
 
 // DefaultUpstreamConfig provides a useful first-run configuration without
@@ -1657,7 +1657,7 @@ func (a *App) DeleteModel(name string) Result {
 	if err := storage.DeleteModel(name); err != nil {
 		return Result{OK: false, Message: err.Error()}
 	}
-	return Result{OK: true, Message: "模型已删除"}
+	return Result{OK: true, Message: "模型已删除；请重启 Antigravity 刷新模型列表。"}
 }
 
 // ─── Patch ────────────────────────────────────────────────────────────────────

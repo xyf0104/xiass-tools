@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 	"github.com/andybalholm/brotli"
+	"github.com/xyf0104/xiass-tools/wf-bridge/internal/storage"
 )
 
 // modelFetchRoundTripper keeps fetchAvailableModels tests entirely local.
@@ -158,6 +158,75 @@ func TestInjectCustomModelsSupportsMapAndEverySortGroup(t *testing.T) {
 			if len(ids) == 0 || ids[0] != "custom-gpt-test" {
 				t.Fatalf("custom model missing from sort group: %v", ids)
 			}
+		}
+	}
+}
+
+func TestEnabledCatalogInjectsGPT6SolAndLunaIntoAntigravityPicker(t *testing.T) {
+	stateDir := t.TempDir()
+	storage.Init(stateDir)
+
+	enabled := true
+	disabled := false
+	models := []storage.CustomModel{
+		{Name: "models/gpt-6-sol", DisplayName: "gpt-6-sol", ExternalModelName: "gpt-6-sol", Enabled: &enabled},
+		{Name: "models/gpt-6-luna", DisplayName: "gpt-6-luna", ExternalModelName: "gpt-6-luna", Enabled: &enabled},
+		{Name: "models/disabled", DisplayName: "disabled", ExternalModelName: "disabled", Enabled: &disabled},
+	}
+	if err := storage.SaveModels(models); err != nil {
+		t.Fatal(err)
+	}
+	active, err := storage.LoadEnabledModels()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(active) != 2 {
+		t.Fatalf("enabled model catalog = %d, want 2", len(active))
+	}
+
+	parsed := map[string]any{
+		"models": map[string]any{
+			"native": map[string]any{"model": "MODEL_PLACEHOLDER_M0", "displayName": "Native"},
+		},
+		"agentModelSorts": []any{map[string]any{
+			"groups": []any{map[string]any{"modelIds": []any{"native"}}},
+		}},
+	}
+	summary := injectCustomModels(parsed, active)
+	if err := validateModelInjection(parsed, active, summary); err != nil {
+		t.Fatal(err)
+	}
+	if summary.customCount != 2 {
+		t.Fatalf("injected custom count = %d, want 2: %+v", summary.customCount, summary)
+	}
+
+	modelMap := parsed["models"].(map[string]any)
+	for _, modelID := range []string{"gpt-6-sol", "gpt-6-luna"} {
+		found := false
+		for slug, raw := range modelMap {
+			entry, ok := raw.(map[string]any)
+			if !ok || entry["displayName"] != modelID {
+				continue
+			}
+			if !strings.HasPrefix(slug, "custom-") {
+				t.Fatalf("%s received an invalid injected slug %q", modelID, slug)
+			}
+			found = true
+		}
+		if !found {
+			t.Fatalf("%s was not added to the Antigravity model map: %#v", modelID, modelMap)
+		}
+	}
+	ids := parsed["agentModelSorts"].([]any)[0].(map[string]any)["groups"].([]any)[0].(map[string]any)["modelIds"].([]any)
+	for _, modelID := range []string{"gpt-6-sol", "gpt-6-luna"} {
+		found := false
+		for _, rawID := range ids {
+			if slug, ok := rawID.(string); ok && strings.HasPrefix(slug, "custom-") && strings.Contains(slug, strings.ReplaceAll(modelID, ".", "-")) {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("%s was not added to the picker index: %#v", modelID, ids)
 		}
 	}
 }
